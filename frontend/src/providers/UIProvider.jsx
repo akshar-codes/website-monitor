@@ -8,10 +8,21 @@ import {
 
 const UIContext = createContext(null);
 
+const THEME_KEY = "theme";
+const SIDEBAR_COLLAPSED_KEY = "sidebar_collapsed";
+
 function getInitialTheme() {
-  const stored = localStorage.getItem("theme");
+  const stored = localStorage.getItem(THEME_KEY);
   if (stored && ["system", "light", "dark"].includes(stored)) return stored;
   return "system";
+}
+
+function getInitialCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+  } catch {
+    return false;
+  }
 }
 
 function resolveTheme(preference) {
@@ -24,7 +35,16 @@ function resolveTheme(preference) {
 }
 
 export function UIProvider({ children }) {
+  // ── Mobile drawer (sidebar) ──
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // ── Desktop sidebar collapse (icon-only rail) ──
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialCollapsed);
+
+  // ── Command palette (Ctrl+K / Cmd+K) ──
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // ── Theme ──
   const [themePreference, setThemePreference] = useState(getInitialTheme);
   const [resolvedTheme, setResolvedTheme] = useState(() =>
     resolveTheme(getInitialTheme()),
@@ -35,7 +55,7 @@ export function UIProvider({ children }) {
     const resolved = resolveTheme(themePreference);
     setResolvedTheme(resolved);
     document.documentElement.setAttribute("data-theme", resolved);
-    localStorage.setItem("theme", themePreference);
+    localStorage.setItem(THEME_KEY, themePreference);
   }, [themePreference]);
 
   // Listen for OS theme changes when preference is 'system'
@@ -51,8 +71,32 @@ export function UIProvider({ children }) {
     return () => mq.removeEventListener("change", handler);
   }, [themePreference]);
 
+  // Persist sidebar collapse preference
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+    } catch {
+      // localStorage unavailable (private browsing, storage quota, etc.) — safe to ignore
+    }
+  }, [sidebarCollapsed]);
+
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  const toggleSidebarCollapsed = useCallback(
+    () => setSidebarCollapsed((v) => !v),
+    [],
+  );
+
+  const openCommandPalette = useCallback(() => setCommandPaletteOpen(true), []);
+  const closeCommandPalette = useCallback(
+    () => setCommandPaletteOpen(false),
+    [],
+  );
+  const toggleCommandPalette = useCallback(
+    () => setCommandPaletteOpen((v) => !v),
+    [],
+  );
 
   const cycleTheme = useCallback(() => {
     setThemePreference((prev) => {
@@ -63,9 +107,19 @@ export function UIProvider({ children }) {
   }, []);
 
   const value = {
+    // mobile drawer
     sidebarOpen,
     toggleSidebar,
     closeSidebar,
+    // desktop collapse
+    sidebarCollapsed,
+    toggleSidebarCollapsed,
+    // command palette
+    commandPaletteOpen,
+    openCommandPalette,
+    closeCommandPalette,
+    toggleCommandPalette,
+    // theme
     themePreference,
     resolvedTheme,
     cycleTheme,
