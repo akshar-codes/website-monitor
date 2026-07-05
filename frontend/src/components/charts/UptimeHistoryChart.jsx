@@ -180,7 +180,7 @@ function UptimeHistoryChart({ data, window, loading }) {
           </h3>
         </div>
         <div
-          className="flex items-center justify-center h-[280px] text-sm"
+          className="flex items-center justify-center h-70 text-sm"
           style={{ color: "var(--text-tertiary)" }}
         >
           No uptime data available

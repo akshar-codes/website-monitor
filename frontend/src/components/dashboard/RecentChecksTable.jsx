@@ -96,7 +96,7 @@ function RecentChecksTable({ checks }) {
                       color: "var(--text-primary)",
                     }}
                   >
-                    <span className="truncate block max-w-40 sm:max-w-[220px]">
+                    <span className="truncate block max-w-40 sm:max-w-55">
                       {check.monitor?.name || "Unknown"}
                     </span>
                   </TableCell>

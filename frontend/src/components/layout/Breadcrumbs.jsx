@@ -80,7 +80,7 @@ function Breadcrumbs() {
           />
           {crumb.isLast ? (
             <span
-              className="text-sm font-semibold truncate max-w-[220px]"
+              className="text-sm font-semibold truncate max-w-55"
               style={{ color: "var(--text-primary)" }}
             >
               {crumb.label}
@@ -88,7 +88,7 @@ function Breadcrumbs() {
           ) : (
             <Link
               to={crumb.path}
-              className="text-sm font-medium truncate max-w-[160px] hover:underline"
+              className="text-sm font-medium truncate max-w-40 hover:underline"
               style={{ color: "var(--text-tertiary)" }}
             >
               {crumb.label}

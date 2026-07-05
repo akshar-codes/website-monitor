@@ -46,8 +46,8 @@ function TopBar() {
       id="topbar"
       className={`fixed top-0 right-0 left-0 z-30 flex items-center justify-between gap-3 px-4 md:px-6 ${
         sidebarCollapsed
-          ? "md:left-[var(--sidebar-collapsed)]"
-          : "md:left-[var(--sidebar-width)]"
+          ? "md:left-(--sidebar-collapsed)"
+          : "md:left-(--sidebar-width)"
       }`}
       style={{
         height: "var(--topbar-height)",

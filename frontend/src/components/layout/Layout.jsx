@@ -36,8 +36,8 @@ function Layout() {
       <div
         className={`flex-1 flex flex-col w-full ${
           sidebarCollapsed
-            ? "md:ml-[var(--sidebar-collapsed)]"
-            : "md:ml-[var(--sidebar-width)]"
+            ? "md:ml-(--sidebar-collapsed)"
+            : "md:ml-(--sidebar-width)"
         }`}
         style={{
           paddingTop: "var(--topbar-height)",

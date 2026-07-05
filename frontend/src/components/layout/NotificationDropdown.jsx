@@ -162,7 +162,7 @@ function NotificationDropdown() {
                     {incident.monitor?.name || "Unknown monitor"}
                   </span>
                 </div>
-                <RelativeTime date={incident.startedAt} className="!text-xs" />
+                <RelativeTime date={incident.startedAt} className="text-xs!" />
               </button>
             ))}
           </div>

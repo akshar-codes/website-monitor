@@ -204,7 +204,7 @@ function StatusTrendChart({ data, window, loading }) {
           Status Trend
         </h3>
         <div
-          className="flex items-center justify-center h-[280px] text-sm"
+          className="flex items-center justify-center h-70 text-sm"
           style={{ color: "var(--text-tertiary)" }}
         >
           No status trend data available

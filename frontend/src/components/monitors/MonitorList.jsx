@@ -104,13 +104,13 @@ function MonitorTableRow({
       <TableCell
         sx={{ ...cellSx, fontWeight: 600, color: "var(--text-primary)" }}
       >
-        <span className="truncate block max-w-[200px]">{monitor.name}</span>
+        <span className="truncate block max-w-50">{monitor.name}</span>
       </TableCell>
 
       {/* URL */}
       <TableCell sx={cellSx}>
         <span
-          className="truncate block max-w-[260px] text-xs font-mono"
+          className="truncate block max-w-65 text-xs font-mono"
           style={{ color: "var(--text-tertiary)" }}
         >
           {truncateUrl(monitor.url, 45)}

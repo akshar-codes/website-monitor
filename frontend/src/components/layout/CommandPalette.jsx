@@ -160,7 +160,7 @@ function CommandPalette() {
   return (
     <div
       id="command-palette-overlay"
-      className="fixed inset-0 z-[var(--z-modal)] flex items-start justify-center px-4"
+      className="fixed inset-0 z-(--z-modal) flex items-start justify-center px-4"
       style={{
         paddingTop: "12vh",
         background: "var(--surface-overlay)",
@@ -222,7 +222,7 @@ function CommandPalette() {
         </div>
 
         {/* Results */}
-        <div className="max-h-[360px] overflow-y-auto py-2">
+        <div className="max-h-90 overflow-y-auto py-2">
           {flatItems.length === 0 ? (
             <div
               className="py-10 text-center text-sm"

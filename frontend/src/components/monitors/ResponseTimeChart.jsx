@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { memo } from "react";
 import {
   LineChart,
   Line,
@@ -86,7 +86,7 @@ function ResponseTimeChart({ checks }) {
       </h3>
       {data.length === 0 ? (
         <div
-          className="flex items-center justify-center h-[300px] text-sm"
+          className="flex items-center justify-center h-75 text-sm"
           style={{ color: "var(--text-tertiary)" }}
         >
           No check data available
