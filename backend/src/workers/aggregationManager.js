@@ -1,4 +1,4 @@
-const DailyStat = require("../models/DailyStat.model");
+const DailyStat = require("../models/DailyStat");
 const logger = require("../utils/logger");
 
 const todayUTC = () => {
