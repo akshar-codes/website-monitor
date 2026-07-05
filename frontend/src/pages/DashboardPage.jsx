@@ -1,45 +1,40 @@
-import { memo, useMemo } from "react";
+import { memo, useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDashboard } from "../hooks/queries/useDashboard";
-import LoadingSkeleton from "../components/shared/LoadingSkeleton";
-import ErrorBanner from "../components/shared/ErrorBanner";
-import StatusCardGrid from "../components/dashboard/StatusCardGrid";
-import CurrentStatusBreakdown from "../components/dashboard/CurrentStatusBreakdown";
-import SystemUptimeGauge from "../components/dashboard/SystemUptimeGauge";
-import AvgResponseTimeCard from "../components/dashboard/AvgResponseTimeCard";
+import DashboardHeader from "../components/dashboard/DashboardHeader";
+import DashboardSkeleton from "../components/dashboard/DashboardSkeleton";
+import AvailabilityCards from "../components/dashboard/AvailabilityCards";
+import ResponseTimeTrendCard from "../components/dashboard/ResponseTimeTrendCard";
+import HealthOverviewPanel from "../components/dashboard/HealthOverviewPanel";
+import MonitorSummaryPanel from "../components/dashboard/MonitorSummaryPanel";
+import QuickActionsPanel from "../components/dashboard/QuickActionsPanel";
+import RecentEventsFeed from "../components/dashboard/RecentEventsFeed";
+import ActivityFeed from "../components/dashboard/ActivityFeed";
 import ActiveIncidentsList from "../components/dashboard/ActiveIncidentsList";
-import RecentChecksTable from "../components/dashboard/RecentChecksTable";
+import ErrorBanner from "../components/shared/ErrorBanner";
+import CreateMonitorModal from "../components/monitors/CreateMonitorModal";
 
 function DashboardPage() {
-  const { data, isLoading, isError, error, refetch } = useDashboard();
+  const { data, isLoading, isError, error, refetch, dataUpdatedAt } =
+    useDashboard();
+  const queryClient = useQueryClient();
+  const [createMonitorOpen, setCreateMonitorOpen] = useState(false);
 
-  const cardData = useMemo(
-    () =>
-      data
-        ? {
-            monitors: data.monitors,
-            activeIncidents: data.activeIncidents,
-          }
-        : null,
-    [data],
+  const handleRefreshAll = useCallback(() => {
+    queryClient.invalidateQueries();
+  }, [queryClient]);
+
+  const handleOpenCreateMonitor = useCallback(
+    () => setCreateMonitorOpen(true),
+    [],
+  );
+  const handleCloseCreateMonitor = useCallback(
+    () => setCreateMonitorOpen(false),
+    [],
   );
 
   if (isLoading) {
-    return (
-      <div className="space-y-6 animate-fade-in" id="dashboard-loading">
-        <LoadingSkeleton variant="card" count={4} />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-6">
-            <LoadingSkeleton variant="chart" count={1} />
-            <LoadingSkeleton variant="chart" count={1} />
-          </div>
-          <div className="space-y-6">
-            <LoadingSkeleton variant="chart" count={1} />
-            <LoadingSkeleton variant="card" count={1} />
-          </div>
-        </div>
-        <LoadingSkeleton variant="table" count={6} />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (isError) {
@@ -51,45 +46,51 @@ function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in" id="dashboard-page">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1
-            className="text-xl sm:text-2xl font-bold tracking-tight"
-            style={{ color: "var(--text-primary)" }}
-          >
-            Dashboard
-          </h1>
-          <p
-            className="text-sm mt-0.5"
-            style={{ color: "var(--text-tertiary)" }}
-          >
-            Real-time overview of your monitored services
-          </p>
+    <div id="dashboard-page" className="space-y-6 animate-fade-in pb-4">
+      {/* Header — title, live "updated" indicator, refresh, add monitor */}
+      <DashboardHeader
+        lastUpdatedAt={dataUpdatedAt}
+        onRefresh={handleRefreshAll}
+        onAddMonitor={handleOpenCreateMonitor}
+      />
+
+      {/* Availability — animated fleet-level stat cards */}
+      <AvailabilityCards data={data} />
+
+      {/* Primary grid — response time trend + monitor summary (left),
+          health overview + incidents + quick actions (right) */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        <div className="xl:col-span-2 space-y-5">
+          <ResponseTimeTrendCard
+            recentChecks={data?.recentChecks}
+            responseTime={data?.responseTime}
+          />
+          <MonitorSummaryPanel />
         </div>
-      </div>
 
-      {/* Status cards */}
-      <StatusCardGrid data={cardData} />
-
-      {/* Two-column layout: status breakdown + incidents | uptime gauge + response time */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left column */}
-        <div className="space-y-6">
-          <CurrentStatusBreakdown data={data?.currentStatus} />
+        <div className="space-y-5">
+          <HealthOverviewPanel
+            currentStatus={data?.currentStatus}
+            uptime={data?.uptime}
+          />
           <ActiveIncidentsList incidents={data?.activeIncidents?.latest} />
-        </div>
-
-        {/* Right column */}
-        <div className="space-y-6">
-          <SystemUptimeGauge data={data?.uptime} />
-          <AvgResponseTimeCard data={data?.responseTime} />
+          <QuickActionsPanel onAddMonitor={handleOpenCreateMonitor} />
         </div>
       </div>
 
-      {/* Recent checks table — full width */}
-      <RecentChecksTable checks={data?.recentChecks} />
+      {/* Secondary grid — recent notable events + full activity feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <RecentEventsFeed checks={data?.recentChecks} />
+        <ActivityFeed
+          recentChecks={data?.recentChecks}
+          incidents={data?.activeIncidents?.latest}
+        />
+      </div>
+
+      <CreateMonitorModal
+        open={createMonitorOpen}
+        onClose={handleCloseCreateMonitor}
+      />
     </div>
   );
 }
