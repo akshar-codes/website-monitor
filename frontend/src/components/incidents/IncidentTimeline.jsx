@@ -86,7 +86,7 @@ function IncidentTimeline({ incident }) {
                 </div>
                 {i < activeStages.length - 1 && (
                   <div
-                    className="w-0.5 flex-1 my-1 min-h-[32px]"
+                    className="w-0.5 flex-1 my-1 min-h-8"
                     style={{ background: "var(--border)" }}
                   />
                 )}
