@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const Incident = require("../models/Incident.model");
+const Incident = require("../models/Incident");
 const ApiError = require("../utils/ApiError");
 
 const WINDOW_MS = {
