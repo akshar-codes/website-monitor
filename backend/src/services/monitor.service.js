@@ -1,0 +1,90 @@
+const Monitor = require("../models/Monitor");
+const ApiError = require("../utils/ApiError");
+const normalizeUrl = require("../utils/normalizeUrl");
+
+const createMonitor = async (data) => {
+  data.url = normalizeUrl(data.url);
+
+  // Guard against duplicate URLs
+  const existing = await Monitor.findOne({ url: data.url });
+  if (existing) {
+    throw ApiError.conflict(`A monitor for "${data.url}" already exists`);
+  }
+
+  return Monitor.create(data);
+};
+
+const getMonitors = async ({ page, limit, active, sortBy, order }) => {
+  const filter = {};
+  if (active !== undefined) filter.active = active;
+
+  const sort = { [sortBy]: order === "asc" ? 1 : -1 };
+  const skip = (page - 1) * limit;
+
+  const [monitors, total] = await Promise.all([
+    Monitor.find(filter).sort(sort).skip(skip).limit(limit),
+    Monitor.countDocuments(filter),
+  ]);
+
+  return {
+    monitors,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
+};
+
+const getMonitorById = async (id) => {
+  const monitor = await Monitor.findById(id);
+  if (!monitor) {
+    throw ApiError.notFound(`Monitor not found with id: ${id}`);
+  }
+  return monitor;
+};
+
+const updateMonitor = async (id, data) => {
+  // Normalise URL if being changed
+  if (data.url) {
+    data.url = normalizeUrl(data.url);
+
+    const existing = await Monitor.findOne({
+      url: data.url,
+      _id: { $ne: id },
+    });
+    if (existing) {
+      throw ApiError.conflict(`A monitor for "${data.url}" already exists`);
+    }
+  }
+
+  // If the monitor is being reactivated, schedule an immediate check
+  if (data.active === true) {
+    data.nextCheckAt = new Date();
+  }
+
+  const monitor = await Monitor.findByIdAndUpdate(id, data, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (!monitor) {
+    throw ApiError.notFound(`Monitor not found with id: ${id}`);
+  }
+
+  return monitor;
+};
+
+const deleteMonitor = async (id) => {
+  const monitor = await Monitor.findByIdAndDelete(id);
+  if (!monitor) {
+    throw ApiError.notFound(`Monitor not found with id: ${id}`);
+  }
+  return monitor;
+};
+
+module.exports = {
+  createMonitor,
+  getMonitors,
+  getMonitorById,
+  updateMonitor,
+  deleteMonitor,
+};
