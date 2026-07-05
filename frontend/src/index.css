@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Design system — load order matters:
+   ============================================================ */
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+@import "./styles/components.css";
+@import "./styles/utilities.css";
+
+/* ============================================================
+   MUI bridge — align Material UI primitives with design tokens
+   ============================================================ */
+.MuiPaper-root {
+  background-color: var(--surface-raised) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border) !important;
+  background-image: none !important;
+}
+
+.MuiTableCell-root {
+  border-bottom-color: var(--border) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-sans) !important;
+}
+
+.MuiTableCell-head {
+  color: var(--text-secondary) !important;
+  font-weight: 600 !important;
+}
+
+.MuiButton-root {
+  font-family: var(--font-sans) !important;
+  text-transform: none !important;
+  border-radius: var(--radius-md) !important;
+  font-weight: 500 !important;
+}
+
+.MuiDialog-paper {
+  border-radius: var(--radius-xl) !important;
+}
+
+.MuiChip-root {
+  font-family: var(--font-sans) !important;
+}
+
+.MuiInputBase-root {
+  font-family: var(--font-sans) !important;
+}
+
+.MuiTooltip-tooltip {
+  font-family: var(--font-sans) !important;
+}
+
+.MuiMenu-paper,
+.MuiPopover-paper {
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.MuiSwitch-track {
+  opacity: 1 !important;
+  background-color: var(--border) !important;
+}
