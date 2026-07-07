@@ -46,45 +46,54 @@ function DashboardPage() {
   }
 
   return (
-    <div id="dashboard-page" className="space-y-6 animate-fade-in pb-4">
-      {/* Header — title, live "updated" indicator, refresh, add monitor */}
+    <div id="dashboard-page" className="space-y-8 animate-fade-in pb-4">
+      {/* Header — eyebrow date line, heading, action row */}
       <DashboardHeader
         lastUpdatedAt={dataUpdatedAt}
         onRefresh={handleRefreshAll}
         onAddMonitor={handleOpenCreateMonitor}
       />
 
-      {/* Availability — animated fleet-level stat cards */}
-      <AvailabilityCards data={data} />
+      {/* Overview — fleet-level stat cards */}
+      <div className="space-y-3">
+        <span className="u-eyebrow">Overview</span>
+        <AvailabilityCards data={data} />
+      </div>
 
-      {/* Primary grid — response time trend + monitor summary (left),
+      {/* Analytics — response time trend + monitor summary (left),
           health overview + incidents + quick actions (right) */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-2 space-y-5">
-          <ResponseTimeTrendCard
-            recentChecks={data?.recentChecks}
-            responseTime={data?.responseTime}
-          />
-          <MonitorSummaryPanel />
-        </div>
+      <div className="space-y-3">
+        <span className="u-eyebrow">Analytics</span>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+          <div className="xl:col-span-2 space-y-5">
+            <ResponseTimeTrendCard
+              recentChecks={data?.recentChecks}
+              responseTime={data?.responseTime}
+            />
+            <MonitorSummaryPanel />
+          </div>
 
-        <div className="space-y-5">
-          <HealthOverviewPanel
-            currentStatus={data?.currentStatus}
-            uptime={data?.uptime}
-          />
-          <ActiveIncidentsList incidents={data?.activeIncidents?.latest} />
-          <QuickActionsPanel onAddMonitor={handleOpenCreateMonitor} />
+          <div className="space-y-5">
+            <HealthOverviewPanel
+              currentStatus={data?.currentStatus}
+              uptime={data?.uptime}
+            />
+            <ActiveIncidentsList incidents={data?.activeIncidents?.latest} />
+            <QuickActionsPanel onAddMonitor={handleOpenCreateMonitor} />
+          </div>
         </div>
       </div>
 
-      {/* Secondary grid — recent notable events + full activity feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <RecentEventsFeed checks={data?.recentChecks} />
-        <ActivityFeed
-          recentChecks={data?.recentChecks}
-          incidents={data?.activeIncidents?.latest}
-        />
+      {/* Activity — recent notable events + full activity feed */}
+      <div className="space-y-3">
+        <span className="u-eyebrow">Activity</span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <RecentEventsFeed checks={data?.recentChecks} />
+          <ActivityFeed
+            recentChecks={data?.recentChecks}
+            incidents={data?.activeIncidents?.latest}
+          />
+        </div>
       </div>
 
       <CreateMonitorModal

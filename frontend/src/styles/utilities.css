@@ -50,29 +50,91 @@
 .u-elevation-5 {
   box-shadow: var(--shadow-xl);
 }
+.u-elevation-6 {
+  box-shadow: var(--shadow-2xl);
+}
 .u-elevation-glow {
   box-shadow: var(--shadow-glow-primary);
 }
+.u-elevation-glow-sm {
+  box-shadow: var(--shadow-glow-primary-sm);
+}
 
-/* Glass / premium surface treatment */
+/* ------------------------------------------------------------
+   Glassmorphism — the app's signature surface treatment.
+   `.u-glass` is the workhorse; `-strong` reduces see-through for
+   text-dense content; `-subtle` is for large ambient panels.
+   ------------------------------------------------------------ */
 .u-glass {
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur))
+    saturate(var(--glass-saturate));
+}
+.u-glass-strong {
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur))
+    saturate(var(--glass-saturate));
+}
+.u-glass-subtle {
   background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border: 1px solid var(--border);
+  backdrop-filter: blur(var(--glass-blur-sm)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(120%);
+  border: 1px solid var(--glass-border);
+}
+
+/* Ambient radial glow — apply to a positioned ancestor for a soft
+   emerald wash behind hero/feature panels. Use sparingly (one per view). */
+.u-ambient-glow {
+  position: relative;
+}
+.u-ambient-glow::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: var(--gradient-radial-glow);
+  pointer-events: none;
+  z-index: 0;
+}
+.u-ambient-glow > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Gradient text — premium emerald headline treatment, use sparingly */
 .u-gradient-text {
-  background: linear-gradient(
-    120deg,
-    var(--emerald-300),
-    var(--emerald-500) 60%,
-    var(--emerald-600)
-  );
+  background: var(--gradient-primary);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* Gradient border ring — reveals on hover for interactive glass surfaces */
+.u-gradient-border-hover {
+  position: relative;
+  border-radius: inherit;
+}
+.u-gradient-border-hover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--gradient-border);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.u-gradient-border-hover:hover::after {
+  opacity: 1;
 }
 
 /* Dividers */
@@ -169,4 +231,85 @@
 .u-hover-lift:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+}
+
+/* Glow-on-hover — for cards/buttons that should signal "primary action" */
+.u-glow-hover {
+  transition:
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
+}
+.u-glow-hover:hover {
+  box-shadow: var(--shadow-glow-primary-sm);
+  border-color: var(--primary);
+}
+
+/* ------------------------------------------------------------
+   Motion utilities — fade / scale / slide entrance animations
+   with staggered-list support. Respect prefers-reduced-motion
+   globally (handled in base.css).
+   ------------------------------------------------------------ */
+.u-anim-fade {
+  animation: fadeIn var(--transition-slow) var(--ease-decelerate) both;
+}
+.u-anim-scale {
+  animation: scaleIn var(--transition-spring) var(--ease-spring) both;
+}
+.u-anim-slide-up {
+  animation: slideUpIn var(--transition-slower) var(--ease-out-quart) both;
+}
+
+/* Stagger helper — pair with inline `style={{ animationDelay: \`${i * 40}ms\` }}`
+   on list items, or use the fixed steps below for simple lists. */
+.u-stagger > * {
+  animation: fadeIn var(--transition-slow) var(--ease-decelerate) both;
+}
+.u-stagger > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.u-stagger > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.u-stagger > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.u-stagger > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+.u-stagger > *:nth-child(5) {
+  animation-delay: 160ms;
+}
+.u-stagger > *:nth-child(6) {
+  animation-delay: 200ms;
+}
+.u-stagger > *:nth-child(n + 7) {
+  animation-delay: 240ms;
+}
+
+@keyframes slideUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ------------------------------------------------------------
+   Section eyebrow label — small uppercase tracked caption used
+   above a section heading (e.g. "OVERVIEW", "ANALYTICS",
+   "ACTIVITY") to establish the same visual hierarchy rhythm as
+   the reference dashboard's "OVERVIEW — 2026" / "ANALYTICS" /
+   "RECENT ACTIVITY" labels.
+   ------------------------------------------------------------ */
+.u-eyebrow {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
 }

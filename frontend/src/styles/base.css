@@ -28,6 +28,19 @@ body {
     color var(--transition-slow);
 }
 
+/* Premium ambient glow overlay — applied to body via pseudo-element */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 600px;
+  background: var(--gradient-radial-glow);
+  pointer-events: none;
+  z-index: 0;
+}
+
 a {
   color: var(--primary);
   text-decoration: none;
@@ -75,8 +88,8 @@ ol {
    Scrollbar
    ------------------------------------------------------------ */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -84,7 +97,7 @@ ol {
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: var(--radius-full);
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -92,14 +105,14 @@ ol {
 }
 
 /* ------------------------------------------------------------
-   Typography scale
+   Typography scale — premium tight tracking
    ------------------------------------------------------------ */
 h1,
 .text-h1 {
   font-size: var(--text-4xl);
   font-weight: var(--font-weight-extrabold);
   line-height: var(--leading-tight);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   color: var(--text-primary);
 }
 h2,
@@ -107,7 +120,7 @@ h2,
   font-size: var(--text-3xl);
   font-weight: var(--font-weight-bold);
   line-height: var(--leading-tight);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.025em;
   color: var(--text-primary);
 }
 h3,
@@ -115,7 +128,7 @@ h3,
   font-size: var(--text-2xl);
   font-weight: var(--font-weight-bold);
   line-height: var(--leading-snug);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
 }
 h4,
@@ -123,6 +136,7 @@ h4,
   font-size: var(--text-xl);
   font-weight: var(--font-weight-semibold);
   line-height: var(--leading-snug);
+  letter-spacing: -0.015em;
   color: var(--text-primary);
 }
 h5,
@@ -130,6 +144,7 @@ h5,
   font-size: var(--text-lg);
   font-weight: var(--font-weight-semibold);
   line-height: var(--leading-snug);
+  letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 h6,
@@ -157,12 +172,30 @@ h6,
   line-height: var(--leading-normal);
   color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 .text-code {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--text-secondary);
+}
+
+/* Premium number styling for dashboard stat values */
+.text-stat {
+  font-size: var(--text-4xl);
+  font-weight: var(--font-weight-extrabold);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.text-stat-sm {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------
@@ -239,6 +272,39 @@ h6,
   }
 }
 
+/* Premium glow pulse — for live status indicators */
+@keyframes glowPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.4),
+      0 0 32px rgba(16, 185, 129, 0.1);
+  }
+}
+
+/* Shine sweep — diagonal highlight sweep across cards */
+@keyframes shineSweep {
+  0% {
+    transform: translateX(-100%) rotate(0deg);
+  }
+  100% {
+    transform: translateX(200%) rotate(0deg);
+  }
+}
+
+/* Subtle float — gentle vertical hover animation */
+@keyframes subtleFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn var(--transition-slow) var(--ease-decelerate);
 }
@@ -253,6 +319,9 @@ h6,
 }
 .animate-scale-in {
   animation: scaleIn 160ms var(--ease-decelerate);
+}
+.animate-glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
 }
 
 /* ------------------------------------------------------------

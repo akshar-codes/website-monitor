@@ -28,16 +28,12 @@ function Layout() {
       {/* Command palette — mounted globally so Ctrl+K works from any page */}
       <CommandPalette />
 
-      {/*
-        Content column — offset by the sidebar's current width on desktop.
-        Kept as a single flex column (main + footer) so the footer sits
-        at the bottom of the viewport even on short pages.
-      */}
+      {/* Content column — offset by the sidebar's current width on desktop*/}
       <div
-        className={`flex-1 flex flex-col w-full ${
+        className={`app-content-shell flex-1 flex flex-col w-full ${
           sidebarCollapsed
-            ? "md:ml-(--sidebar-collapsed)"
-            : "md:ml-(--sidebar-width)"
+            ? "app-content-shell--collapsed"
+            : "app-content-shell--expanded"
         }`}
         style={{
           paddingTop: "var(--topbar-height)",
