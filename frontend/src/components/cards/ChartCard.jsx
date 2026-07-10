@@ -1,0 +1,79 @@
+import React from "react";
+import { cn } from "../../utils/cn";
+import { Skeleton } from "../ui/Skeleton";
+
+function WindowSelector({ options, value, onChange }) {
+  return (
+    <div className="flex items-center gap-0.5 rounded-lg border border-[#27272a] bg-[#18181b] p-0.5">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={cn(
+            "rounded-md px-2.5 py-1 text-[11px] font-medium transition-all",
+            value === opt.value
+              ? "bg-[#27272a] text-white"
+              : "text-[#52525b] hover:text-[#a1a1aa]",
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function ChartCard({
+  title,
+  subtitle,
+  children,
+  loading = false,
+  windows,
+  window: currentWindow,
+  onWindowChange,
+  action,
+  className,
+  height = 280,
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-[#1f1f23] bg-[#111113] p-6",
+        className,
+      )}
+    >
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-white">{title}</p>
+          {subtitle && (
+            <p className="mt-0.5 text-xs text-[#52525b]">{subtitle}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {windows && onWindowChange && (
+            <WindowSelector
+              options={windows}
+              value={currentWindow}
+              onChange={onWindowChange}
+            />
+          )}
+          {action}
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ height }} className="flex items-end gap-2 pb-4">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-sm bg-[#1f1f23]"
+              style={{ height: `${20 + Math.random() * 70}%` }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={{ height }}>{children}</div>
+      )}
+    </div>
+  );
+}
