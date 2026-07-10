@@ -1,34 +1,77 @@
-import React from "react";
-import { Button, Typography, Container, Box } from "@mui/material";
+import React, { Suspense } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "sonner";
+import AppLayout from "./components/layout/AppLayout";
+import Dashboard from "./pages/Dashboard";
+import Monitors from "./pages/Monitors";
+import Insights from "./pages/Insights";
+import { Skeleton } from "./components/ui/Skeleton";
 
-function App() {
+function PageFallback() {
   return (
-    // Using Tailwind for layout and background (min-h-screen, flex, bg-gray-100)
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      {/* Using MUI Container and Box with Tailwind for padding and shadows */}
-      <Container maxWidth="sm">
-        <Box className="p-8 bg-white rounded-2xl shadow-xl text-center">
-          <Typography
-            variant="h4"
-            component="h1"
-            gutterBottom
-            className="font-bold text-gray-800"
-          >
-            Frontend Initialized
-          </Typography>
-
-          <Typography variant="body1" className="mb-6 text-gray-600">
-            React + Material UI + Tailwind CSS
-          </Typography>
-
-          {/* MUI Button */}
-          <Button variant="contained" color="primary" size="large">
-            Get Started
-          </Button>
-        </Box>
-      </Container>
+    <div className="flex flex-1 flex-col gap-4 p-8">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-4 w-64" />
+      <div className="mt-4 grid grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 rounded-xl" />
+        ))}
+      </div>
+      <Skeleton className="mt-4 h-72 rounded-xl" />
     </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: "#18181b",
+            border: "1px solid #27272a",
+            color: "#fafafa",
+            fontSize: "13px",
+            borderRadius: "12px",
+          },
+          classNames: {
+            success: "!text-emerald-400",
+            error: "!text-red-400",
+          },
+        }}
+        richColors
+      />
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route
+            path="/"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <Dashboard />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/monitors"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <Monitors />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/insights"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <Insights />
+              </Suspense>
+            }
+          />
+          {/* Catch-all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
