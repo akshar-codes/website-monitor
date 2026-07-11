@@ -27,7 +27,7 @@ const WINDOWS = [
 
 function WindowSelector({ value, onChange }) {
   return (
-    <div className="flex items-center gap-0.5 rounded-lg border border-[#27272a] bg-[#18181b] p-0.5">
+    <div className="flex items-center gap-0.5 rounded-lg border border-border-default bg-bg-elevated p-0.5">
       {WINDOWS.map((w) => (
         <button
           key={w.value}
@@ -35,8 +35,8 @@ function WindowSelector({ value, onChange }) {
           className={cn(
             "rounded-md px-3 py-1 text-[11px] font-medium transition-all",
             value === w.value
-              ? "bg-[#27272a] text-white"
-              : "text-[#52525b] hover:text-[#a1a1aa]",
+              ? "bg-bg-subtle text-white"
+              : "text-text-muted hover:text-text-secondary",
           )}
         >
           {w.label}
@@ -260,11 +260,11 @@ export default function Insights() {
           </ChartCard>
 
           {/* Severity breakdown */}
-          <div className="rounded-xl border border-[#1f1f23] bg-[#111113] p-6">
+          <div className="rounded-xl border border-border-subtle bg-bg-surface p-6">
             <p className="mb-1 text-sm font-semibold text-white">
               Incident Severity
             </p>
-            <p className="mb-5 text-xs text-[#52525b]">
+            <p className="mb-5 text-xs text-text-muted">
               Breakdown by severity in window
             </p>
             {statsLoading ? (
@@ -272,10 +272,10 @@ export default function Insights() {
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="space-y-1.5">
                     <div className="flex justify-between">
-                      <div className="h-2.5 w-16 animate-pulse rounded bg-[#1f1f23]" />
-                      <div className="h-2.5 w-8 animate-pulse rounded bg-[#1f1f23]" />
+                      <div className="h-2.5 w-16 animate-pulse rounded bg-bg-overlay" />
+                      <div className="h-2.5 w-8 animate-pulse rounded bg-bg-overlay" />
                     </div>
-                    <div className="h-2 w-full animate-pulse rounded-full bg-[#1f1f23]" />
+                    <div className="h-2 w-full animate-pulse rounded-full bg-bg-overlay" />
                   </div>
                 ))}
               </div>
@@ -303,12 +303,12 @@ export default function Insights() {
                   return (
                     <div key={label}>
                       <div className="mb-1.5 flex items-center justify-between">
-                        <span className="text-xs text-[#a1a1aa]">{label}</span>
+                        <span className="text-xs text-text-secondary">{label}</span>
                         <span className="text-xs font-semibold text-white">
                           {value}
                         </span>
                       </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#27272a]">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle">
                         <div
                           className={`h-full rounded-full ${color} transition-all duration-500`}
                           style={{ width: `${pct}%` }}
@@ -322,11 +322,11 @@ export default function Insights() {
           </div>
 
           {/* Availability summary */}
-          <div className="rounded-xl border border-[#1f1f23] bg-[#111113] p-6">
+          <div className="rounded-xl border border-border-subtle bg-bg-surface p-6">
             <p className="mb-1 text-sm font-semibold text-white">
               Availability
             </p>
-            <p className="mb-5 text-xs text-[#52525b]">
+            <p className="mb-5 text-xs text-text-muted">
               Service health by monitor
             </p>
             {chartLoading ? (
@@ -336,13 +336,13 @@ export default function Insights() {
                     key={i}
                     className="flex items-center justify-between gap-3"
                   >
-                    <div className="h-2.5 w-28 animate-pulse rounded bg-[#1f1f23]" />
-                    <div className="h-2.5 w-12 animate-pulse rounded bg-[#1f1f23]" />
+                    <div className="h-2.5 w-28 animate-pulse rounded bg-bg-overlay" />
+                    <div className="h-2.5 w-12 animate-pulse rounded bg-bg-overlay" />
                   </div>
                 ))}
               </div>
             ) : !chartData?.monitors?.length ? (
-              <p className="text-sm text-[#52525b]">No monitors available</p>
+              <p className="text-sm text-text-muted">No monitors available</p>
             ) : (
               <div className="space-y-3">
                 {chartData.monitors.map((m) => {
@@ -359,13 +359,13 @@ export default function Insights() {
                       key={m.id}
                       className="flex items-center justify-between gap-3"
                     >
-                      <p className="truncate text-xs text-[#a1a1aa]">
+                      <p className="truncate text-xs text-text-secondary">
                         {m.name}
                       </p>
                       <p
                         className={`shrink-0 text-xs font-semibold ${
                           avg == null
-                            ? "text-[#52525b]"
+                            ? "text-text-muted"
                             : avg >= 99
                               ? "text-emerald-400"
                               : avg >= 95

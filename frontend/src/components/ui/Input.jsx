@@ -28,8 +28,8 @@ export const Input = forwardRef(function Input(
     <input
       ref={ref}
       className={cn(
-        "h-9 w-full rounded-lg border bg-[#18181b] px-3 text-sm text-white placeholder:text-[#3f3f46] outline-none transition-all",
-        "border-[#27272a] focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/10",
+        "h-9 w-full rounded-lg border bg-bg-elevated px-3 text-sm text-white placeholder:text-text-disabled outline-none transition-all",
+        "border-border-default focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/10",
         error &&
           "border-red-500/50 focus:border-red-500/50 focus:ring-red-500/10",
         "disabled:cursor-not-allowed disabled:opacity-50",
@@ -48,8 +48,8 @@ export const Textarea = forwardRef(function Textarea(
     <textarea
       ref={ref}
       className={cn(
-        "w-full rounded-lg border bg-[#18181b] px-3 py-2 text-sm text-white placeholder:text-[#3f3f46] outline-none transition-all resize-none",
-        "border-[#27272a] focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/10",
+        "w-full rounded-lg border bg-bg-elevated px-3 py-2 text-sm text-white placeholder:text-text-disabled outline-none transition-all resize-none",
+        "border-border-default focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/10",
         error && "border-red-500/50",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className,
@@ -67,8 +67,8 @@ export const Select = forwardRef(function Select(
     <select
       ref={ref}
       className={cn(
-        "h-9 w-full rounded-lg border bg-[#18181b] px-3 text-sm text-white outline-none transition-all appearance-none",
-        "border-[#27272a] focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/10",
+        "h-9 w-full rounded-lg border bg-bg-elevated px-3 text-sm text-white outline-none transition-all appearance-none",
+        "border-border-default focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/10",
         error && "border-red-500/50",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className,
@@ -85,7 +85,7 @@ export function FormField({ label, error, required, children, hint }) {
     <div className="space-y-1.5">
       {label && <Label required={required}>{label}</Label>}
       {children}
-      {hint && !error && <p className="text-[11px] text-[#52525b]">{hint}</p>}
+      {hint && !error && <p className="text-[11px] text-text-muted">{hint}</p>}
       {error && <p className="text-[11px] text-red-400">{error}</p>}
     </div>
   );

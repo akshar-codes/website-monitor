@@ -11,7 +11,7 @@ export function Modal({ open, onClose, children }) {
         <Dialog.Content
           className={cn(
             "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
-            "w-full max-w-lg rounded-2xl border border-[#27272a] bg-[#111113] shadow-2xl",
+            "w-full max-w-lg rounded-2xl border border-border-default bg-bg-surface shadow-2xl",
             "data-[state=open]:animate-fade-in",
             "focus:outline-none",
           )}
@@ -26,7 +26,7 @@ export function Modal({ open, onClose, children }) {
 
 export function ModalHeader({ title, description, onClose }) {
   return (
-    <div className="flex items-start justify-between border-b border-[#1f1f23] px-6 py-5">
+    <div className="flex items-start justify-between border-b border-border-subtle px-6 py-5">
       <div>
         <Dialog.Title className="text-base font-semibold text-white">
           {title}
@@ -40,7 +40,7 @@ export function ModalHeader({ title, description, onClose }) {
       {onClose && (
         <button
           onClick={onClose}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-[#71717a] transition-colors hover:bg-[#1f1f23] hover:text-white"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-[#71717a] transition-colors hover:bg-bg-overlay hover:text-white"
         >
           <X size={15} />
         </button>
@@ -57,7 +57,7 @@ export function ModalFooter({ children, className }) {
   return (
     <div
       className={cn(
-        "flex items-center justify-end gap-2 border-t border-[#1f1f23] px-6 py-4",
+        "flex items-center justify-end gap-2 border-t border-border-subtle px-6 py-4",
         className,
       )}
     >

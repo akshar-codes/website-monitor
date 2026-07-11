@@ -9,20 +9,20 @@ import Button from "../../components/ui/Button";
 
 function MonitorStatusCard({ name, url, status, responseTime }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-[#1f1f23] bg-[#18181b] px-4 py-3 transition-colors hover:border-[#27272a] hover:bg-[#1a1a1d]">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#111113]">
-        <span className="text-[10px] font-bold uppercase text-[#52525b]">
+    <div className="flex items-center gap-3 rounded-lg border border-border-subtle bg-bg-elevated px-4 py-3 transition-colors hover:border-border-default hover:bg-[#1a1a1d]">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-bg-surface">
+        <span className="text-[10px] font-bold uppercase text-text-muted">
           {getDomain(url)?.charAt(0) || "?"}
         </span>
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[#e4e4e7]">{name}</p>
-        <p className="truncate text-[11px] text-[#52525b]">{getDomain(url)}</p>
+        <p className="truncate text-[11px] text-text-muted">{getDomain(url)}</p>
       </div>
       <div className="shrink-0 text-right">
         <StatusBadge status={status} size="sm" />
         {responseTime != null && (
-          <p className="mt-0.5 text-[11px] text-[#52525b]">
+          <p className="mt-0.5 text-[11px] text-text-muted">
             {formatResponseTime(responseTime)}
           </p>
         )}
@@ -33,11 +33,11 @@ function MonitorStatusCard({ name, url, status, responseTime }) {
 
 export default function MonitorStatusGrid({ monitors = [], loading = false }) {
   return (
-    <div className="rounded-xl border border-[#1f1f23] bg-[#111113]">
-      <div className="flex items-center justify-between border-b border-[#1f1f23] px-5 py-4">
+    <div className="rounded-xl border border-border-subtle bg-bg-surface">
+      <div className="flex items-center justify-between border-b border-border-subtle px-5 py-4">
         <div>
           <p className="text-sm font-semibold text-white">Monitor Status</p>
-          <p className="text-xs text-[#52525b]">
+          <p className="text-xs text-text-muted">
             Current state of all active monitors
           </p>
         </div>
@@ -53,7 +53,7 @@ export default function MonitorStatusGrid({ monitors = [], loading = false }) {
         {loading ? (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-[58px] rounded-lg" />
+              <Skeleton key={i} className="h-14.5 rounded-lg" />
             ))}
           </div>
         ) : !monitors.length ? (

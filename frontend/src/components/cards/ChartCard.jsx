@@ -4,7 +4,7 @@ import { Skeleton } from "../ui/Skeleton";
 
 function WindowSelector({ options, value, onChange }) {
   return (
-    <div className="flex items-center gap-0.5 rounded-lg border border-[#27272a] bg-[#18181b] p-0.5">
+    <div className="flex items-center gap-0.5 rounded-lg border border-border-default bg-bg-elevated p-0.5">
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -12,8 +12,8 @@ function WindowSelector({ options, value, onChange }) {
           className={cn(
             "rounded-md px-2.5 py-1 text-[11px] font-medium transition-all",
             value === opt.value
-              ? "bg-[#27272a] text-white"
-              : "text-[#52525b] hover:text-[#a1a1aa]",
+              ? "bg-bg-subtle text-white"
+              : "text-text-muted hover:text-text-secondary",
           )}
         >
           {opt.label}
@@ -38,7 +38,7 @@ export default function ChartCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-[#1f1f23] bg-[#111113] p-6",
+        "rounded-xl border border-border-subtle bg-bg-surface p-6",
         className,
       )}
     >
@@ -46,7 +46,7 @@ export default function ChartCard({
         <div>
           <p className="text-sm font-semibold text-white">{title}</p>
           {subtitle && (
-            <p className="mt-0.5 text-xs text-[#52525b]">{subtitle}</p>
+            <p className="mt-0.5 text-xs text-text-muted">{subtitle}</p>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -66,7 +66,7 @@ export default function ChartCard({
           {Array.from({ length: 12 }).map((_, i) => (
             <div
               key={i}
-              className="flex-1 rounded-sm bg-[#1f1f23]"
+              className="flex-1 rounded-sm bg-bg-overlay"
               style={{ height: `${20 + Math.random() * 70}%` }}
             />
           ))}

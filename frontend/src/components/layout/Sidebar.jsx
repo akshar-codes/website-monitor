@@ -42,7 +42,7 @@ function NavItem({ item, collapsed }) {
       className={({ isActive }) =>
         cn(
           "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
-          "hover:bg-[#1f1f23] hover:text-white",
+          "hover:bg-bg-overlay hover:text-white",
           isActive
             ? "bg-[#1a2e22] text-emerald-400 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)]"
             : "text-[#71717a]",
@@ -61,12 +61,12 @@ function NavItem({ item, collapsed }) {
               "shrink-0 transition-colors",
               isActive
                 ? "text-emerald-400"
-                : "text-[#52525b] group-hover:text-[#a1a1aa]",
+                : "text-text-muted group-hover:text-text-secondary",
             )}
           />
           {!collapsed && <span className="truncate">{item.label}</span>}
           {collapsed && (
-            <span className="pointer-events-none absolute left-full ml-2 hidden whitespace-nowrap rounded-md bg-[#18181b] border border-[#27272a] px-2 py-1 text-xs text-white shadow-lg group-hover:block z-50">
+            <span className="pointer-events-none absolute left-full ml-2 hidden whitespace-nowrap rounded-md bg-bg-elevated border border-border-default px-2 py-1 text-xs text-white shadow-lg group-hover:block z-50">
               {item.label}
             </span>
           )}
@@ -82,14 +82,14 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative flex h-screen flex-col border-r border-[#1f1f23] bg-[#0d0d0f] transition-all duration-200",
-        collapsed ? "w-[60px]" : "w-[220px]",
+        "relative flex h-screen flex-col border-r border-border-subtle bg-[#0d0d0f] transition-all duration-200",
+        collapsed ? "w-15" : "w-55",
       )}
     >
       {/* Logo */}
       <div
         className={cn(
-          "flex items-center border-b border-[#1f1f23] py-4",
+          "flex items-center border-b border-border-subtle py-4",
           collapsed ? "justify-center px-3" : "gap-3 px-4",
         )}
       >
@@ -101,7 +101,7 @@ export default function Sidebar() {
             <p className="text-sm font-semibold text-white leading-tight">
               WebMonitor
             </p>
-            <p className="text-[11px] text-[#52525b]">Uptime Platform</p>
+            <p className="text-[11px] text-text-muted">Uptime Platform</p>
           </div>
         )}
       </div>
@@ -116,16 +116,18 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className={cn("border-t border-[#1f1f23] px-2 py-3 space-y-0.5")}>
+      <div
+        className={cn("border-t border-border-subtle px-2 py-3 space-y-0.5")}
+      >
         <button
           className={cn(
-            "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#71717a] transition-all hover:bg-[#1f1f23] hover:text-white",
+            "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#71717a] transition-all hover:bg-bg-overlay hover:text-white",
             collapsed && "justify-center px-2",
           )}
         >
           <User
             size={17}
-            className="shrink-0 text-[#52525b] group-hover:text-[#a1a1aa]"
+            className="shrink-0 text-text-muted group-hover:text-text-secondary"
           />
           {!collapsed && <span className="truncate">Profile</span>}
         </button>
@@ -138,21 +140,21 @@ export default function Sidebar() {
         >
           <LogOut
             size={17}
-            className="shrink-0 text-[#52525b] group-hover:text-red-400"
+            className="shrink-0 text-text-muted group-hover:text-red-400"
           />
           {!collapsed && <span className="truncate">Sign out</span>}
         </button>
 
         {/* Version */}
         {!collapsed && (
-          <p className="px-3 pt-2 text-[11px] text-[#3f3f46]">v1.0.0</p>
+          <p className="px-3 pt-2 text-[11px] text-text-disabled">v1.0.0</p>
         )}
       </div>
 
       {/* Collapse toggle */}
       <button
         onClick={() => setCollapsed((c) => !c)}
-        className="absolute -right-3 top-[68px] flex h-6 w-6 items-center justify-center rounded-full border border-[#27272a] bg-[#18181b] text-[#71717a] shadow-sm transition-all hover:border-[#3f3f46] hover:text-white z-10"
+        className="absolute -right-3 top-17 flex h-6 w-6 items-center justify-center rounded-full border border-border-default bg-bg-elevated text-[#71717a] shadow-sm transition-all hover:border-border-strong hover:text-white z-10"
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}

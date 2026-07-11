@@ -109,8 +109,8 @@ export default function Dashboard() {
         value: overview?.monitors?.total ?? "—",
         description: `${overview?.monitors?.active ?? 0} active`,
         icon: Monitor,
-        iconColor: "text-[#a1a1aa]",
-        iconBg: "bg-[#1f1f23]",
+        iconColor: "text-text-secondary",
+        iconBg: "bg-bg-overlay",
       },
       {
         label: "Online",
@@ -185,7 +185,7 @@ export default function Dashboard() {
             <p className="text-sm font-semibold text-white">
               {formatUptime(overview.uptime?.percentage)} uptime
             </p>
-            <p className="text-xs text-[#52525b]">
+            <p className="text-xs text-text-muted">
               {overview.uptime?.totalChecks?.toLocaleString()} checks in the
               last 24 hours ·{" "}
               {incidentCount > 0

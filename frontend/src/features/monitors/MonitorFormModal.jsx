@@ -136,12 +136,12 @@ export default function MonitorFormModal({
             </Select>
           </FormField>
 
-          <div className="flex items-center gap-3 rounded-lg border border-[#27272a] bg-[#18181b] px-4 py-3">
+          <div className="flex items-center gap-3 rounded-lg border border-border-default bg-bg-elevated px-4 py-3">
             <input
               type="checkbox"
               id="active"
               {...register("active")}
-              className="h-4 w-4 rounded border-[#3f3f46] bg-[#27272a] accent-emerald-500"
+              className="h-4 w-4 rounded border-border-strong bg-bg-subtle accent-emerald-500"
             />
             <div>
               <label
@@ -150,7 +150,7 @@ export default function MonitorFormModal({
               >
                 Active monitoring
               </label>
-              <p className="text-[11px] text-[#52525b]">
+              <p className="text-[11px] text-text-muted">
                 Disable to pause checks without deleting the monitor
               </p>
             </div>

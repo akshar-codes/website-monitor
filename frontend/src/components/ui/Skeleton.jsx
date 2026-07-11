@@ -3,7 +3,7 @@ import { cn } from "../../utils/cn";
 
 export function Skeleton({ className }) {
   return (
-    <div className={cn("animate-pulse rounded-md bg-[#1f1f23]", className)} />
+    <div className={cn("animate-pulse rounded-md bg-bg-overlay", className)} />
   );
 }
 
@@ -11,7 +11,7 @@ export function SkeletonCard({ className }) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-[#1f1f23] bg-[#111113] p-6",
+        "rounded-xl border border-border-subtle bg-bg-surface p-6",
         className,
       )}
     >

@@ -6,12 +6,12 @@ const VARIANTS = {
   primary:
     "bg-emerald-500 text-white hover:bg-emerald-600 shadow-[0_0_0_1px_rgba(16,185,129,0.3)]",
   secondary:
-    "bg-[#1f1f23] text-[#a1a1aa] border border-[#27272a] hover:bg-[#27272a] hover:text-white",
-  ghost: "text-[#71717a] hover:bg-[#1f1f23] hover:text-white",
+    "bg-bg-overlay text-text-secondary border border-border-default hover:bg-bg-subtle hover:text-white",
+  ghost: "text-[#71717a] hover:bg-bg-overlay hover:text-white",
   danger:
     "bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:text-red-300",
   outline:
-    "border border-[#27272a] bg-transparent text-[#a1a1aa] hover:bg-[#1f1f23] hover:text-white",
+    "border border-border-default bg-transparent text-text-secondary hover:bg-bg-overlay hover:text-white",
 };
 
 const SIZES = {

@@ -13,11 +13,11 @@ import { Activity } from "lucide-react";
 
 export default function RecentActivity({ checks = [], loading = false }) {
   return (
-    <div className="rounded-xl border border-[#1f1f23] bg-[#111113]">
-      <div className="flex items-center justify-between border-b border-[#1f1f23] px-5 py-4">
+    <div className="rounded-xl border border-border-subtle bg-bg-surface">
+      <div className="flex items-center justify-between border-b border-border-subtle px-5 py-4">
         <div>
           <p className="text-sm font-semibold text-white">Recent Activity</p>
-          <p className="text-xs text-[#52525b]">Latest health checks</p>
+          <p className="text-xs text-text-muted">Latest health checks</p>
         </div>
         <Link
           to="/monitors"
@@ -48,15 +48,15 @@ export default function RecentActivity({ checks = [], loading = false }) {
                 <p className="truncate text-sm font-medium text-[#e4e4e7]">
                   {check.monitor?.name || getDomain(check.monitor?.url)}
                 </p>
-                <p className="truncate text-xs text-[#52525b]">
+                <p className="truncate text-xs text-text-muted">
                   {getDomain(check.monitor?.url)}
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-xs font-medium text-[#a1a1aa]">
+                <p className="text-xs font-medium text-text-secondary">
                   {formatResponseTime(check.responseTime)}
                 </p>
-                <p className="text-[11px] text-[#3f3f46]">
+                <p className="text-[11px] text-text-disabled">
                   {formatRelative(check.checkedAt)}
                 </p>
               </div>

@@ -29,7 +29,7 @@ function IncidentRow({ incident }) {
           <SeverityBadge severity={incident.severity} />
           <IncidentStatusBadge status={incident.status} />
         </div>
-        <p className="mt-0.5 text-xs text-[#52525b]">
+        <p className="mt-0.5 text-xs text-text-muted">
           Started {formatRelative(incident.startedAt)} · {duration}
         </p>
       </div>
@@ -43,11 +43,11 @@ export default function ActiveIncidents({
   loading = false,
 }) {
   return (
-    <div className="rounded-xl border border-[#1f1f23] bg-[#111113]">
-      <div className="flex items-center justify-between border-b border-[#1f1f23] px-5 py-4">
+    <div className="rounded-xl border border-border-subtle bg-bg-surface">
+      <div className="flex items-center justify-between border-b border-border-subtle px-5 py-4">
         <div>
           <p className="text-sm font-semibold text-white">Active Incidents</p>
-          <p className="text-xs text-[#52525b]">
+          <p className="text-xs text-text-muted">
             {count > 0 ? `${count} unresolved` : "All systems operational"}
           </p>
         </div>

@@ -11,7 +11,7 @@ export default function DowntimeStatsCards({ stats, loading }) {
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="rounded-xl border border-[#1f1f23] bg-[#111113] p-5"
+            className="rounded-xl border border-border-subtle bg-bg-surface p-5"
           >
             <div className="space-y-3">
               <Skeleton className="h-3 w-24" />

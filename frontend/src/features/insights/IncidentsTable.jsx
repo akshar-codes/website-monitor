@@ -25,7 +25,9 @@ function IncidentTableRow({ incident }) {
         <p className="truncate text-sm font-medium text-white">
           {monitor?.name || getDomain(monitor?.url) || "Unknown"}
         </p>
-        <p className="truncate text-xs text-[#52525b]">{monitor?.url || "—"}</p>
+        <p className="truncate text-xs text-text-muted">
+          {monitor?.url || "—"}
+        </p>
       </div>
       <div>
         <SeverityBadge severity={incident.severity} />
@@ -34,17 +36,17 @@ function IncidentTableRow({ incident }) {
         <IncidentStatusBadge status={incident.status} />
       </div>
       <div>
-        <p className="text-xs text-[#a1a1aa]">
+        <p className="text-xs text-text-secondary">
           {formatRelative(incident.startedAt)}
         </p>
       </div>
       <div>
-        <p className="text-xs text-[#a1a1aa]">
+        <p className="text-xs text-text-secondary">
           {incident.duration ? formatDuration(incident.duration) : "Ongoing"}
         </p>
       </div>
       <div className="min-w-0">
-        <p className="truncate text-xs text-[#52525b]">
+        <p className="truncate text-xs text-text-muted">
           {incident.rootCause || "—"}
         </p>
       </div>
@@ -54,20 +56,20 @@ function IncidentTableRow({ incident }) {
 
 export default function IncidentsTable({ incidents = [], loading = false }) {
   return (
-    <div className="rounded-xl border border-[#1f1f23] bg-[#111113]">
-      <div className="border-b border-[#1f1f23] px-5 py-4">
+    <div className="rounded-xl border border-border-subtle bg-bg-surface">
+      <div className="border-b border-border-subtle px-5 py-4">
         <p className="text-sm font-semibold text-white">Incident History</p>
-        <p className="text-xs text-[#52525b] mt-0.5">
+        <p className="text-xs text-text-muted mt-0.5">
           All incidents in the selected window
         </p>
       </div>
 
       {/* Column headers */}
-      <div className="grid grid-cols-[1fr_90px_110px_130px_100px_1fr] items-center gap-3 border-b border-[#1f1f23] px-5 py-3">
+      <div className="grid grid-cols-[1fr_90px_110px_130px_100px_1fr] items-center gap-3 border-b border-border-subtle px-5 py-3">
         {COLUMN_HEADERS.map((h) => (
           <p
             key={h}
-            className="text-[11px] font-semibold uppercase tracking-wider text-[#3f3f46]"
+            className="text-[11px] font-semibold uppercase tracking-wider text-text-disabled"
           >
             {h}
           </p>
@@ -82,7 +84,7 @@ export default function IncidentsTable({ incidents = [], loading = false }) {
               className="grid grid-cols-[1fr_90px_110px_130px_100px_1fr] items-center gap-3 px-5 py-4"
             >
               {Array.from({ length: 6 }).map((_, j) => (
-                <Skeleton key={j} className="h-3 w-full max-w-[120px]" />
+                <Skeleton key={j} className="h-3 w-full max-w-30" />
               ))}
             </div>
           ))}

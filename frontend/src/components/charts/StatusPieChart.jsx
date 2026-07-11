@@ -22,7 +22,7 @@ export default function StatusPieChart({ data = [] }) {
   if (!chartData.length) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-[#52525b]">No monitor data</p>
+        <p className="text-sm text-text-muted">No monitor data</p>
       </div>
     );
   }

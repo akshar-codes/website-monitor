@@ -155,7 +155,7 @@ export default function Monitors() {
         <div className="relative flex-1 min-w-60 max-w-sm">
           <Search
             size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#52525b]"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
           />
           <Input
             value={search}
@@ -166,7 +166,7 @@ export default function Monitors() {
         </div>
 
         {/* Status filter pills */}
-        <div className="flex items-center gap-1 rounded-lg border border-[#27272a] bg-[#18181b] p-1">
+        <div className="flex items-center gap-1 rounded-lg border border-border-default bg-bg-elevated p-1">
           {STATUS_FILTERS.map((f) => (
             <button
               key={f.value}
@@ -177,8 +177,8 @@ export default function Monitors() {
               className={cn(
                 "rounded-md px-3 py-1 text-xs font-medium transition-all",
                 statusFilter === f.value
-                  ? "bg-[#27272a] text-white"
-                  : "text-[#52525b] hover:text-[#a1a1aa]",
+                  ? "bg-bg-subtle text-white"
+                  : "text-text-muted hover:text-text-secondary",
               )}
             >
               {f.label}
@@ -187,20 +187,20 @@ export default function Monitors() {
         </div>
 
         {pagination && (
-          <p className="ml-auto text-xs text-[#52525b]">
+          <p className="ml-auto text-xs text-text-muted">
             {pagination.total} monitor{pagination.total !== 1 ? "s" : ""}
           </p>
         )}
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-[#1f1f23] bg-[#111113]">
+      <div className="rounded-xl border border-border-subtle bg-bg-surface">
         {/* Column headers */}
-        <div className="grid grid-cols-[1fr_100px_100px_90px_90px_100px_40px] items-center gap-3 border-b border-[#1f1f23] px-5 py-3">
+        <div className="grid grid-cols-[1fr_100px_100px_90px_90px_100px_40px] items-center gap-3 border-b border-border-subtle px-5 py-3">
           {COLUMN_HEADERS.map((col, i) => (
             <p
               key={i}
-              className="text-[11px] font-semibold uppercase tracking-wider text-[#3f3f46]"
+              className="text-[11px] font-semibold uppercase tracking-wider text-text-disabled"
             >
               {col.label}
             </p>

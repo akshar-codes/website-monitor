@@ -22,7 +22,7 @@ export default function ConfirmDialog({
             <AlertTriangle size={20} className="text-red-400" />
           </div>
           <div>
-            <p className="text-sm text-[#a1a1aa]">
+            <p className="text-sm text-text-secondary">
               {description || "This action cannot be undone."}
             </p>
           </div>

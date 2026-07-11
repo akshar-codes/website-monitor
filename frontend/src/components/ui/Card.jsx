@@ -6,9 +6,9 @@ export function Card({ children, className, hover = false, onClick }) {
     <div
       onClick={onClick}
       className={cn(
-        "rounded-xl border border-[#1f1f23] bg-[#111113] p-6",
+        "rounded-xl border border-border-subtle bg-bg-surface p-6",
         hover &&
-          "cursor-pointer transition-all duration-150 hover:border-[#27272a] hover:bg-[#131315] hover:shadow-lg",
+          "cursor-pointer transition-all duration-150 hover:border-border-default hover:bg-[#131315] hover:shadow-lg",
         onClick && "cursor-pointer",
         className,
       )}
@@ -32,7 +32,7 @@ export function CardTitle({ children, className }) {
   return (
     <h3
       className={cn(
-        "text-sm font-medium text-[#a1a1aa] uppercase tracking-wider",
+        "text-sm font-medium text-text-secondary uppercase tracking-wider",
         className,
       )}
     >
@@ -52,5 +52,5 @@ export function CardValue({ children, className }) {
 }
 
 export function CardDescription({ children, className }) {
-  return <p className={cn("text-xs text-[#52525b]", className)}>{children}</p>;
+  return <p className={cn("text-xs text-text-muted", className)}>{children}</p>;
 }

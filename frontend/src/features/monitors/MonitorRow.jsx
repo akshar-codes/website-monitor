@@ -27,7 +27,7 @@ function ActionMenu({ monitor, onEdit, onToggle, onDelete }) {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-[#52525b] transition-colors hover:bg-[#27272a] hover:text-white"
+        className="flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-bg-subtle hover:text-white"
       >
         <MoreHorizontal size={15} />
       </button>
@@ -35,13 +35,13 @@ function ActionMenu({ monitor, onEdit, onToggle, onDelete }) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-20 w-44 rounded-xl border border-[#27272a] bg-[#18181b] py-1 shadow-2xl">
+          <div className="absolute right-0 top-8 z-20 w-44 rounded-xl border border-border-default bg-bg-elevated py-1 shadow-2xl">
             <button
               onClick={() => {
                 setOpen(false);
                 onEdit();
               }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-[#a1a1aa] transition-colors hover:bg-[#27272a] hover:text-white"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-white"
             >
               <Edit2 size={13} /> Edit
             </button>
@@ -50,12 +50,12 @@ function ActionMenu({ monitor, onEdit, onToggle, onDelete }) {
                 setOpen(false);
                 onToggle();
               }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-[#a1a1aa] transition-colors hover:bg-[#27272a] hover:text-white"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-white"
             >
               {monitor.active ? <Pause size={13} /> : <Play size={13} />}
               {monitor.active ? "Pause" : "Resume"}
             </button>
-            <div className="my-1 h-px bg-[#27272a]" />
+            <div className="my-1 h-px bg-bg-subtle" />
             <button
               onClick={() => {
                 setOpen(false);
@@ -93,19 +93,19 @@ export default function MonitorRow({
             {monitor.name}
           </p>
           {!monitor.active && (
-            <span className="shrink-0 rounded-full bg-[#27272a] px-1.5 py-0.5 text-[10px] font-medium text-[#71717a]">
+            <span className="shrink-0 rounded-full bg-bg-subtle px-1.5 py-0.5 text-[10px] font-medium text-[#71717a]">
               Paused
             </span>
           )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <p className="truncate text-xs text-[#52525b]">{monitor.url}</p>
+          <p className="truncate text-xs text-text-muted">{monitor.url}</p>
           <a
             href={monitor.url}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="shrink-0 text-[#3f3f46] hover:text-[#71717a] transition-colors"
+            className="shrink-0 text-text-disabled hover:text-[#71717a] transition-colors"
           >
             <ExternalLink size={11} />
           </a>
@@ -122,7 +122,7 @@ export default function MonitorRow({
         <p className="text-sm font-medium text-white">
           {uptime != null ? formatUptime(uptime) : "—"}
         </p>
-        <p className="text-[11px] text-[#52525b]">
+        <p className="text-[11px] text-text-muted">
           {stats?.uptime?.window || "24h"}
         </p>
       </div>
@@ -132,12 +132,12 @@ export default function MonitorRow({
         <p className="text-sm font-medium text-white">
           {avgRt != null ? formatResponseTime(avgRt) : "—"}
         </p>
-        <p className="text-[11px] text-[#52525b]">avg</p>
+        <p className="text-[11px] text-text-muted">avg</p>
       </div>
 
       {/* Interval */}
       <div>
-        <p className="text-sm text-[#a1a1aa]">
+        <p className="text-sm text-text-secondary">
           {formatInterval(monitor.interval)}
         </p>
       </div>

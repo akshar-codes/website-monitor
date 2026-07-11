@@ -12,14 +12,14 @@ export default function Pagination({
 
   return (
     <div className={cn("flex items-center justify-between", className)}>
-      <p className="text-xs text-[#52525b]">
+      <p className="text-xs text-text-muted">
         Page {page} of {totalPages}
       </p>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
-          className="flex h-7 w-7 items-center justify-center rounded-md border border-[#27272a] bg-[#18181b] text-[#71717a] transition-colors hover:bg-[#1f1f23] hover:text-white disabled:pointer-events-none disabled:opacity-30"
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-border-default bg-bg-elevated text-[#71717a] transition-colors hover:bg-bg-overlay hover:text-white disabled:pointer-events-none disabled:opacity-30"
         >
           <ChevronLeft size={13} />
         </button>
@@ -44,7 +44,7 @@ export default function Pagination({
                 "flex h-7 w-7 items-center justify-center rounded-md text-xs font-medium transition-colors",
                 pageNum === page
                   ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
-                  : "border border-[#27272a] bg-[#18181b] text-[#71717a] hover:bg-[#1f1f23] hover:text-white",
+                  : "border border-border-default bg-bg-elevated text-[#71717a] hover:bg-bg-overlay hover:text-white",
               )}
             >
               {pageNum}
@@ -55,7 +55,7 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
-          className="flex h-7 w-7 items-center justify-center rounded-md border border-[#27272a] bg-[#18181b] text-[#71717a] transition-colors hover:bg-[#1f1f23] hover:text-white disabled:pointer-events-none disabled:opacity-30"
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-border-default bg-bg-elevated text-[#71717a] transition-colors hover:bg-bg-overlay hover:text-white disabled:pointer-events-none disabled:opacity-30"
         >
           <ChevronRight size={13} />
         </button>

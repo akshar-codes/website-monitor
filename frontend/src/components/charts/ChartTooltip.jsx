@@ -12,7 +12,7 @@ export default function ChartTooltip({
   const displayLabel = labelFormatter ? labelFormatter(label) : label;
 
   return (
-    <div className="rounded-xl border border-[#27272a] bg-[#18181b] px-3 py-2.5 shadow-xl">
+    <div className="rounded-xl border border-border-default bg-bg-elevated px-3 py-2.5 shadow-xl">
       {displayLabel && (
         <p className="mb-2 text-[11px] font-semibold text-[#71717a]">
           {displayLabel}
@@ -25,7 +25,7 @@ export default function ChartTooltip({
               className="inline-block h-2 w-2 rounded-full shrink-0"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-[11px] text-[#a1a1aa]">{entry.name}</span>
+            <span className="text-[11px] text-text-secondary">{entry.name}</span>
             <span className="ml-auto pl-4 text-[11px] font-semibold text-white">
               {formatter ? formatter(entry.value, entry.name) : entry.value}
             </span>

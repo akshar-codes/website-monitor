@@ -28,8 +28,8 @@ function WindowBtn({ label, active, onClick }) {
       onClick={onClick}
       className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-all ${
         active
-          ? "bg-[#27272a] text-white"
-          : "text-[#52525b] hover:text-[#a1a1aa]"
+          ? "bg-bg-subtle text-white"
+          : "text-text-muted hover:text-text-secondary"
       }`}
     >
       {label}
@@ -43,17 +43,17 @@ export default function OverviewChart({ data: allData = {}, loading = false }) {
   const data = allData[window] || [];
 
   return (
-    <div className="rounded-xl border border-[#1f1f23] bg-[#111113] p-6">
+    <div className="rounded-xl border border-border-subtle bg-bg-surface p-6">
       <div className="mb-5 flex items-start justify-between">
         <div>
           <p className="text-sm font-semibold text-white">
             Response Time & Uptime
           </p>
-          <p className="text-xs text-[#52525b] mt-0.5">
+          <p className="text-xs text-text-muted mt-0.5">
             System-wide performance overview
           </p>
         </div>
-        <div className="flex items-center gap-0.5 rounded-lg border border-[#27272a] bg-[#18181b] p-0.5">
+        <div className="flex items-center gap-0.5 rounded-lg border border-border-default bg-bg-elevated p-0.5">
           {WINDOWS.map((w) => (
             <WindowBtn
               key={w.value}
@@ -71,7 +71,7 @@ export default function OverviewChart({ data: allData = {}, loading = false }) {
             {Array.from({ length: 14 }).map((_, i) => (
               <div
                 key={i}
-                className="flex-1 rounded-sm animate-pulse bg-[#1f1f23]"
+                className="flex-1 rounded-sm animate-pulse bg-bg-overlay"
                 style={{ height: `${25 + Math.random() * 65}%` }}
               />
             ))}
