@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import ChartTooltip from "../../components/charts/ChartTooltip";
 import { formatChartDate, formatResponseTime } from "../../utils/format";
-import { Skeleton } from "../../components/ui/Skeleton";
+
 import EmptyState from "../../components/ui/EmptyState";
 import { BarChart3 } from "lucide-react";
 
@@ -39,6 +39,9 @@ function WindowBtn({ label, active, onClick }) {
 
 export default function OverviewChart({ data: allData = {}, loading = false }) {
   const [window, setWindow] = useState("24h");
+  const [skeletonHeights] = useState(() =>
+    Array.from({ length: 14 }, () => 25 + Math.random() * 65),
+  );
 
   const data = allData[window] || [];
 
@@ -68,11 +71,11 @@ export default function OverviewChart({ data: allData = {}, loading = false }) {
       <div style={{ height: 280 }}>
         {loading ? (
           <div className="flex h-full items-end gap-2 pb-6">
-            {Array.from({ length: 14 }).map((_, i) => (
+            {skeletonHeights.map((h, i) => (
               <div
                 key={i}
                 className="flex-1 rounded-sm animate-pulse bg-bg-overlay"
-                style={{ height: `${25 + Math.random() * 65}%` }}
+                style={{ height: `${h}%` }}
               />
             ))}
           </div>

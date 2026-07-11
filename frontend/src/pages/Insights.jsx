@@ -1,22 +1,20 @@
-import React, { useState, useMemo } from "react";
-import { BarChart3, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { RefreshCw } from "lucide-react";
 import PageContainer from "../components/layout/PageContainer";
 import PageHeader from "../components/layout/PageHeader";
 import Button from "../components/ui/Button";
 import SectionLabel from "../components/ui/SectionLabel";
 import ChartCard from "../components/cards/ChartCard";
-import StatCard from "../components/cards/StatCard";
 import StatusPieChart from "../components/charts/StatusPieChart";
 import DowntimeStatsCards from "../features/insights/DowntimeStatsCards";
 import IncidentsTable from "../features/insights/IncidentsTable";
 import UptimeTrendChart from "../features/insights/UptimeTrendChart";
 import ResponseTimeTrendChart from "../features/insights/ResponseTimeTrendChart";
-import Pagination from "../components/ui/Pagination";
 import { useDowntimeStats, useIncidentList } from "../hooks/useInsights";
 import { useQuery } from "../hooks/useQuery";
 import * as monitorsApi from "../services/api/monitors";
 import * as dashboardApi from "../services/api/dashboard";
-import { formatUptime, formatResponseTime } from "../utils/format";
+import { formatUptime } from "../utils/format";
 import { cn } from "../utils/cn";
 
 const WINDOWS = [
@@ -141,7 +139,7 @@ function useStatusDistribution() {
 export default function Insights() {
   const [statsWindow, setStatsWindow] = useState("30d");
   const [chartWindow, setChartWindow] = useState("7d");
-  const [incidentPage, setIncidentPage] = useState(1);
+
 
   const {
     data: statsData,
@@ -150,13 +148,6 @@ export default function Insights() {
   } = useDowntimeStats({ window: statsWindow });
   const stats = statsData?.data;
 
-  const { data: incidentsData, loading: incidentsLoading } = useIncidentList({
-    page: incidentPage,
-    limit: 15,
-    status: "active",
-  });
-  const incidents = incidentsData?.data || [];
-  const incidentPagination = incidentsData?.pagination;
 
   const { data: allIncidentsData, loading: allIncidentsLoading } =
     useIncidentList({

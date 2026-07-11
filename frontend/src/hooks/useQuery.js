@@ -12,7 +12,9 @@ export function useQuery(fetchFn, deps = [], options = {}) {
   const [error, setError] = useState(null);
 
   const fetchFnRef = useRef(fetchFn);
-  fetchFnRef.current = fetchFn;
+  useEffect(() => {
+    fetchFnRef.current = fetchFn;
+  }, [fetchFn]);
 
   const isMountedRef = useRef(true);
 
@@ -43,7 +45,7 @@ export function useQuery(fetchFn, deps = [], options = {}) {
         setLoading(false);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/use-memo
   }, deps);
 
   useEffect(() => {

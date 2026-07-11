@@ -1,4 +1,4 @@
-import React from "react";
+
 import {
   ResponsiveContainer,
   PieChart,
@@ -48,7 +48,7 @@ export default function StatusPieChart({ data = [] }) {
           ))}
         </Pie>
         <Tooltip
-          content={<ChartTooltip formatter={(v, name) => `${v} monitors`} />}
+          content={<ChartTooltip formatter={(v) => `${v} monitors`} />}
         />
         <Legend
           wrapperStyle={{ fontSize: 11, color: "#71717a", paddingTop: 8 }}

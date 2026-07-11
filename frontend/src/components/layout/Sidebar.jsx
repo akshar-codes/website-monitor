@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   Monitor,
@@ -9,7 +9,6 @@ import {
   ChevronRight,
   LogOut,
   User,
-  Zap,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 

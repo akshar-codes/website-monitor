@@ -1,4 +1,3 @@
-import React from "react";
 import { AlertTriangle, Clock, TrendingDown, Shield } from "lucide-react";
 import StatCard from "../../components/cards/StatCard";
 import { formatDuration } from "../../utils/format";

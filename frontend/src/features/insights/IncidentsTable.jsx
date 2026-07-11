@@ -1,5 +1,4 @@
-import React from "react";
-import { AlertTriangle, CheckCircle } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import {
   SeverityBadge,
   IncidentStatusBadge,

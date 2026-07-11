@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import {
   Monitor,
   CheckCircle,
@@ -7,7 +7,6 @@ import {
   RefreshCw,
   AlertTriangle,
   TrendingUp,
-  Activity,
 } from "lucide-react";
 import PageContainer from "../components/layout/PageContainer";
 import PageHeader from "../components/layout/PageHeader";
@@ -23,7 +22,6 @@ import {
   useRecentHealthChecks,
   useActiveIncidents,
 } from "../hooks/useMonitors";
-import { useMonitorChartData } from "../hooks/useMonitors";
 import { formatResponseTime, formatUptime } from "../utils/format";
 import { useQuery } from "../hooks/useQuery";
 import * as dashboardApi from "../services/api/dashboard";

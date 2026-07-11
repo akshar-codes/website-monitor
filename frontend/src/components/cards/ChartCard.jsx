@@ -1,6 +1,5 @@
-import React from "react";
+import { useState } from "react";
 import { cn } from "../../utils/cn";
-import { Skeleton } from "../ui/Skeleton";
 
 function WindowSelector({ options, value, onChange }) {
   return (
@@ -35,6 +34,9 @@ export default function ChartCard({
   className,
   height = 280,
 }) {
+  const [skeletonHeights] = useState(() =>
+    Array.from({ length: 12 }, () => 20 + Math.random() * 70),
+  );
   return (
     <div
       className={cn(
@@ -63,11 +65,11 @@ export default function ChartCard({
 
       {loading ? (
         <div style={{ height }} className="flex items-end gap-2 pb-4">
-          {Array.from({ length: 12 }).map((_, i) => (
+          {skeletonHeights.map((h, i) => (
             <div
               key={i}
               className="flex-1 rounded-sm bg-bg-overlay"
-              style={{ height: `${20 + Math.random() * 70}%` }}
+              style={{ height: `${h}%` }}
             />
           ))}
         </div>

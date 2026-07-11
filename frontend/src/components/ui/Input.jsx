@@ -1,4 +1,4 @@
-import React, { forwardRef } from "react";
+import { forwardRef } from "react";
 import { cn } from "../../utils/cn";
 
 export const Label = forwardRef(function Label(

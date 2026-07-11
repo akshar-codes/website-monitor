@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Plus, Search, Monitor, RefreshCw } from "lucide-react";
 import PageContainer from "../components/layout/PageContainer";
 import PageHeader from "../components/layout/PageHeader";
@@ -70,12 +70,12 @@ export default function Monitors() {
   }, [page, statusFilter]);
 
   const { data: monitorsData, loading, refetch } = useMonitorList(listParams);
-  const monitors = monitorsData?.data || [];
+  const monitors = useMemo(() => monitorsData?.data || [], [monitorsData]);
   const pagination = monitorsData?.pagination;
 
   // statsMap initializes as null from useQuery; guard with ?? {} so map access
   // never throws regardless of fetch state (null default only catches undefined).
-  const { data: statsMapRaw, loading: statsLoading } =
+  const { data: statsMapRaw } =
     useMonitorsWithStats(monitors);
   const statsMap = statsMapRaw ?? {};
 

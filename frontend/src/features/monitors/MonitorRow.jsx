@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   MoreHorizontal,
   Edit2,
@@ -13,9 +13,7 @@ import {
   formatUptime,
   formatRelative,
   formatInterval,
-  getDomain,
 } from "../../utils/format";
-import { cn } from "../../utils/cn";
 
 function ActionMenu({ monitor, onEdit, onToggle, onDelete }) {
   const [open, setOpen] = useState(false);
