@@ -1,17 +1,15 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { Plus, Search, Filter, Monitor, RefreshCw } from "lucide-react";
+import { Plus, Search, Monitor, RefreshCw } from "lucide-react";
 import PageContainer from "../components/layout/PageContainer";
 import PageHeader from "../components/layout/PageHeader";
 import Button from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
-import StatusBadge from "../components/ui/StatusBadge";
 import MonitorRow from "../features/monitors/MonitorRow";
 import MonitorFormModal from "../features/monitors/MonitorFormModal";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Pagination from "../components/ui/Pagination";
 import EmptyState from "../components/ui/EmptyState";
 import { SkeletonRow } from "../components/ui/Skeleton";
-import SectionLabel from "../components/ui/SectionLabel";
 import { useMonitorList, useMonitorMutations } from "../hooks/useMonitors";
 import { useQuery } from "../hooks/useQuery";
 import * as dashboardApi from "../services/api/dashboard";
@@ -24,13 +22,13 @@ const STATUS_FILTERS = [
 ];
 
 const COLUMN_HEADERS = [
-  { label: "Monitor", flex: true },
-  { label: "Status", width: 100 },
-  { label: "Uptime", width: 100 },
-  { label: "Response", width: 90 },
-  { label: "Interval", width: 90 },
-  { label: "Last check", width: 100 },
-  { label: "", width: 40 },
+  { label: "Monitor" },
+  { label: "Status" },
+  { label: "Uptime" },
+  { label: "Response" },
+  { label: "Interval" },
+  { label: "Last check" },
+  { label: "" },
 ];
 
 function useMonitorsWithStats(monitors = []) {
@@ -75,8 +73,11 @@ export default function Monitors() {
   const monitors = monitorsData?.data || [];
   const pagination = monitorsData?.pagination;
 
-  const { data: statsMap = {}, loading: statsLoading } =
+  // statsMap initializes as null from useQuery; guard with ?? {} so map access
+  // never throws regardless of fetch state (null default only catches undefined).
+  const { data: statsMapRaw, loading: statsLoading } =
     useMonitorsWithStats(monitors);
+  const statsMap = statsMapRaw ?? {};
 
   const handleMutationSuccess = useCallback(() => {
     setFormOpen(false);

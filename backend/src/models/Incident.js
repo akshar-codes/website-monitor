@@ -140,14 +140,10 @@ incidentSchema.index({ monitor: 1, duration: 1 });
 // Middleware
 // ─────────────────────────────────────────────
 
-/**
- * Auto-compute duration when an incident is resolved.
- */
-incidentSchema.pre("save", function (next) {
+incidentSchema.pre("save", async function () {
   if (this.endedAt && this.startedAt) {
     this.duration = Math.round((this.endedAt - this.startedAt) / 1000);
   }
-  next();
 });
 
 // ─────────────────────────────────────────────

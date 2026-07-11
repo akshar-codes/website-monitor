@@ -80,7 +80,8 @@ const updateDailyStat = async (monitor, healthCheck) => {
           },
         },
       ],
-      { upsert: true, new: true },
+
+      { upsert: true, new: true, updatePipeline: true },
     );
 
     return stat;
