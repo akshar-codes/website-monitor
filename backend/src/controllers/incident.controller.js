@@ -1,31 +1,13 @@
 import asyncHandler from "../utils/asyncHandler.js";
-import ApiError from "../utils/ApiError.js";
-import incidentService from "../services/incident.service.js";
+import * as incidentService from "../services/incident.service.js";
+import { assertObjectId, validate } from "../utils/controllerHelpers.js";
 import {
   listIncidentsSchema,
   updateStatusSchema,
   downtimeStatsSchema,
 } from "../validators/incident.validator.js";
-import mongoose from "mongoose";
 
-// ── Helpers ──
-
-const assertObjectId = (id) => {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw ApiError.badRequest(`Invalid ID format: ${id}`);
-  }
-};
-
-const validate = (schema, data) => {
-  const result = schema.safeParse(data);
-  if (!result.success) {
-    const messages = result.error.errors.map((e) => e.message).join("; ");
-    throw ApiError.badRequest(messages);
-  }
-  return result.data;
-};
-
-// ── Controllers ──
+// ── Controllers ──────────────────────────────────────────────────────────────
 
 /**
  * GET /api/incidents

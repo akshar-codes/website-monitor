@@ -1,37 +1,13 @@
 import asyncHandler from "../utils/asyncHandler.js";
-import ApiError from "../utils/ApiError.js";
-import monitorService from "../services/monitor.service.js";
+import * as monitorService from "../services/monitor.service.js";
+import { assertObjectId, validate } from "../utils/controllerHelpers.js";
 import {
   createMonitorSchema,
   updateMonitorSchema,
   listMonitorsSchema,
 } from "../validators/monitor.validator.js";
-import mongoose from "mongoose";
 
-// ── Helpers ──
-
-/**
- * Validate that `id` is a valid Mongo ObjectId.
- */
-const assertObjectId = (id) => {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw ApiError.badRequest(`Invalid ID format: ${id}`);
-  }
-};
-
-/**
- * Parse a Zod schema and throw a 400 ApiError on failure.
- */
-const validate = (schema, data) => {
-  const result = schema.safeParse(data);
-  if (!result.success) {
-    const messages = result.error.errors.map((e) => e.message).join("; ");
-    throw ApiError.badRequest(messages);
-  }
-  return result.data;
-};
-
-// ── Controllers ──
+// ── Controllers ──────────────────────────────────────────────────────────────
 
 /**
  * POST /api/monitors

@@ -1,37 +1,13 @@
 import asyncHandler from "../utils/asyncHandler.js";
-import ApiError from "../utils/ApiError.js";
-import dashboardService from "../services/dashboard.service.js";
+import * as dashboardService from "../services/dashboard.service.js";
+import { assertObjectId, validate } from "../utils/controllerHelpers.js";
 import {
   incidentsQuerySchema,
   healthChecksQuerySchema,
   monitorStatsQuerySchema,
 } from "../validators/dashboard.validator.js";
-import mongoose from "mongoose";
 
-// ── Helpers ──
-
-/**
- * Validate that `id` is a valid Mongo ObjectId.
- */
-const assertObjectId = (id) => {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw ApiError.badRequest(`Invalid ID format: ${id}`);
-  }
-};
-
-/**
- * Parse a Zod schema and throw a 400 ApiError on failure.
- */
-const validate = (schema, data) => {
-  const result = schema.safeParse(data);
-  if (!result.success) {
-    const messages = result.error.errors.map((e) => e.message).join("; ");
-    throw ApiError.badRequest(messages);
-  }
-  return result.data;
-};
-
-// ── Controllers ──
+// ── Controllers ──────────────────────────────────────────────────────────────
 
 /**
  * GET /api/dashboard/overview
@@ -72,7 +48,6 @@ export const getActiveIncidents = asyncHandler(async (req, res) => {
 export const getRecentHealthChecks = asyncHandler(async (req, res) => {
   const query = validate(healthChecksQuerySchema, req.query);
 
-  // Validate monitorId format if provided
   if (query.monitorId) {
     assertObjectId(query.monitorId);
   }
@@ -107,7 +82,10 @@ export const getMonitorStats = asyncHandler(async (req, res) => {
 export const getMonitorChartData = asyncHandler(async (req, res) => {
   assertObjectId(req.params.id);
   const query = validate(monitorStatsQuerySchema, req.query);
-  const data = await dashboardService.getMonitorChartData(req.params.id, query);
+  const data = await dashboardService.getMonitorChartData(
+    req.params.id,
+    query,
+  );
 
   res.json({
     success: true,
