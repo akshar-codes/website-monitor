@@ -12,4 +12,4 @@ const normalizeUrl = (urlString) => {
   return parsed.toString().replace(/\/+$/, "");
 };
 
-module.exports = normalizeUrl;
+export default normalizeUrl;

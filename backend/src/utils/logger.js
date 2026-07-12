@@ -1,6 +1,10 @@
+import { createLogger, format, transports } from "winston";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const { createLogger, format, transports } = require("winston");
-const path = require("path");
+// Derive __dirname equivalent in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const LOG_DIR = path.resolve(__dirname, "../../logs");
 
@@ -44,4 +48,4 @@ if (process.env.NODE_ENV !== "production") {
   );
 }
 
-module.exports = logger;
+export default logger;
