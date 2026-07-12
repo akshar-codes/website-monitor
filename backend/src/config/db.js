@@ -2,9 +2,9 @@
  * MongoDB connection via Mongoose
  */
 
-const mongoose = require("mongoose");
-const env = require("./env");
-const logger = require("../utils/logger");
+import mongoose from "mongoose";
+import env from "./env.js";
+import logger from "../utils/logger.js";
 
 const connectDB = async () => {
   try {
@@ -25,4 +25,4 @@ mongoose.connection.on("reconnected", () => {
   logger.info("MongoDB reconnected");
 });
 
-module.exports = connectDB;
+export default connectDB;

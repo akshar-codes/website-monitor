@@ -3,8 +3,13 @@
  * Loads and validates all environment variables in one place.
  */
 
-const dotenv = require("dotenv");
-const path = require("path");
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Derive __dirname equivalent in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load .env from project root
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
@@ -50,4 +55,4 @@ const env = {
   },
 };
 
-module.exports = env;
+export default env;
