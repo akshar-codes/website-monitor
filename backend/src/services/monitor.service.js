@@ -2,10 +2,9 @@ import Monitor from "../models/Monitor.js";
 import ApiError from "../utils/ApiError.js";
 import normalizeUrl from "../utils/normalizeUrl.js";
 
-const createMonitor = async (data) => {
-  data.url = normalizeUrl(data.url);
+// ── Service methods ───────────────────────────────────────────────────────────
 
-  // Guard against duplicate URLs
+export const createMonitor = async (data) => {
   const existing = await Monitor.findOne({ url: data.url });
   if (existing) {
     throw ApiError.conflict(`A monitor for "${data.url}" already exists`);
@@ -14,7 +13,7 @@ const createMonitor = async (data) => {
   return Monitor.create(data);
 };
 
-const getMonitors = async ({ page, limit, active, sortBy, order }) => {
+export const getMonitors = async ({ page, limit, active, sortBy, order }) => {
   const filter = {};
   if (active !== undefined) filter.active = active;
 
@@ -34,7 +33,7 @@ const getMonitors = async ({ page, limit, active, sortBy, order }) => {
   };
 };
 
-const getMonitorById = async (id) => {
+export const getMonitorById = async (id) => {
   const monitor = await Monitor.findById(id);
   if (!monitor) {
     throw ApiError.notFound(`Monitor not found with id: ${id}`);
@@ -42,8 +41,7 @@ const getMonitorById = async (id) => {
   return monitor;
 };
 
-const updateMonitor = async (id, data) => {
-  // Normalise URL if being changed
+export const updateMonitor = async (id, data) => {
   if (data.url) {
     data.url = normalizeUrl(data.url);
 
@@ -56,7 +54,7 @@ const updateMonitor = async (id, data) => {
     }
   }
 
-  // If the monitor is being reactivated, schedule an immediate check
+  // Reactivating a monitor schedules an immediate re-check.
   if (data.active === true) {
     data.nextCheckAt = new Date();
   }
@@ -73,18 +71,10 @@ const updateMonitor = async (id, data) => {
   return monitor;
 };
 
-const deleteMonitor = async (id) => {
+export const deleteMonitor = async (id) => {
   const monitor = await Monitor.findByIdAndDelete(id);
   if (!monitor) {
     throw ApiError.notFound(`Monitor not found with id: ${id}`);
   }
   return monitor;
-};
-
-export default {
-  createMonitor,
-  getMonitors,
-  getMonitorById,
-  updateMonitor,
-  deleteMonitor,
 };
