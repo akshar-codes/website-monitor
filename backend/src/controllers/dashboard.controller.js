@@ -1,11 +1,6 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import * as dashboardService from "../services/dashboard.service.js";
-import { assertObjectId, validate } from "../utils/controllerHelpers.js";
-import {
-  incidentsQuerySchema,
-  healthChecksQuerySchema,
-  monitorStatsQuerySchema,
-} from "../validators/dashboard.validator.js";
+import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
 
 // ── Controllers ──────────────────────────────────────────────────────────────
 
@@ -16,10 +11,7 @@ import {
 export const getOverview = asyncHandler(async (_req, res) => {
   const data = await dashboardService.getOverview();
 
-  res.json({
-    success: true,
-    data,
-  });
+  sendSuccess(res, { data });
 });
 
 /**
@@ -27,17 +19,14 @@ export const getOverview = asyncHandler(async (_req, res) => {
  * Paginated active incidents.
  */
 export const getActiveIncidents = asyncHandler(async (req, res) => {
-  const query = validate(incidentsQuerySchema, req.query);
+  const query = req.validatedQuery;
   const result = await dashboardService.getActiveIncidents(query);
 
-  res.json({
-    success: true,
+  sendPaginated(res, {
     data: result.incidents,
-    pagination: {
-      total: result.total,
-      page: result.page,
-      totalPages: result.totalPages,
-    },
+    page: result.page,
+    limit: query.limit,
+    total: result.total,
   });
 });
 
@@ -46,18 +35,11 @@ export const getActiveIncidents = asyncHandler(async (req, res) => {
  * Recent health checks with optional filters.
  */
 export const getRecentHealthChecks = asyncHandler(async (req, res) => {
-  const query = validate(healthChecksQuerySchema, req.query);
+  const checks = await dashboardService.getRecentHealthChecks(
+    req.validatedQuery,
+  );
 
-  if (query.monitorId) {
-    assertObjectId(query.monitorId);
-  }
-
-  const checks = await dashboardService.getRecentHealthChecks(query);
-
-  res.json({
-    success: true,
-    data: checks,
-  });
+  sendSuccess(res, { data: checks });
 });
 
 /**
@@ -65,14 +47,12 @@ export const getRecentHealthChecks = asyncHandler(async (req, res) => {
  * Per-monitor detail page stats.
  */
 export const getMonitorStats = asyncHandler(async (req, res) => {
-  assertObjectId(req.params.id);
-  const query = validate(monitorStatsQuerySchema, req.query);
-  const data = await dashboardService.getMonitorStats(req.params.id, query);
+  const data = await dashboardService.getMonitorStats(
+    req.params.id,
+    req.validatedQuery,
+  );
 
-  res.json({
-    success: true,
-    data,
-  });
+  sendSuccess(res, { data });
 });
 
 /**
@@ -80,15 +60,10 @@ export const getMonitorStats = asyncHandler(async (req, res) => {
  * Per-monitor time-series chart data.
  */
 export const getMonitorChartData = asyncHandler(async (req, res) => {
-  assertObjectId(req.params.id);
-  const query = validate(monitorStatsQuerySchema, req.query);
   const data = await dashboardService.getMonitorChartData(
     req.params.id,
-    query,
+    req.validatedQuery,
   );
 
-  res.json({
-    success: true,
-    data,
-  });
+  sendSuccess(res, { data });
 });

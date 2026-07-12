@@ -1,11 +1,6 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import * as incidentService from "../services/incident.service.js";
-import { assertObjectId, validate } from "../utils/controllerHelpers.js";
-import {
-  listIncidentsSchema,
-  updateStatusSchema,
-  downtimeStatsSchema,
-} from "../validators/incident.validator.js";
+import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
 
 // ── Controllers ──────────────────────────────────────────────────────────────
 
@@ -14,22 +9,14 @@ import {
  * List incidents with filtering and pagination.
  */
 export const getIncidents = asyncHandler(async (req, res) => {
-  const query = validate(listIncidentsSchema, req.query);
-
-  if (query.monitorId) {
-    assertObjectId(query.monitorId);
-  }
-
+  const query = req.validatedQuery;
   const result = await incidentService.getIncidents(query);
 
-  res.json({
-    success: true,
+  sendPaginated(res, {
     data: result.incidents,
-    pagination: {
-      total: result.total,
-      page: result.page,
-      totalPages: result.totalPages,
-    },
+    page: result.page,
+    limit: query.limit,
+    total: result.total,
   });
 });
 
@@ -38,13 +25,9 @@ export const getIncidents = asyncHandler(async (req, res) => {
  * Single incident with populated relations.
  */
 export const getIncidentById = asyncHandler(async (req, res) => {
-  assertObjectId(req.params.id);
   const data = await incidentService.getIncidentById(req.params.id);
 
-  res.json({
-    success: true,
-    data,
-  });
+  sendSuccess(res, { data });
 });
 
 /**
@@ -52,14 +35,12 @@ export const getIncidentById = asyncHandler(async (req, res) => {
  * Update incident status with transition validation.
  */
 export const updateIncidentStatus = asyncHandler(async (req, res) => {
-  assertObjectId(req.params.id);
-  const body = validate(updateStatusSchema, req.body);
-  const data = await incidentService.updateIncidentStatus(req.params.id, body);
+  const data = await incidentService.updateIncidentStatus(
+    req.params.id,
+    req.body,
+  );
 
-  res.json({
-    success: true,
-    data,
-  });
+  sendSuccess(res, { data });
 });
 
 /**
@@ -67,16 +48,7 @@ export const updateIncidentStatus = asyncHandler(async (req, res) => {
  * Aggregate downtime statistics.
  */
 export const getDowntimeStats = asyncHandler(async (req, res) => {
-  const query = validate(downtimeStatsSchema, req.query);
+  const data = await incidentService.getDowntimeStats(req.validatedQuery);
 
-  if (query.monitorId) {
-    assertObjectId(query.monitorId);
-  }
-
-  const data = await incidentService.getDowntimeStats(query);
-
-  res.json({
-    success: true,
-    data,
-  });
+  sendSuccess(res, { data });
 });
