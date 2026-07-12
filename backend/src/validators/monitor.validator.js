@@ -1,6 +1,6 @@
-const { z } = require("zod");
-const Monitor = require("../models/Monitor");
-const normalizeUrl = require("../utils/normalizeUrl");
+import { z } from "zod";
+import Monitor from "../models/Monitor.js";
+import normalizeUrl from "../utils/normalizeUrl.js";
 
 // ── Shared field definitions ──
 
@@ -39,7 +39,7 @@ const activeField = z.boolean();
 
 // ── Create schema — all required fields ──
 
-const createMonitorSchema = z.object({
+export const createMonitorSchema = z.object({
   name: nameField,
   url: urlField,
   interval: intervalField.optional().default(300),
@@ -48,7 +48,7 @@ const createMonitorSchema = z.object({
 
 // ── Update schema — all fields optional, at least one required ──
 
-const updateMonitorSchema = z
+export const updateMonitorSchema = z
   .object({
     name: nameField.optional(),
     url: urlField.optional(),
@@ -61,7 +61,7 @@ const updateMonitorSchema = z
 
 // ── Query params for listing ──
 
-const listMonitorsSchema = z.object({
+export const listMonitorsSchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
   active: z
@@ -74,9 +74,3 @@ const listMonitorsSchema = z.object({
     .default("createdAt"),
   order: z.enum(["asc", "desc"]).optional().default("desc"),
 });
-
-module.exports = {
-  createMonitorSchema,
-  updateMonitorSchema,
-  listMonitorsSchema,
-};
