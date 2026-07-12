@@ -3,8 +3,8 @@
  * Must be registered LAST in the middleware chain.
  */
 
-const env = require("../config/env");
-const logger = require("../utils/logger");
+import env from "../config/env.js";
+import logger from "../utils/logger.js";
 
 // eslint-disable-next-line no-unused-vars
 const errorHandler = (err, req, res, _next) => {
@@ -38,4 +38,4 @@ const errorHandler = (err, req, res, _next) => {
   res.status(statusCode).json(response);
 };
 
-module.exports = errorHandler;
+export default errorHandler;
