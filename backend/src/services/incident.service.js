@@ -1,29 +1,24 @@
 import mongoose from "mongoose";
 import Incident from "../models/Incident.js";
 import ApiError from "../utils/ApiError.js";
+import { WINDOW_MS } from "../config/constants.js";
+import { msBefore } from "../utils/dateUtils.js";
 
-const WINDOW_MS = {
-  "24h": 24 * 60 * 60 * 1000,
-  "7d": 7 * 24 * 60 * 60 * 1000,
-  "30d": 30 * 24 * 60 * 60 * 1000,
-};
+// ── State machine ─────────────────────────────────────────────────────────────
 
-// Valid forward-only status transitions
+/** Valid forward-only status transitions. */
 const ALLOWED_TRANSITIONS = {
   ongoing: ["investigating", "identified", "resolved"],
   investigating: ["identified", "resolved"],
   identified: ["resolved"],
-  resolved: [], // terminal state
+  resolved: [], // terminal
 };
 
-// ─────────────────────────────────────────────
-// List incidents (filtered, paginated)
-// ─────────────────────────────────────────────
+// ── List incidents ────────────────────────────────────────────────────────────
 
-const getIncidents = async ({ page, limit, severity, status, monitorId }) => {
+export const getIncidents = async ({ page, limit, severity, status, monitorId }) => {
   const filter = {};
 
-  // Status filter
   if (status === "active") {
     filter.status = { $ne: "resolved" };
   } else if (status) {
@@ -62,11 +57,9 @@ const getIncidents = async ({ page, limit, severity, status, monitorId }) => {
   };
 };
 
-// ─────────────────────────────────────────────
-// Single incident by ID
-// ─────────────────────────────────────────────
+// ── Single incident ───────────────────────────────────────────────────────────
 
-const getIncidentById = async (id) => {
+export const getIncidentById = async (id) => {
   const incident = await Incident.findById(id)
     .populate("monitor", "name url")
     .populate(
@@ -82,11 +75,9 @@ const getIncidentById = async (id) => {
   return incident;
 };
 
-// ─────────────────────────────────────────────
-// Update incident status
-// ─────────────────────────────────────────────
+// ── Update status ─────────────────────────────────────────────────────────────
 
-const updateIncidentStatus = async (
+export const updateIncidentStatus = async (
   id,
   { status, rootCause, resolutionNotes },
 ) => {
@@ -95,7 +86,6 @@ const updateIncidentStatus = async (
     throw ApiError.notFound(`Incident not found with id: ${id}`);
   }
 
-  // Validate transition
   const allowed = ALLOWED_TRANSITIONS[incident.status] || [];
   if (!allowed.includes(status)) {
     throw ApiError.badRequest(
@@ -103,49 +93,40 @@ const updateIncidentStatus = async (
     );
   }
 
-  // Use the model's resolve() static for terminal transition
   if (status === "resolved") {
     const resolved = await Incident.resolve(id, { rootCause, resolutionNotes });
-    const populated = await Incident.findById(resolved._id)
+    return Incident.findById(resolved._id)
       .populate("monitor", "name url")
       .populate(
         "triggerCheck",
         "status responseTime httpStatus failureReason checkedAt",
       )
       .lean();
-    return populated;
   }
 
-  // Non-terminal transition
   incident.status = status;
   if (rootCause != null) incident.rootCause = rootCause;
   await incident.save();
 
-  const populated = await Incident.findById(incident._id)
+  return Incident.findById(incident._id)
     .populate("monitor", "name url")
     .populate(
       "triggerCheck",
       "status responseTime httpStatus failureReason checkedAt",
     )
     .lean();
-
-  return populated;
 };
 
-// ─────────────────────────────────────────────
-// Downtime statistics
-// ─────────────────────────────────────────────
+// ── Downtime statistics ───────────────────────────────────────────────────────
 
-const getDowntimeStats = async ({ monitorId, window }) => {
-  const windowMs = WINDOW_MS[window];
-  const since = new Date(Date.now() - windowMs);
+export const getDowntimeStats = async ({ monitorId, window }) => {
+  const since = msBefore(WINDOW_MS[window]);
 
   const matchFilter = { startedAt: { $gte: since } };
   if (monitorId) {
     matchFilter.monitor = new mongoose.Types.ObjectId(monitorId);
   }
 
-  // Single aggregate pass for all resolved-incident metrics
   const [aggResult] = await Incident.aggregate([
     { $match: matchFilter },
     {
@@ -223,11 +204,4 @@ const getDowntimeStats = async ({ monitorId, window }) => {
     },
     window,
   };
-};
-
-export default {
-  getIncidents,
-  getIncidentById,
-  updateIncidentStatus,
-  getDowntimeStats,
 };

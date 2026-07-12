@@ -22,5 +22,8 @@
     "mongoose": "^9.6.3",
     "winston": "^3.19.0",
     "zod": "^4.4.3"
+  },
+  "allowScripts": {
+    "msgpackr-extract@3.0.4": true
   }
 }

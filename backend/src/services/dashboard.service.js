@@ -4,19 +4,13 @@ import HealthCheck from "../models/HealthCheck.js";
 import Incident from "../models/Incident.js";
 import DailyStat from "../models/DailyStat.js";
 import ApiError from "../utils/ApiError.js";
+import { WINDOW_MS } from "../config/constants.js";
+import { startOfDayUTC, endOfDayUTC, msBefore } from "../utils/dateUtils.js";
 
-const WINDOW_MS = {
-  "24h": 24 * 60 * 60 * 1000,
-  "7d": 7 * 24 * 60 * 60 * 1000,
-  "30d": 30 * 24 * 60 * 60 * 1000,
-};
+// ── Overview ─────────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────
-// Overview — single endpoint for the main dashboard
-// ─────────────────────────────────────────────
-
-const getOverview = async () => {
-  const since = new Date(Date.now() - WINDOW_MS["24h"]);
+export const getOverview = async () => {
+  const since = msBefore(WINDOW_MS["24h"]);
 
   const [
     monitorCounts,
@@ -40,7 +34,6 @@ const getOverview = async () => {
 
     // 2 ─ Latest health check per active monitor
     //     Uses compound index { monitor: 1, checkedAt: -1 }
-    //     $lookup filters to active monitors and pulls interval for staleness check
     HealthCheck.aggregate([
       { $sort: { monitor: 1, checkedAt: -1 } },
       {
@@ -73,7 +66,6 @@ const getOverview = async () => {
     ]),
 
     // 3 ─ System-wide uptime + avg response time (last 24 h)
-    //     Single aggregate — two metrics for the price of one scan
     HealthCheck.aggregate([
       { $match: { checkedAt: { $gte: since } } },
       {
@@ -88,7 +80,7 @@ const getOverview = async () => {
       },
     ]),
 
-    // 4 ─ Active incident count (cheap countDocuments)
+    // 4 ─ Active incident count
     Incident.countDocuments({ status: { $ne: "resolved" } }),
 
     // 5 ─ Latest active incidents (preview — top 5)
@@ -115,9 +107,6 @@ const getOverview = async () => {
   const now = Date.now();
 
   for (const doc of latestPerMonitor) {
-    // A monitor is "stale" if its last check is older than 2× its polling
-    // interval.  This prevents the dashboard from showing a monitor as "up"
-    // when the worker has actually stopped polling it.
     const ageMs = now - new Date(doc.checkedAt).getTime();
     const staleThresholdMs = (doc.interval || 300) * 2 * 1000;
 
@@ -130,8 +119,7 @@ const getOverview = async () => {
     }
   }
 
-  // Active monitors that have never been checked have no HealthCheck document,
-  // so they don't appear in latestPerMonitor — count them as unknown.
+  // Active monitors that have never been checked have no HealthCheck document.
   const neverChecked = Math.max(0, counts.active - latestPerMonitor.length);
   currentStatus.unknown += neverChecked;
 
@@ -172,11 +160,9 @@ const getOverview = async () => {
   };
 };
 
-// ─────────────────────────────────────────────
-// Active incidents (paginated)
-// ─────────────────────────────────────────────
+// ── Active incidents (paginated) ─────────────────────────────────────────────
 
-const getActiveIncidents = async ({ page, limit, severity }) => {
+export const getActiveIncidents = async ({ page, limit, severity }) => {
   const filter = { status: { $ne: "resolved" } };
   if (severity) filter.severity = severity;
 
@@ -204,11 +190,9 @@ const getActiveIncidents = async ({ page, limit, severity }) => {
   };
 };
 
-// ─────────────────────────────────────────────
-// Recent health checks (filterable)
-// ─────────────────────────────────────────────
+// ── Recent health checks ──────────────────────────────────────────────────────
 
-const getRecentHealthChecks = async ({ monitorId, status, limit }) => {
+export const getRecentHealthChecks = async ({ monitorId, status, limit }) => {
   const filter = {};
 
   if (monitorId) {
@@ -226,14 +210,11 @@ const getRecentHealthChecks = async ({ monitorId, status, limit }) => {
     .lean();
 };
 
-// ─────────────────────────────────────────────
-// Per-monitor stats
-// ─────────────────────────────────────────────
+// ── Per-monitor stats ─────────────────────────────────────────────────────────
 
-const getMonitorStats = async (monitorId, { window }) => {
+export const getMonitorStats = async (monitorId, { window }) => {
   const id = new mongoose.Types.ObjectId(monitorId);
 
-  // Verify monitor exists and fetch scheduling fields (fast indexed lookup)
   const monitor = await Monitor.findById(id)
     .select(
       "name url active interval lastCheckedAt nextCheckAt consecutiveFailures",
@@ -244,18 +225,14 @@ const getMonitorStats = async (monitorId, { window }) => {
   }
 
   const windowMs = WINDOW_MS[window];
-  const since = new Date(Date.now() - windowMs);
+  const since = msBefore(windowMs);
   const useDaily = window !== "24h";
 
-  // ── Phase 1: window-dependent metrics ──
   let uptimePercentage, responseTimeStats;
 
   if (useDaily) {
-    // 7d / 30d: use pre-aggregated DailyStat for performance
-    const startDate = new Date(since);
-    startDate.setUTCHours(0, 0, 0, 0);
-    const endDate = new Date();
-    endDate.setUTCHours(23, 59, 59, 999);
+    const startDate = startOfDayUTC(since);
+    const endDate = endOfDayUTC(new Date());
 
     const [uptime, dailyStats] = await Promise.all([
       DailyStat.calculateUptime(id, startDate, endDate),
@@ -283,7 +260,6 @@ const getMonitorStats = async (monitorId, { window }) => {
       responseTimeStats = { average: 0, min: 0, max: 0 };
     }
   } else {
-    // 24h: use raw HealthCheck for real-time accuracy
     const [uptime, rtAgg] = await Promise.all([
       HealthCheck.uptimePercent(id, windowMs),
       HealthCheck.aggregate([
@@ -308,7 +284,6 @@ const getMonitorStats = async (monitorId, { window }) => {
     };
   }
 
-  // ── Phase 2: always-live queries (parallel) ──
   const [latestCheck, recentChecks, activeIncident] = await Promise.all([
     HealthCheck.findLatest(id),
     HealthCheck.find({ monitor: id })
@@ -324,8 +299,6 @@ const getMonitorStats = async (monitorId, { window }) => {
       .lean(),
   ]);
 
-  // Derive current status with staleness check — a stale latest check
-  // should not be trusted as the current truth.
   let currentStatus = latestCheck?.status || "unknown";
   if (latestCheck && monitor.interval) {
     const ageMs = Date.now() - new Date(latestCheck.checkedAt).getTime();
@@ -343,7 +316,6 @@ const getMonitorStats = async (monitorId, { window }) => {
       active: monitor.active,
     },
     currentStatus,
-    // Scheduling fields — cheap to return, invaluable for debugging
     lastCheckedAt: monitor.lastCheckedAt,
     nextCheckAt: monitor.nextCheckAt,
     consecutiveFailures: monitor.consecutiveFailures,
@@ -360,26 +332,22 @@ const getMonitorStats = async (monitorId, { window }) => {
   };
 };
 
-// ─────────────────────────────────────────────
-// Per-monitor chart data
-// ─────────────────────────────────────────────
+// ── Per-monitor chart data ────────────────────────────────────────────────────
 
-const getMonitorChartData = async (monitorId, { window }) => {
+export const getMonitorChartData = async (monitorId, { window }) => {
   const id = new mongoose.Types.ObjectId(monitorId);
 
-  // Verify monitor exists (fast indexed lookup)
   const monitor = await Monitor.findById(id).select("_id").lean();
   if (!monitor) {
     throw ApiError.notFound(`Monitor not found with id: ${monitorId}`);
   }
 
   const windowMs = WINDOW_MS[window];
-  const since = new Date(Date.now() - windowMs);
+  const since = msBefore(windowMs);
 
   let dataPoints;
 
   if (window === "24h") {
-    // Aggregate raw HealthCheck records into hourly buckets
     const buckets = await HealthCheck.aggregate([
       { $match: { monitor: id, checkedAt: { $gte: since } } },
       {
@@ -423,15 +391,14 @@ const getMonitorChartData = async (monitorId, { window }) => {
       unknownChecks: b.unknownChecks,
       uptimePercentage:
         b.totalChecks > 0
-          ? parseFloat(((b.successfulChecks / b.totalChecks) * 100).toFixed(2))
+          ? parseFloat(
+              ((b.successfulChecks / b.totalChecks) * 100).toFixed(2),
+            )
           : 0,
     }));
   } else {
-    // 7d / 30d: use pre-aggregated DailyStat
-    const startDate = new Date(since);
-    startDate.setUTCHours(0, 0, 0, 0);
-    const endDate = new Date();
-    endDate.setUTCHours(23, 59, 59, 999);
+    const startDate = startOfDayUTC(since);
+    const endDate = endOfDayUTC(new Date());
 
     const dailyStats = await DailyStat.getDateRangeStats(
       id,
@@ -458,12 +425,4 @@ const getMonitorChartData = async (monitorId, { window }) => {
     window,
     dataPoints,
   };
-};
-
-export default {
-  getOverview,
-  getActiveIncidents,
-  getRecentHealthChecks,
-  getMonitorStats,
-  getMonitorChartData,
 };
