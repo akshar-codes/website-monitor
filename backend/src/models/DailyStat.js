@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const dailyStatSchema = new mongoose.Schema(
   {
@@ -156,4 +156,4 @@ dailyStatSchema.statics.calculateUptime = async function (
 
 const DailyStat = mongoose.model("DailyStat", dailyStatSchema);
 
-module.exports = DailyStat;
+export default DailyStat;

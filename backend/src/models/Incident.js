@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 // ── Incident lifecycle statuses ──
 const STATUS = Object.freeze({
@@ -242,4 +242,4 @@ incidentSchema.statics.SEVERITY = SEVERITY;
 
 const Incident = mongoose.model("Incident", incidentSchema);
 
-module.exports = Incident;
+export default Incident;

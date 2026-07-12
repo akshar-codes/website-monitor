@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 // ── Status enum ──
 const STATUS = Object.freeze({
@@ -207,4 +207,4 @@ healthCheckSchema.statics.FAILURE_REASONS = FAILURE_REASONS;
 
 const HealthCheck = mongoose.model("HealthCheck", healthCheckSchema);
 
-module.exports = HealthCheck;
+export default HealthCheck;

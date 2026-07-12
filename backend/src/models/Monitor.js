@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 // ── Allowed interval presets (in seconds) ──
 const INTERVAL_PRESETS = [30, 60, 120, 300, 600, 900, 1800, 3600];
@@ -132,4 +132,4 @@ monitorSchema.statics.INTERVAL_PRESETS = INTERVAL_PRESETS;
 
 const Monitor = mongoose.model("Monitor", monitorSchema);
 
-module.exports = Monitor;
+export default Monitor;
