@@ -3,11 +3,11 @@
  * All feature routers are mounted here and then plugged into app.js once.
  */
 
-const { Router } = require("express");
-const healthRoutes = require("./health.routes");
-const monitorRoutes = require("./monitor.routes");
-const dashboardRoutes = require("./dashboard.routes");
-const incidentRoutes = require("./incident.routes");
+import { Router } from "express";
+import healthRoutes from "./health.routes.js";
+import monitorRoutes from "./monitor.routes.js";
+import dashboardRoutes from "./dashboard.routes.js";
+import incidentRoutes from "./incident.routes.js";
 
 const router = Router();
 
@@ -16,4 +16,4 @@ router.use("/monitors", monitorRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/incidents", incidentRoutes);
 
-module.exports = router;
+export default router;

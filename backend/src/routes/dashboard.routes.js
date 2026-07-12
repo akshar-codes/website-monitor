@@ -8,14 +8,14 @@
  * GET /api/dashboard/monitors/:id/chart-data   — per-monitor chart data
  */
 
-const { Router } = require("express");
-const {
+import { Router } from "express";
+import {
   getOverview,
   getActiveIncidents,
   getRecentHealthChecks,
   getMonitorStats,
   getMonitorChartData,
-} = require("../controllers/dashboard.controller");
+} from "../controllers/dashboard.controller.js";
 
 const router = Router();
 
@@ -25,4 +25,4 @@ router.get("/health-checks", getRecentHealthChecks);
 router.get("/monitors/:id/stats", getMonitorStats);
 router.get("/monitors/:id/chart-data", getMonitorChartData);
 
-module.exports = router;
+export default router;

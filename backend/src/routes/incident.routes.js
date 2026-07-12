@@ -7,13 +7,13 @@
  * PATCH  /api/incidents/:id/status     — update incident status
  */
 
-const { Router } = require("express");
-const {
+import { Router } from "express";
+import {
   getIncidents,
   getIncidentById,
   updateIncidentStatus,
   getDowntimeStats,
-} = require("../controllers/incident.controller");
+} from "../controllers/incident.controller.js";
 
 const router = Router();
 
@@ -22,4 +22,4 @@ router.get("/downtime-stats", getDowntimeStats); // before /:id to avoid param c
 router.get("/:id", getIncidentById);
 router.patch("/:id/status", updateIncidentStatus);
 
-module.exports = router;
+export default router;

@@ -8,14 +8,14 @@
  * DELETE /api/monitors/:id  — delete
  */
 
-const { Router } = require("express");
-const {
+import { Router } from "express";
+import {
   createMonitor,
   getMonitors,
   getMonitorById,
   updateMonitor,
   deleteMonitor,
-} = require("../controllers/monitor.controller");
+} from "../controllers/monitor.controller.js";
 
 const router = Router();
 
@@ -23,4 +23,4 @@ router.route("/").post(createMonitor).get(getMonitors);
 
 router.route("/:id").get(getMonitorById).put(updateMonitor).delete(deleteMonitor);
 
-module.exports = router;
+export default router;

@@ -3,9 +3,9 @@
  * GET /api/health
  */
 
-const { Router } = require("express");
-const mongoose = require("mongoose");
-const asyncHandler = require("../utils/asyncHandler");
+import { Router } from "express";
+import mongoose from "mongoose";
+import asyncHandler from "../utils/asyncHandler.js";
 
 const router = Router();
 
@@ -31,4 +31,4 @@ router.get(
   })
 );
 
-module.exports = router;
+export default router;
