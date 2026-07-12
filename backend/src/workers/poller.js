@@ -5,8 +5,8 @@
  * the classifier can consume without caring about network details.
  */
 
-const env = require("../config/env");
-const logger = require("../utils/logger");
+import env from "../config/env.js";
+import logger from "../utils/logger.js";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -109,7 +109,7 @@ const singlePoll = async (url, timeout) => {
  * @property {string|null} error         — error message or null
  * @property {string|null} failureReason — from FAILURE_REASONS enum or null
  */
-const poll = async (url, opts = {}) => {
+export const poll = async (url, opts = {}) => {
   const timeout = opts.timeout ?? env.POLL_TIMEOUT_MS;
   const maxRetries = opts.maxRetries ?? env.MONITOR_RETRY_COUNT;
   const retryDelay = opts.retryDelay ?? env.MONITOR_RETRY_DELAY;
@@ -141,5 +141,3 @@ const poll = async (url, opts = {}) => {
 
   return result;
 };
-
-module.exports = { poll };

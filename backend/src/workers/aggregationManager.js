@@ -1,5 +1,5 @@
-const DailyStat = require("../models/DailyStat");
-const logger = require("../utils/logger");
+import DailyStat from "../models/DailyStat.js";
+import logger from "../utils/logger.js";
 
 const todayUTC = () => {
   const d = new Date();
@@ -7,7 +7,7 @@ const todayUTC = () => {
   return d;
 };
 
-const updateDailyStat = async (monitor, healthCheck) => {
+export const updateDailyStat = async (monitor, healthCheck) => {
   const date = todayUTC();
   const isSuccess = healthCheck.status === "up";
   const rt = healthCheck.responseTime;
@@ -93,5 +93,3 @@ const updateDailyStat = async (monitor, healthCheck) => {
     return null;
   }
 };
-
-module.exports = { updateDailyStat };

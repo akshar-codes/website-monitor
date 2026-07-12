@@ -1,12 +1,12 @@
-const Monitor = require("../models/Monitor");
-const HealthCheck = require("../models/HealthCheck");
-const env = require("../config/env");
-const logger = require("../utils/logger");
+import Monitor from "../models/Monitor.js";
+import HealthCheck from "../models/HealthCheck.js";
+import env from "../config/env.js";
+import logger from "../utils/logger.js";
 
-const { poll } = require("./poller");
-const { classify } = require("./classifier");
-const { handleIncident } = require("./incidentManager");
-const { updateDailyStat } = require("./aggregationManager");
+import { poll } from "./poller.js";
+import { classify } from "./classifier.js";
+import { handleIncident } from "./incidentManager.js";
+import { updateDailyStat } from "./aggregationManager.js";
 
 let intervalId = null;
 let isRunning = false;
@@ -98,7 +98,7 @@ const tick = async () => {
 /**
  * Start the scheduler.
  */
-const start = () => {
+export const start = () => {
   if (intervalId) {
     logger.warn("Scheduler already running");
     return;
@@ -118,12 +118,10 @@ const start = () => {
 /**
  * Stop the scheduler gracefully.
  */
-const stop = () => {
+export const stop = () => {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
     logger.info("Scheduler stopped");
   }
 };
-
-module.exports = { start, stop };

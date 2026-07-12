@@ -25,7 +25,7 @@ const isValidContract = (body) => {
 /**
  * Classify a poll result into structured status fields.
  */
-const classify = (pollResult) => {
+export const classify = (pollResult) => {
   const { ok, httpStatus, body, failureReason } = pollResult;
 
   // ── Total network failure (no HTTP response at all) ──
@@ -109,5 +109,3 @@ const classify = (pollResult) => {
     failureReason: derivedFailureReason,
   };
 };
-
-module.exports = { classify };

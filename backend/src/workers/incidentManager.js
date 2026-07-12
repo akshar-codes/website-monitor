@@ -1,7 +1,7 @@
-const Monitor = require("../models/Monitor");
-const Incident = require("../models/Incident");
-const env = require("../config/env");
-const logger = require("../utils/logger");
+import Monitor from "../models/Monitor.js";
+import Incident from "../models/Incident.js";
+import env from "../config/env.js";
+import logger from "../utils/logger.js";
 
 const { STATUS, SEVERITY } = Incident;
 
@@ -11,7 +11,7 @@ const deriveSeverity = (checkStatus) => {
   return SEVERITY.MAJOR;
 };
 
-const handleIncident = async (monitor, healthCheck) => {
+export const handleIncident = async (monitor, healthCheck) => {
   const isHealthy = healthCheck.status === "up";
 
   if (isHealthy) {
@@ -91,5 +91,3 @@ const handleFailure = async (monitor, healthCheck) => {
     `Incident ${incident._id} opened for monitor "${monitor.name}" — severity: ${incident.severity}, reason: ${healthCheck.failureReason || "unknown"}`,
   );
 };
-
-module.exports = { handleIncident };
