@@ -1,12 +1,12 @@
-const asyncHandler = require("../utils/asyncHandler");
-const ApiError = require("../utils/ApiError");
-const monitorService = require("../services/monitor.service");
-const {
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
+import monitorService from "../services/monitor.service.js";
+import {
   createMonitorSchema,
   updateMonitorSchema,
   listMonitorsSchema,
-} = require("../validators/monitor.validator");
-const mongoose = require("mongoose");
+} from "../validators/monitor.validator.js";
+import mongoose from "mongoose";
 
 // ── Helpers ──
 
@@ -36,7 +36,7 @@ const validate = (schema, data) => {
 /**
  * POST /api/monitors
  */
-const createMonitor = asyncHandler(async (req, res) => {
+export const createMonitor = asyncHandler(async (req, res) => {
   const data = validate(createMonitorSchema, req.body);
   const monitor = await monitorService.createMonitor(data);
 
@@ -49,7 +49,7 @@ const createMonitor = asyncHandler(async (req, res) => {
 /**
  * GET /api/monitors
  */
-const getMonitors = asyncHandler(async (req, res) => {
+export const getMonitors = asyncHandler(async (req, res) => {
   const query = validate(listMonitorsSchema, req.query);
   const result = await monitorService.getMonitors(query);
 
@@ -67,7 +67,7 @@ const getMonitors = asyncHandler(async (req, res) => {
 /**
  * GET /api/monitors/:id
  */
-const getMonitorById = asyncHandler(async (req, res) => {
+export const getMonitorById = asyncHandler(async (req, res) => {
   assertObjectId(req.params.id);
   const monitor = await monitorService.getMonitorById(req.params.id);
 
@@ -80,7 +80,7 @@ const getMonitorById = asyncHandler(async (req, res) => {
 /**
  * PUT /api/monitors/:id
  */
-const updateMonitor = asyncHandler(async (req, res) => {
+export const updateMonitor = asyncHandler(async (req, res) => {
   assertObjectId(req.params.id);
   const data = validate(updateMonitorSchema, req.body);
   const monitor = await monitorService.updateMonitor(req.params.id, data);
@@ -94,7 +94,7 @@ const updateMonitor = asyncHandler(async (req, res) => {
 /**
  * DELETE /api/monitors/:id
  */
-const deleteMonitor = asyncHandler(async (req, res) => {
+export const deleteMonitor = asyncHandler(async (req, res) => {
   assertObjectId(req.params.id);
   await monitorService.deleteMonitor(req.params.id);
 
@@ -103,11 +103,3 @@ const deleteMonitor = asyncHandler(async (req, res) => {
     message: "Monitor deleted successfully",
   });
 });
-
-module.exports = {
-  createMonitor,
-  getMonitors,
-  getMonitorById,
-  updateMonitor,
-  deleteMonitor,
-};

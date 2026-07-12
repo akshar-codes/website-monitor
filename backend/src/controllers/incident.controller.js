@@ -1,12 +1,12 @@
-const asyncHandler = require("../utils/asyncHandler");
-const ApiError = require("../utils/ApiError");
-const incidentService = require("../services/incident.service");
-const {
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
+import incidentService from "../services/incident.service.js";
+import {
   listIncidentsSchema,
   updateStatusSchema,
   downtimeStatsSchema,
-} = require("../validators/incident.validator");
-const mongoose = require("mongoose");
+} from "../validators/incident.validator.js";
+import mongoose from "mongoose";
 
 // ── Helpers ──
 
@@ -31,7 +31,7 @@ const validate = (schema, data) => {
  * GET /api/incidents
  * List incidents with filtering and pagination.
  */
-const getIncidents = asyncHandler(async (req, res) => {
+export const getIncidents = asyncHandler(async (req, res) => {
   const query = validate(listIncidentsSchema, req.query);
 
   if (query.monitorId) {
@@ -55,7 +55,7 @@ const getIncidents = asyncHandler(async (req, res) => {
  * GET /api/incidents/:id
  * Single incident with populated relations.
  */
-const getIncidentById = asyncHandler(async (req, res) => {
+export const getIncidentById = asyncHandler(async (req, res) => {
   assertObjectId(req.params.id);
   const data = await incidentService.getIncidentById(req.params.id);
 
@@ -69,7 +69,7 @@ const getIncidentById = asyncHandler(async (req, res) => {
  * PATCH /api/incidents/:id/status
  * Update incident status with transition validation.
  */
-const updateIncidentStatus = asyncHandler(async (req, res) => {
+export const updateIncidentStatus = asyncHandler(async (req, res) => {
   assertObjectId(req.params.id);
   const body = validate(updateStatusSchema, req.body);
   const data = await incidentService.updateIncidentStatus(req.params.id, body);
@@ -84,7 +84,7 @@ const updateIncidentStatus = asyncHandler(async (req, res) => {
  * GET /api/incidents/downtime-stats
  * Aggregate downtime statistics.
  */
-const getDowntimeStats = asyncHandler(async (req, res) => {
+export const getDowntimeStats = asyncHandler(async (req, res) => {
   const query = validate(downtimeStatsSchema, req.query);
 
   if (query.monitorId) {
@@ -98,10 +98,3 @@ const getDowntimeStats = asyncHandler(async (req, res) => {
     data,
   });
 });
-
-module.exports = {
-  getIncidents,
-  getIncidentById,
-  updateIncidentStatus,
-  getDowntimeStats,
-};

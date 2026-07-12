@@ -1,12 +1,12 @@
-const asyncHandler = require("../utils/asyncHandler");
-const ApiError = require("../utils/ApiError");
-const dashboardService = require("../services/dashboard.service");
-const {
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
+import dashboardService from "../services/dashboard.service.js";
+import {
   incidentsQuerySchema,
   healthChecksQuerySchema,
   monitorStatsQuerySchema,
-} = require("../validators/dashboard.validator");
-const mongoose = require("mongoose");
+} from "../validators/dashboard.validator.js";
+import mongoose from "mongoose";
 
 // ── Helpers ──
 
@@ -37,7 +37,7 @@ const validate = (schema, data) => {
  * GET /api/dashboard/overview
  * Main dashboard — everything in one round-trip.
  */
-const getOverview = asyncHandler(async (_req, res) => {
+export const getOverview = asyncHandler(async (_req, res) => {
   const data = await dashboardService.getOverview();
 
   res.json({
@@ -50,7 +50,7 @@ const getOverview = asyncHandler(async (_req, res) => {
  * GET /api/dashboard/incidents
  * Paginated active incidents.
  */
-const getActiveIncidents = asyncHandler(async (req, res) => {
+export const getActiveIncidents = asyncHandler(async (req, res) => {
   const query = validate(incidentsQuerySchema, req.query);
   const result = await dashboardService.getActiveIncidents(query);
 
@@ -69,7 +69,7 @@ const getActiveIncidents = asyncHandler(async (req, res) => {
  * GET /api/dashboard/health-checks
  * Recent health checks with optional filters.
  */
-const getRecentHealthChecks = asyncHandler(async (req, res) => {
+export const getRecentHealthChecks = asyncHandler(async (req, res) => {
   const query = validate(healthChecksQuerySchema, req.query);
 
   // Validate monitorId format if provided
@@ -89,7 +89,7 @@ const getRecentHealthChecks = asyncHandler(async (req, res) => {
  * GET /api/dashboard/monitors/:id/stats
  * Per-monitor detail page stats.
  */
-const getMonitorStats = asyncHandler(async (req, res) => {
+export const getMonitorStats = asyncHandler(async (req, res) => {
   assertObjectId(req.params.id);
   const query = validate(monitorStatsQuerySchema, req.query);
   const data = await dashboardService.getMonitorStats(req.params.id, query);
@@ -104,7 +104,7 @@ const getMonitorStats = asyncHandler(async (req, res) => {
  * GET /api/dashboard/monitors/:id/chart-data
  * Per-monitor time-series chart data.
  */
-const getMonitorChartData = asyncHandler(async (req, res) => {
+export const getMonitorChartData = asyncHandler(async (req, res) => {
   assertObjectId(req.params.id);
   const query = validate(monitorStatsQuerySchema, req.query);
   const data = await dashboardService.getMonitorChartData(req.params.id, query);
@@ -114,11 +114,3 @@ const getMonitorChartData = asyncHandler(async (req, res) => {
     data,
   });
 });
-
-module.exports = {
-  getOverview,
-  getActiveIncidents,
-  getRecentHealthChecks,
-  getMonitorStats,
-  getMonitorChartData,
-};
