@@ -1,15 +1,15 @@
-const app = require("./app");
-const env = require("./config/env");
-const connectDB = require("./config/db");
-const logger = require("./utils/logger");
-const scheduler = require("./workers/scheduler");
+import app from "./app.js";
+import env from "./config/env.js";
+import connectDB from "./config/db.js";
+import logger from "./utils/logger.js";
+import { start, stop } from "./workers/scheduler.js";
 
 const startServer = async () => {
   // 1. Connect to MongoDB
   await connectDB();
 
   // 2. Start the monitoring scheduler
-  scheduler.start();
+  start();
 
   // 3. Start listening
   const server = app.listen(env.PORT, () => {
@@ -23,7 +23,7 @@ const startServer = async () => {
     logger.info(`${signal} received — shutting down gracefully`);
 
     // Stop the scheduler first (no new polls)
-    scheduler.stop();
+    stop();
 
     server.close(() => {
       logger.info("HTTP server closed");

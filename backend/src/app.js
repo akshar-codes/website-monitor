@@ -1,12 +1,12 @@
-const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
-const env = require("./config/env");
-const routes = require("./routes");
-const notFound = require("./middlewares/notFound");
-const errorHandler = require("./middlewares/errorHandler");
+import env from "./config/env.js";
+import routes from "./routes/index.js";
+import notFound from "./middlewares/notFound.js";
+import errorHandler from "./middlewares/errorHandler.js";
 
 const app = express();
 
@@ -41,4 +41,4 @@ app.use("/api", routes);
 app.use(notFound);
 app.use(errorHandler);
 
-module.exports = app;
+export default app;
