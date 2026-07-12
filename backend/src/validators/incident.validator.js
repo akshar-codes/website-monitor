@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { optionalObjectIdSchema } from "./common.js";
 
 export const listIncidentsSchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
@@ -8,7 +9,7 @@ export const listIncidentsSchema = z.object({
     .enum(["active", "ongoing", "investigating", "identified", "resolved"])
     .optional()
     .default("active"),
-  monitorId: z.string().optional(),
+  monitorId: optionalObjectIdSchema,
 });
 
 export const updateStatusSchema = z.object({
@@ -18,6 +19,6 @@ export const updateStatusSchema = z.object({
 });
 
 export const downtimeStatsSchema = z.object({
-  monitorId: z.string().optional(),
+  monitorId: optionalObjectIdSchema,
   window: z.enum(["24h", "7d", "30d"]).optional().default("30d"),
 });

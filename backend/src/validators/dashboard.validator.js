@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { optionalObjectIdSchema } from "./common.js";
 
 // ── Active incidents listing ──
 
@@ -11,7 +12,7 @@ export const incidentsQuerySchema = z.object({
 // ── Recent health checks listing ──
 
 export const healthChecksQuerySchema = z.object({
-  monitorId: z.string().optional(),
+  monitorId: optionalObjectIdSchema,
   status: z.enum(["up", "down", "degraded", "unknown"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
