@@ -3,14 +3,19 @@ class ApiError extends Error {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = isOperational;
-    this.errors = errors; // Array<{ field?: string, message: string }> | null
+    this.errors = errors;
     Error.captureStackTrace(this, this.constructor);
   }
 
   // ── Convenience factory methods ──
 
-  static badRequest(message = "Bad request", errors = null) {
-    return new ApiError(400, message, true, errors);
+  static badRequest(message = "Bad request") {
+    return new ApiError(400, message);
+  }
+
+  static validation(errors, message) {
+    const topMessage = message || errors?.[0]?.message || "Validation failed";
+    return new ApiError(400, topMessage, true, errors);
   }
 
   static unauthorized(message = "Unauthorized") {
@@ -25,16 +30,8 @@ class ApiError extends Error {
     return new ApiError(404, message);
   }
 
-  static conflict(message = "Conflict", errors = null) {
-    return new ApiError(409, message, true, errors);
-  }
-
-  static unprocessable(message = "Unprocessable entity", errors = null) {
-    return new ApiError(422, message, true, errors);
-  }
-
-  static tooManyRequests(message = "Too many requests") {
-    return new ApiError(429, message);
+  static conflict(message = "Conflict") {
+    return new ApiError(409, message);
   }
 
   static internal(message = "Internal server error") {
