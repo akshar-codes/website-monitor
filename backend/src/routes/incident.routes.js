@@ -14,12 +14,27 @@ import {
   updateIncidentStatus,
   getDowntimeStats,
 } from "../controllers/incident.controller.js";
+import { validate, validateObjectId } from "../middlewares/validate.js";
+import {
+  listIncidentsSchema,
+  updateStatusSchema,
+  downtimeStatsSchema,
+} from "../validators/incident.validator.js";
 
 const router = Router();
 
-router.get("/", getIncidents);
-router.get("/downtime-stats", getDowntimeStats); // before /:id to avoid param capture
-router.get("/:id", getIncidentById);
-router.patch("/:id/status", updateIncidentStatus);
+router.get("/", validate(listIncidentsSchema, "query"), getIncidents);
+router.get(
+  "/downtime-stats",
+  validate(downtimeStatsSchema, "query"),
+  getDowntimeStats,
+); // before /:id to avoid param capture
+router.get("/:id", validateObjectId("id"), getIncidentById);
+router.patch(
+  "/:id/status",
+  validateObjectId("id"),
+  validate(updateStatusSchema, "body"),
+  updateIncidentStatus,
+);
 
 export default router;

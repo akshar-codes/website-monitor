@@ -16,13 +16,41 @@ import {
   getMonitorStats,
   getMonitorChartData,
 } from "../controllers/dashboard.controller.js";
+import { validate, validateObjectId } from "../middlewares/validate.js";
+import {
+  incidentsQuerySchema,
+  healthChecksQuerySchema,
+  monitorStatsQuerySchema,
+} from "../validators/dashboard.validator.js";
 
 const router = Router();
 
 router.get("/overview", getOverview);
-router.get("/incidents", getActiveIncidents);
-router.get("/health-checks", getRecentHealthChecks);
-router.get("/monitors/:id/stats", getMonitorStats);
-router.get("/monitors/:id/chart-data", getMonitorChartData);
+
+router.get(
+  "/incidents",
+  validate(incidentsQuerySchema, "query"),
+  getActiveIncidents,
+);
+
+router.get(
+  "/health-checks",
+  validate(healthChecksQuerySchema, "query"),
+  getRecentHealthChecks,
+);
+
+router.get(
+  "/monitors/:id/stats",
+  validateObjectId("id"),
+  validate(monitorStatsQuerySchema, "query"),
+  getMonitorStats,
+);
+
+router.get(
+  "/monitors/:id/chart-data",
+  validateObjectId("id"),
+  validate(monitorStatsQuerySchema, "query"),
+  getMonitorChartData,
+);
 
 export default router;

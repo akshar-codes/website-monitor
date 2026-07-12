@@ -16,11 +16,28 @@ import {
   updateMonitor,
   deleteMonitor,
 } from "../controllers/monitor.controller.js";
+import { validate, validateObjectId } from "../middlewares/validate.js";
+import {
+  createMonitorSchema,
+  updateMonitorSchema,
+  listMonitorsSchema,
+} from "../validators/monitor.validator.js";
 
 const router = Router();
 
-router.route("/").post(createMonitor).get(getMonitors);
+router
+  .route("/")
+  .post(validate(createMonitorSchema, "body"), createMonitor)
+  .get(validate(listMonitorsSchema, "query"), getMonitors);
 
-router.route("/:id").get(getMonitorById).put(updateMonitor).delete(deleteMonitor);
+router
+  .route("/:id")
+  .get(validateObjectId("id"), getMonitorById)
+  .put(
+    validateObjectId("id"),
+    validate(updateMonitorSchema, "body"),
+    updateMonitor,
+  )
+  .delete(validateObjectId("id"), deleteMonitor);
 
 export default router;
