@@ -1,11 +1,6 @@
 import DailyStat from "../models/DailyStat.js";
 import logger from "../utils/logger.js";
-
-const todayUTC = () => {
-  const d = new Date();
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-};
+import { todayUTC } from "../utils/dateUtils.js";
 
 export const updateDailyStat = async (monitor, healthCheck) => {
   const date = todayUTC();
@@ -86,7 +81,7 @@ export const updateDailyStat = async (monitor, healthCheck) => {
 
     return stat;
   } catch (error) {
-    // Aggregation failures must not break the polling pipeline
+    // Aggregation failures must not break the polling pipeline.
     logger.error(
       `Failed to update DailyStat for monitor ${monitor._id}: ${error.message}`,
     );
