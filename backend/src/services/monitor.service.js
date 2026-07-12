@@ -1,6 +1,6 @@
-const Monitor = require("../models/Monitor");
-const ApiError = require("../utils/ApiError");
-const normalizeUrl = require("../utils/normalizeUrl");
+import Monitor from "../models/Monitor.js";
+import ApiError from "../utils/ApiError.js";
+import normalizeUrl from "../utils/normalizeUrl.js";
 
 const createMonitor = async (data) => {
   data.url = normalizeUrl(data.url);
@@ -81,7 +81,7 @@ const deleteMonitor = async (id) => {
   return monitor;
 };
 
-module.exports = {
+export default {
   createMonitor,
   getMonitors,
   getMonitorById,

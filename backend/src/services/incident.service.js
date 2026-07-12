@@ -1,6 +1,6 @@
-const mongoose = require("mongoose");
-const Incident = require("../models/Incident");
-const ApiError = require("../utils/ApiError");
+import mongoose from "mongoose";
+import Incident from "../models/Incident.js";
+import ApiError from "../utils/ApiError.js";
 
 const WINDOW_MS = {
   "24h": 24 * 60 * 60 * 1000,
@@ -225,7 +225,7 @@ const getDowntimeStats = async ({ monitorId, window }) => {
   };
 };
 
-module.exports = {
+export default {
   getIncidents,
   getIncidentById,
   updateIncidentStatus,

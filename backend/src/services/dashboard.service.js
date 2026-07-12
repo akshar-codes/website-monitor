@@ -1,9 +1,9 @@
-const mongoose = require("mongoose");
-const Monitor = require("../models/Monitor");
-const HealthCheck = require("../models/HealthCheck");
-const Incident = require("../models/Incident");
-const DailyStat = require("../models/DailyStat");
-const ApiError = require("../utils/ApiError");
+import mongoose from "mongoose";
+import Monitor from "../models/Monitor.js";
+import HealthCheck from "../models/HealthCheck.js";
+import Incident from "../models/Incident.js";
+import DailyStat from "../models/DailyStat.js";
+import ApiError from "../utils/ApiError.js";
 
 const WINDOW_MS = {
   "24h": 24 * 60 * 60 * 1000,
@@ -460,7 +460,7 @@ const getMonitorChartData = async (monitorId, { window }) => {
   };
 };
 
-module.exports = {
+export default {
   getOverview,
   getActiveIncidents,
   getRecentHealthChecks,
