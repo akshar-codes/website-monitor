@@ -1,11 +1,3 @@
-/**
- * Environment configuration
- *
- * Loads, validates, and exports all environment variables in one place.
- * Any missing required variable causes a hard crash at startup with a
- * clear message rather than a cryptic runtime error later.
- */
-
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -30,18 +22,23 @@ if (missing.length > 0) {
   );
 }
 
+const NODE_ENV = process.env.NODE_ENV || "development";
+
+const DEFAULT_LOG_LEVEL = NODE_ENV === "production" ? "http" : "debug";
+
 // ── Parsed config object ──────────────────────────────────────────────────────
 
 const env = {
   // Server
-  NODE_ENV: process.env.NODE_ENV || "development",
+  NODE_ENV,
   PORT: parseInt(process.env.PORT, 10) || 5000,
 
   // MongoDB
   MONGO_URI: process.env.MONGO_URI,
 
   // Logging
-  LOG_LEVEL: process.env.LOG_LEVEL || "info",
+  LOG_LEVEL: process.env.LOG_LEVEL || DEFAULT_LOG_LEVEL,
+  LOG_DIR: process.env.LOG_DIR || null, // null → defaults to backend/logs
 
   // Rate limiting
   RATE_LIMIT_WINDOW_MS:
