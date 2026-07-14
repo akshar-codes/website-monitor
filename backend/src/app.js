@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 
 import env from "./config/env.js";
 import routes from "./routes/index.js";
+import requestLogger from "./middlewares/requestLogger.js";
 import notFound from "./middlewares/notFound.js";
 import errorHandler from "./middlewares/errorHandler.js";
 
@@ -18,6 +19,9 @@ app.use(
     credentials: true,
   }),
 );
+
+// ── Request logging ──
+app.use(requestLogger);
 
 // ── Rate limiting ──
 app.use(
