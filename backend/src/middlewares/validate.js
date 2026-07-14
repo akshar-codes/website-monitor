@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import ApiError from "../utils/ApiError.js";
+import { sanitizeQueryTarget } from "../utils/sanitize.js";
 
 const formatZodErrors = (zodError, fallbackField) =>
   zodError.errors.map((issue) => ({
@@ -10,7 +11,8 @@ const formatZodErrors = (zodError, fallbackField) =>
 export const validate =
   (schema, source = "body") =>
   (req, res, next) => {
-    const target = source === "query" ? req.query : req[source];
+    const target =
+      source === "query" ? sanitizeQueryTarget(req.query) : req[source];
 
     const result = schema.safeParse(target);
 

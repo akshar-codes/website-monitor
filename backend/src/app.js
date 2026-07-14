@@ -1,42 +1,48 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import compression from "compression";
+import cookieParser from "cookie-parser";
 
 import env from "./config/env.js";
+import helmetOptions from "./config/helmet.js";
+import corsOptions from "./config/cors.js";
 import routes from "./routes/index.js";
 import requestLogger from "./middlewares/requestLogger.js";
+import globalLimiter from "./middlewares/rateLimiter.js";
+import sanitizeRequest from "./middlewares/sanitize.js";
 import notFound from "./middlewares/notFound.js";
 import errorHandler from "./middlewares/errorHandler.js";
 
 const app = express();
 
-// ── Security ──
-app.use(helmet());
-app.use(
-  cors({
-    origin: env.isDev ? "*" : [], // lock down in production
-    credentials: true,
-  }),
-);
+// ── Trust proxy ──
+app.set("trust proxy", env.TRUST_PROXY);
+
+// ── Security headers ──
+app.use(helmet(helmetOptions));
+
+// ── CORS ──
+app.use(cors(corsOptions));
+
+// ── Compression ──
+app.use(compression());
 
 // ── Request logging ──
 app.use(requestLogger);
 
 // ── Rate limiting ──
-app.use(
-  rateLimit({
-    windowMs: env.RATE_LIMIT_WINDOW_MS,
-    max: env.RATE_LIMIT_MAX,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: "Too many requests, slow down." },
-  }),
-);
+app.use(globalLimiter);
 
 // ── Body parsing ──
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+app.use(express.json({ limit: env.MAX_BODY_SIZE }));
+app.use(express.urlencoded({ extended: true, limit: env.MAX_BODY_SIZE }));
+
+// ── Cookies ──
+app.use(cookieParser(env.COOKIE_SECRET));
+
+// ── Input sanitisation ──
+app.use(sanitizeRequest);
 
 // ── Routes ──
 app.use("/api", routes);
