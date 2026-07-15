@@ -4,6 +4,7 @@ import { sendError } from "../utils/apiResponse.js";
 
 /**
  * Global request-flooding guard, applied to every route. Keyed on the
+ * client IP by default (respects `app.set("trust proxy", ...)`).
  */
 const globalLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
