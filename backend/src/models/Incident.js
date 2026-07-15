@@ -1,23 +1,8 @@
 import mongoose from "mongoose";
+import { INCIDENT_STATUS, INCIDENT_SEVERITY } from "../config/constants.js";
 
-// ── Incident lifecycle statuses ──
-const STATUS = Object.freeze({
-  ONGOING: "ongoing",
-  INVESTIGATING: "investigating",
-  IDENTIFIED: "identified",
-  RESOLVED: "resolved",
-});
-
-const STATUS_VALUES = Object.values(STATUS);
-
-// ── Severity levels ──
-const SEVERITY = Object.freeze({
-  CRITICAL: "critical",
-  MAJOR: "major",
-  MINOR: "minor",
-});
-
-const SEVERITY_VALUES = Object.values(SEVERITY);
+const STATUS_VALUES = Object.values(INCIDENT_STATUS);
+const SEVERITY_VALUES = Object.values(INCIDENT_SEVERITY);
 
 const incidentSchema = new mongoose.Schema(
   {
@@ -70,7 +55,7 @@ const incidentSchema = new mongoose.Schema(
         values: STATUS_VALUES,
         message: `Status must be one of: ${STATUS_VALUES.join(", ")}`,
       },
-      default: STATUS.ONGOING,
+      default: INCIDENT_STATUS.ONGOING,
     },
 
     // Severity is auto-derived by the incident manager based on health
@@ -81,7 +66,7 @@ const incidentSchema = new mongoose.Schema(
         values: SEVERITY_VALUES,
         message: `Severity must be one of: ${SEVERITY_VALUES.join(", ")}`,
       },
-      default: SEVERITY.MAJOR,
+      default: INCIDENT_SEVERITY.MAJOR,
     },
 
     // ── Diagnostics ──
@@ -154,7 +139,7 @@ incidentSchema.pre("save", async function () {
  * True while the incident is unresolved.
  */
 incidentSchema.virtual("isActive").get(function () {
-  return this.status !== STATUS.RESOLVED;
+  return this.status !== INCIDENT_STATUS.RESOLVED;
 });
 
 /**
@@ -181,7 +166,7 @@ incidentSchema.virtual("durationDisplay").get(function () {
  * Find all currently-active (unresolved) incidents.
  */
 incidentSchema.statics.findActive = function () {
-  return this.find({ status: { $ne: STATUS.RESOLVED } }).sort({
+  return this.find({ status: { $ne: INCIDENT_STATUS.RESOLVED } }).sort({
     startedAt: -1,
   });
 };
@@ -192,7 +177,7 @@ incidentSchema.statics.findActive = function () {
 incidentSchema.statics.findActiveForMonitor = function (monitorId) {
   return this.findOne({
     monitor: monitorId,
-    status: { $ne: STATUS.RESOLVED },
+    status: { $ne: INCIDENT_STATUS.RESOLVED },
   }).sort({ startedAt: -1 });
 };
 
@@ -207,7 +192,7 @@ incidentSchema.statics.resolve = async function (
   const incident = await this.findById(incidentId);
   if (!incident) return null;
 
-  incident.status = STATUS.RESOLVED;
+  incident.status = INCIDENT_STATUS.RESOLVED;
   incident.endedAt = new Date();
   if (rootCause != null) incident.rootCause = rootCause;
   if (resolutionNotes != null) incident.resolutionNotes = resolutionNotes;
@@ -225,7 +210,7 @@ incidentSchema.statics.mttr = async function (
     {
       $match: {
         monitor: monitorId,
-        status: STATUS.RESOLVED,
+        status: INCIDENT_STATUS.RESOLVED,
         duration: { $ne: null },
         startedAt: { $gte: since },
       },
@@ -237,8 +222,8 @@ incidentSchema.statics.mttr = async function (
 };
 
 // ── Expose enums ──
-incidentSchema.statics.STATUS = STATUS;
-incidentSchema.statics.SEVERITY = SEVERITY;
+incidentSchema.statics.STATUS = INCIDENT_STATUS;
+incidentSchema.statics.SEVERITY = INCIDENT_SEVERITY;
 
 const Incident = mongoose.model("Incident", incidentSchema);
 

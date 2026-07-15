@@ -1,30 +1,7 @@
 import mongoose from "mongoose";
+import { HEALTH_STATUS, FAILURE_REASONS } from "../config/constants.js";
 
-// ── Status enum ──
-const STATUS = Object.freeze({
-  UP: "up",
-  DOWN: "down",
-  DEGRADED: "degraded",
-  UNKNOWN: "unknown",
-});
-
-const STATUS_VALUES = Object.values(STATUS);
-
-// ── Failure reason enum ──
-const FAILURE_REASONS = Object.freeze({
-  TIMEOUT: "timeout",
-  DNS_ERROR: "dns_error",
-  CONNECTION_REFUSED: "connection_refused",
-  INVALID_JSON: "invalid_json",
-  INVALID_CONTRACT: "invalid_contract",
-  INSUFFICIENT_HEALTH_DATA: "insufficient_health_data",
-  HTTP_ERROR: "http_error",
-  FRONTEND_DOWN: "frontend_down",
-  BACKEND_DOWN: "backend_down",
-  DATABASE_DOWN: "database_down",
-  UNKNOWN: "unknown",
-});
-
+const STATUS_VALUES = Object.values(HEALTH_STATUS);
 const FAILURE_REASON_VALUES = Object.values(FAILURE_REASONS);
 
 // Reusable sub-schema for component-level status
@@ -34,7 +11,7 @@ const componentStatusSchema = {
     values: STATUS_VALUES,
     message: `Status must be one of: ${STATUS_VALUES.join(", ")}`,
   },
-  default: STATUS.UNKNOWN,
+  default: HEALTH_STATUS.UNKNOWN,
 };
 
 const healthCheckSchema = new mongoose.Schema(
@@ -141,10 +118,10 @@ healthCheckSchema.index({ monitor: 1, responseTime: 1 });
  */
 healthCheckSchema.virtual("isHealthy").get(function () {
   return (
-    this.status === STATUS.UP &&
-    this.frontendStatus === STATUS.UP &&
-    this.backendStatus === STATUS.UP &&
-    this.databaseStatus === STATUS.UP
+    this.status === HEALTH_STATUS.UP &&
+    this.frontendStatus === HEALTH_STATUS.UP &&
+    this.backendStatus === HEALTH_STATUS.UP &&
+    this.databaseStatus === HEALTH_STATUS.UP
   );
 });
 
@@ -178,7 +155,7 @@ healthCheckSchema.statics.uptimePercent = async function (
       $group: {
         _id: null,
         total: { $sum: 1 },
-        up: { $sum: { $cond: [{ $eq: ["$status", STATUS.UP] }, 1, 0] } },
+        up: { $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] } },
       },
     },
   ]);
@@ -202,7 +179,7 @@ healthCheckSchema.statics.avgResponseTime = async function (
 };
 
 // ── Expose enums for external use ──
-healthCheckSchema.statics.STATUS = STATUS;
+healthCheckSchema.statics.STATUS = HEALTH_STATUS;
 healthCheckSchema.statics.FAILURE_REASONS = FAILURE_REASONS;
 
 const HealthCheck = mongoose.model("HealthCheck", healthCheckSchema);

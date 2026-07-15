@@ -1,6 +1,6 @@
 import { z } from "zod";
-import Monitor from "../models/Monitor.js";
 import normalizeUrl from "../utils/normalizeUrl.js";
+import { INTERVAL_PRESETS, MONITOR_SORT_FIELDS } from "../config/constants.js";
 
 // ── Shared field definitions ──
 
@@ -31,8 +31,8 @@ const intervalField = z
   .number({ required_error: "Interval is required" })
   .int("Interval must be a whole number")
   .min(30, "Interval must be at least 30 seconds")
-  .refine((v) => Monitor.INTERVAL_PRESETS.includes(v), {
-    message: `Interval must be one of: ${Monitor.INTERVAL_PRESETS.join(", ")} (seconds)`,
+  .refine((v) => INTERVAL_PRESETS.includes(v), {
+    message: `Interval must be one of: ${INTERVAL_PRESETS.join(", ")} (seconds)`,
   });
 
 const activeField = z.boolean();
@@ -68,9 +68,6 @@ export const listMonitorsSchema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === "true")),
-  sortBy: z
-    .enum(["name", "url", "interval", "createdAt", "updatedAt"])
-    .optional()
-    .default("createdAt"),
+  sortBy: z.enum(MONITOR_SORT_FIELDS).optional().default("createdAt"),
   order: z.enum(["asc", "desc"]).optional().default("desc"),
 });

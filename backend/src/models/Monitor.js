@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
-
-// ── Allowed interval presets (in seconds) ──
-const INTERVAL_PRESETS = [30, 60, 120, 300, 600, 900, 1800, 3600];
+import { INTERVAL_PRESETS } from "../config/constants.js";
 
 const monitorSchema = new mongoose.Schema(
   {
