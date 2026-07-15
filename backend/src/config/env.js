@@ -33,7 +33,7 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
 
-  // ── Redis / BullMQ (reserved for future queue integration) ──
+  // ── Redis (reserved for a future session store / queue integration) ──
   REDIS_HOST: z.string().default("127.0.0.1"),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
 
@@ -56,15 +56,11 @@ const envSchema = z.object({
 
   /**
    * Number of reverse-proxy hops to trust for req.ip / X-Forwarded-*.
-   * 0 disables trust entirely (direct internet exposure).
    */
   TRUST_PROXY: z.coerce.number().int().min(0).default(1),
 
   /**
    * Signs cookies (via cookie-parser) so they're tamper-evident — required
-   * unconditionally, even in development, rather than falling back to a
-   * hardcoded default: a "dev-only" secret has a way of ending up deployed.
-   * Generate one with `openssl rand -hex 32`.
    */
   COOKIE_SECRET: z
     .string({ required_error: "COOKIE_SECRET is required" })
@@ -79,9 +75,6 @@ if (!parsed.success) {
     .map((e) => `  - ${e.path.join(".") || "(root)"}: ${e.message}`)
     .join("\n");
 
-  // Synchronous throw — intentional. If required config is missing or
-  // invalid the server cannot start safely, so fail loudly here rather than
-  // limping along with undefined behaviour downstream.
   throw new Error(
     `Invalid environment configuration:\n${details}\n` +
       `Check your .env file against .env.example.`,

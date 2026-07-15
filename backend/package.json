@@ -1,4 +1,7 @@
 {
+  "engines": {
+    "node": "24.16.0"
+  },
   "name": "website-monitor",
   "version": "1.0.0",
   "description": "Website monitoring service backend",
@@ -13,7 +16,6 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "bullmq": "^5.78.0",
     "compression": "^1.7.5",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

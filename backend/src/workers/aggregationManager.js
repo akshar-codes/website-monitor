@@ -1,16 +1,19 @@
 import DailyStat from "../models/DailyStat.js";
 import logger from "../utils/logger.js";
 import { todayUTC } from "../utils/dateUtils.js";
+import { HEALTH_STATUS } from "../config/constants.js";
 
 export const updateDailyStat = async (monitor, healthCheck) => {
   const date = todayUTC();
-  const isSuccess = healthCheck.status === "up";
+  const isSuccess = healthCheck.status === HEALTH_STATUS.UP;
   const rt = healthCheck.responseTime;
 
   // Seconds of downtime / degradation this check represents.
   // Each check covers approximately `monitor.interval` seconds.
-  const downtimeAdd = healthCheck.status === "down" ? monitor.interval : 0;
-  const degradedAdd = healthCheck.status === "degraded" ? monitor.interval : 0;
+  const downtimeAdd =
+    healthCheck.status === HEALTH_STATUS.DOWN ? monitor.interval : 0;
+  const degradedAdd =
+    healthCheck.status === HEALTH_STATUS.DEGRADED ? monitor.interval : 0;
 
   try {
     const stat = await DailyStat.findOneAndUpdate(

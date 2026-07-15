@@ -2,17 +2,20 @@ import Monitor from "../models/Monitor.js";
 import Incident from "../models/Incident.js";
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
-
-const { STATUS, SEVERITY } = Incident;
+import {
+  HEALTH_STATUS,
+  INCIDENT_STATUS,
+  INCIDENT_SEVERITY,
+} from "../config/constants.js";
 
 const deriveSeverity = (checkStatus) => {
-  if (checkStatus === "down") return SEVERITY.CRITICAL;
-  if (checkStatus === "degraded") return SEVERITY.MINOR;
-  return SEVERITY.MAJOR;
+  if (checkStatus === HEALTH_STATUS.DOWN) return INCIDENT_SEVERITY.CRITICAL;
+  if (checkStatus === HEALTH_STATUS.DEGRADED) return INCIDENT_SEVERITY.MINOR;
+  return INCIDENT_SEVERITY.MAJOR;
 };
 
 export const handleIncident = async (monitor, healthCheck) => {
-  const isHealthy = healthCheck.status === "up";
+  const isHealthy = healthCheck.status === HEALTH_STATUS.UP;
 
   if (isHealthy) {
     await handleRecovery(monitor, healthCheck);
@@ -35,7 +38,7 @@ const handleRecovery = async (monitor, healthCheck) => {
   // Resolve active incident if one exists
   const activeIncident = await Incident.findActiveForMonitor(monitor._id);
   if (activeIncident) {
-    activeIncident.status = STATUS.RESOLVED;
+    activeIncident.status = INCIDENT_STATUS.RESOLVED;
     activeIncident.endedAt = new Date();
     activeIncident.resolutionNotes = `Auto-resolved: service returned to healthy state. Response time: ${healthCheck.responseTime}ms.`;
     await activeIncident.save(); // pre-save hook computes duration
@@ -79,7 +82,7 @@ const handleFailure = async (monitor, healthCheck) => {
   const incident = await Incident.create({
     monitor: monitor._id,
     triggerCheck: healthCheck._id,
-    status: STATUS.ONGOING,
+    status: INCIDENT_STATUS.ONGOING,
     severity: deriveSeverity(healthCheck.status),
     startedAt: new Date(),
     rootCause: healthCheck.failureReason

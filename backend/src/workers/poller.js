@@ -7,6 +7,7 @@
 
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
+import { FAILURE_REASONS } from "../config/constants.js";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -44,11 +45,13 @@ const singlePoll = async (url, timeout) => {
     try {
       body = JSON.parse(text);
     } catch {
-      failureReason = response.ok ? "invalid_json" : "http_error";
+      failureReason = response.ok
+        ? FAILURE_REASONS.INVALID_JSON
+        : FAILURE_REASONS.HTTP_ERROR;
     }
 
     if (!response.ok && !failureReason) {
-      failureReason = "http_error";
+      failureReason = FAILURE_REASONS.HTTP_ERROR;
     }
 
     return {
@@ -65,19 +68,19 @@ const singlePoll = async (url, timeout) => {
 
     let failureReason;
     if (error.name === "AbortError") {
-      failureReason = "timeout";
+      failureReason = FAILURE_REASONS.TIMEOUT;
     } else if (
       error.code === "ENOTFOUND" ||
       error.cause?.code === "ENOTFOUND"
     ) {
-      failureReason = "dns_error";
+      failureReason = FAILURE_REASONS.DNS_ERROR;
     } else if (
       error.code === "ECONNREFUSED" ||
       error.cause?.code === "ECONNREFUSED"
     ) {
-      failureReason = "connection_refused";
+      failureReason = FAILURE_REASONS.CONNECTION_REFUSED;
     } else {
-      failureReason = "unknown";
+      failureReason = FAILURE_REASONS.UNKNOWN;
     }
 
     return {
@@ -93,21 +96,6 @@ const singlePoll = async (url, timeout) => {
 
 /**
  * Poll a URL with retries and exponential backoff.
- *
- * @param {string} url
- * @param {Object} [opts]
- * @param {number} [opts.timeout]    — per-attempt timeout in ms
- * @param {number} [opts.maxRetries] — number of retries (total attempts = maxRetries + 1)
- * @param {number} [opts.retryDelay] — base delay in ms (doubles each retry)
- * @returns {Promise<PollResult>}
- *
- * @typedef {Object} PollResult
- * @property {boolean}     ok            — true if HTTP 2xx
- * @property {number|null} httpStatus    — HTTP status code or null on network error
- * @property {number}      responseTime  — ms for the final attempt
- * @property {Object|null} body          — parsed JSON or null
- * @property {string|null} error         — error message or null
- * @property {string|null} failureReason — from FAILURE_REASONS enum or null
  */
 export const poll = async (url, opts = {}) => {
   const timeout = opts.timeout ?? env.POLL_TIMEOUT_MS;
@@ -121,7 +109,7 @@ export const poll = async (url, opts = {}) => {
     if (attempt > 0) {
       const delay = retryDelay * Math.pow(2, attempt - 1);
       logger.debug(
-        `Retry ${attempt}/${maxRetries} for ${url} — waiting ${delay}ms`
+        `Retry ${attempt}/${maxRetries} for ${url} — waiting ${delay}ms`,
       );
       await sleep(delay);
     }

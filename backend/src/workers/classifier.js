@@ -1,16 +1,19 @@
+import { HEALTH_STATUS, FAILURE_REASONS } from "../config/constants.js";
+
 /**
  * Map a raw status string from the monitored endpoint to our enum.
  * Tolerates common synonyms (ok, healthy, running, etc.).
  */
 const normalizeComponentStatus = (raw) => {
-  if (!raw) return "unknown";
+  if (!raw) return HEALTH_STATUS.UNKNOWN;
   const s = String(raw).toLowerCase().trim();
   if (["up", "ok", "healthy", "running", "operational"].includes(s))
-    return "up";
+    return HEALTH_STATUS.UP;
   if (["down", "error", "failed", "offline", "unavailable"].includes(s))
-    return "down";
-  if (["degraded", "slow", "warning", "partial"].includes(s)) return "degraded";
-  return "unknown";
+    return HEALTH_STATUS.DOWN;
+  if (["degraded", "slow", "warning", "partial"].includes(s))
+    return HEALTH_STATUS.DEGRADED;
+  return HEALTH_STATUS.UNKNOWN;
 };
 
 const isValidContract = (body) => {
@@ -31,10 +34,10 @@ export const classify = (pollResult) => {
   // ── Total network failure (no HTTP response at all) ──
   if (!ok && httpStatus == null) {
     return {
-      status: "down",
-      frontendStatus: "unknown",
-      backendStatus: "unknown",
-      databaseStatus: "unknown",
+      status: HEALTH_STATUS.DOWN,
+      frontendStatus: HEALTH_STATUS.UNKNOWN,
+      backendStatus: HEALTH_STATUS.UNKNOWN,
+      databaseStatus: HEALTH_STATUS.UNKNOWN,
       failureReason,
     };
   }
@@ -42,33 +45,33 @@ export const classify = (pollResult) => {
   // ── Got an HTTP response but non-2xx ──
   if (!ok) {
     return {
-      status: "down",
-      frontendStatus: "unknown",
-      backendStatus: "unknown",
-      databaseStatus: "unknown",
-      failureReason: failureReason || "http_error",
+      status: HEALTH_STATUS.DOWN,
+      frontendStatus: HEALTH_STATUS.UNKNOWN,
+      backendStatus: HEALTH_STATUS.UNKNOWN,
+      databaseStatus: HEALTH_STATUS.UNKNOWN,
+      failureReason: failureReason || FAILURE_REASONS.HTTP_ERROR,
     };
   }
 
   // ── 2xx response but body is not valid JSON ──
   if (!body || typeof body !== "object") {
     return {
-      status: "degraded",
-      frontendStatus: "unknown",
-      backendStatus: "unknown",
-      databaseStatus: "unknown",
-      failureReason: "invalid_json",
+      status: HEALTH_STATUS.DEGRADED,
+      frontendStatus: HEALTH_STATUS.UNKNOWN,
+      backendStatus: HEALTH_STATUS.UNKNOWN,
+      databaseStatus: HEALTH_STATUS.UNKNOWN,
+      failureReason: FAILURE_REASONS.INVALID_JSON,
     };
   }
 
   // ── Valid JSON but missing required contract fields ──
   if (!isValidContract(body)) {
     return {
-      status: "degraded",
-      frontendStatus: "unknown",
-      backendStatus: "unknown",
-      databaseStatus: "unknown",
-      failureReason: "invalid_contract",
+      status: HEALTH_STATUS.DEGRADED,
+      frontendStatus: HEALTH_STATUS.UNKNOWN,
+      backendStatus: HEALTH_STATUS.UNKNOWN,
+      databaseStatus: HEALTH_STATUS.UNKNOWN,
+      failureReason: FAILURE_REASONS.INVALID_CONTRACT,
     };
   }
 
@@ -84,21 +87,23 @@ export const classify = (pollResult) => {
   let status;
   let derivedFailureReason = null;
 
-  if (components.includes("down")) {
-    status = "down";
+  if (components.includes(HEALTH_STATUS.DOWN)) {
+    status = HEALTH_STATUS.DOWN;
     // Failure reason priority: frontend → backend → database
-    if (frontendStatus === "down") derivedFailureReason = "frontend_down";
-    else if (backendStatus === "down") derivedFailureReason = "backend_down";
-    else derivedFailureReason = "database_down";
-  } else if (components.includes("degraded")) {
-    status = "degraded";
-  } else if (components.every((c) => c === "up")) {
-    status = "up";
+    if (frontendStatus === HEALTH_STATUS.DOWN)
+      derivedFailureReason = FAILURE_REASONS.FRONTEND_DOWN;
+    else if (backendStatus === HEALTH_STATUS.DOWN)
+      derivedFailureReason = FAILURE_REASONS.BACKEND_DOWN;
+    else derivedFailureReason = FAILURE_REASONS.DATABASE_DOWN;
+  } else if (components.includes(HEALTH_STATUS.DEGRADED)) {
+    status = HEALTH_STATUS.DEGRADED;
+  } else if (components.every((c) => c === HEALTH_STATUS.UP)) {
+    status = HEALTH_STATUS.UP;
   } else {
     // Some/all components are "unknown" but none are down or degraded.
     // Fail safe: insufficient data should not imply healthy.
-    status = "degraded";
-    derivedFailureReason = "insufficient_health_data";
+    status = HEALTH_STATUS.DEGRADED;
+    derivedFailureReason = FAILURE_REASONS.INSUFFICIENT_HEALTH_DATA;
   }
 
   return {
