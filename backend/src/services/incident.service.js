@@ -1,26 +1,46 @@
 import mongoose from "mongoose";
 import Incident from "../models/Incident.js";
 import ApiError from "../utils/ApiError.js";
-import { WINDOW_MS } from "../config/constants.js";
+import {
+  WINDOW_MS,
+  INCIDENT_STATUS,
+  INCIDENT_SEVERITY,
+  MONITOR_POPULATE_FIELDS,
+  TRIGGER_CHECK_POPULATE_FIELDS,
+  TRIGGER_CHECK_DETAIL_POPULATE_FIELDS,
+} from "../config/constants.js";
 import { msBefore } from "../utils/dateUtils.js";
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
 /** Valid forward-only status transitions. */
 const ALLOWED_TRANSITIONS = {
-  ongoing: ["investigating", "identified", "resolved"],
-  investigating: ["identified", "resolved"],
-  identified: ["resolved"],
-  resolved: [], // terminal
+  [INCIDENT_STATUS.ONGOING]: [
+    INCIDENT_STATUS.INVESTIGATING,
+    INCIDENT_STATUS.IDENTIFIED,
+    INCIDENT_STATUS.RESOLVED,
+  ],
+  [INCIDENT_STATUS.INVESTIGATING]: [
+    INCIDENT_STATUS.IDENTIFIED,
+    INCIDENT_STATUS.RESOLVED,
+  ],
+  [INCIDENT_STATUS.IDENTIFIED]: [INCIDENT_STATUS.RESOLVED],
+  [INCIDENT_STATUS.RESOLVED]: [], // terminal
 };
 
 // ── List incidents ────────────────────────────────────────────────────────────
 
-export const getIncidents = async ({ page, limit, severity, status, monitorId }) => {
+export const getIncidents = async ({
+  page,
+  limit,
+  severity,
+  status,
+  monitorId,
+}) => {
   const filter = {};
 
   if (status === "active") {
-    filter.status = { $ne: "resolved" };
+    filter.status = { $ne: INCIDENT_STATUS.RESOLVED };
   } else if (status) {
     filter.status = status;
   }
@@ -37,11 +57,8 @@ export const getIncidents = async ({ page, limit, severity, status, monitorId })
 
   const [incidents, total] = await Promise.all([
     Incident.find(filter)
-      .populate("monitor", "name url")
-      .populate(
-        "triggerCheck",
-        "status responseTime httpStatus failureReason checkedAt",
-      )
+      .populate("monitor", MONITOR_POPULATE_FIELDS)
+      .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
       .sort({ startedAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -61,11 +78,8 @@ export const getIncidents = async ({ page, limit, severity, status, monitorId })
 
 export const getIncidentById = async (id) => {
   const incident = await Incident.findById(id)
-    .populate("monitor", "name url")
-    .populate(
-      "triggerCheck",
-      "status responseTime httpStatus failureReason checkedAt frontendStatus backendStatus databaseStatus",
-    )
+    .populate("monitor", MONITOR_POPULATE_FIELDS)
+    .populate("triggerCheck", TRIGGER_CHECK_DETAIL_POPULATE_FIELDS)
     .lean();
 
   if (!incident) {
@@ -93,14 +107,11 @@ export const updateIncidentStatus = async (
     );
   }
 
-  if (status === "resolved") {
+  if (status === INCIDENT_STATUS.RESOLVED) {
     const resolved = await Incident.resolve(id, { rootCause, resolutionNotes });
     return Incident.findById(resolved._id)
-      .populate("monitor", "name url")
-      .populate(
-        "triggerCheck",
-        "status responseTime httpStatus failureReason checkedAt",
-      )
+      .populate("monitor", MONITOR_POPULATE_FIELDS)
+      .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
       .lean();
   }
 
@@ -109,11 +120,8 @@ export const updateIncidentStatus = async (
   await incident.save();
 
   return Incident.findById(incident._id)
-    .populate("monitor", "name url")
-    .populate(
-      "triggerCheck",
-      "status responseTime httpStatus failureReason checkedAt",
-    )
+    .populate("monitor", MONITOR_POPULATE_FIELDS)
+    .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
     .lean();
 };
 
@@ -134,10 +142,14 @@ export const getDowntimeStats = async ({ monitorId, window }) => {
         _id: null,
         totalIncidents: { $sum: 1 },
         resolvedCount: {
-          $sum: { $cond: [{ $eq: ["$status", "resolved"] }, 1, 0] },
+          $sum: {
+            $cond: [{ $eq: ["$status", INCIDENT_STATUS.RESOLVED] }, 1, 0],
+          },
         },
         ongoingCount: {
-          $sum: { $cond: [{ $ne: ["$status", "resolved"] }, 1, 0] },
+          $sum: {
+            $cond: [{ $ne: ["$status", INCIDENT_STATUS.RESOLVED] }, 1, 0],
+          },
         },
         resolvedDowntime: {
           $sum: { $ifNull: ["$duration", 0] },
@@ -149,13 +161,19 @@ export const getDowntimeStats = async ({ monitorId, window }) => {
         },
         maxDuration: { $max: "$duration" },
         criticalCount: {
-          $sum: { $cond: [{ $eq: ["$severity", "critical"] }, 1, 0] },
+          $sum: {
+            $cond: [{ $eq: ["$severity", INCIDENT_SEVERITY.CRITICAL] }, 1, 0],
+          },
         },
         majorCount: {
-          $sum: { $cond: [{ $eq: ["$severity", "major"] }, 1, 0] },
+          $sum: {
+            $cond: [{ $eq: ["$severity", INCIDENT_SEVERITY.MAJOR] }, 1, 0],
+          },
         },
         minorCount: {
-          $sum: { $cond: [{ $eq: ["$severity", "minor"] }, 1, 0] },
+          $sum: {
+            $cond: [{ $eq: ["$severity", INCIDENT_SEVERITY.MINOR] }, 1, 0],
+          },
         },
       },
     },
@@ -178,7 +196,7 @@ export const getDowntimeStats = async ({ monitorId, window }) => {
   if (stats.ongoingCount > 0) {
     const activeIncidents = await Incident.find({
       ...matchFilter,
-      status: { $ne: "resolved" },
+      status: { $ne: INCIDENT_STATUS.RESOLVED },
     })
       .select("startedAt")
       .lean();

@@ -1,6 +1,5 @@
 import Monitor from "../models/Monitor.js";
 import ApiError from "../utils/ApiError.js";
-import normalizeUrl from "../utils/normalizeUrl.js";
 
 // ── Service methods ───────────────────────────────────────────────────────────
 
@@ -43,8 +42,6 @@ export const getMonitorById = async (id) => {
 
 export const updateMonitor = async (id, data) => {
   if (data.url) {
-    data.url = normalizeUrl(data.url);
-
     const existing = await Monitor.findOne({
       url: data.url,
       _id: { $ne: id },

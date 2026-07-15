@@ -1,4 +1,3 @@
-
 /**
  * Return midnight UTC for today — used as the DailyStat document key.
  */
@@ -30,3 +29,13 @@ export const endOfDayUTC = (date) => {
  * Return a Date that is `ms` milliseconds before now.
  */
 export const msBefore = (ms) => new Date(Date.now() - ms);
+
+/**
+ * True when a timestamp is older than `intervalSeconds * staleMultiplier`.
+ */
+export const isStale = (checkedAt, intervalSeconds, staleMultiplier = 2) => {
+  if (!checkedAt || !intervalSeconds) return true;
+  const ageMs = Date.now() - new Date(checkedAt).getTime();
+  const staleThresholdMs = intervalSeconds * staleMultiplier * 1000;
+  return ageMs > staleThresholdMs;
+};

@@ -4,8 +4,19 @@ import HealthCheck from "../models/HealthCheck.js";
 import Incident from "../models/Incident.js";
 import DailyStat from "../models/DailyStat.js";
 import ApiError from "../utils/ApiError.js";
-import { WINDOW_MS } from "../config/constants.js";
-import { startOfDayUTC, endOfDayUTC, msBefore } from "../utils/dateUtils.js";
+import {
+  WINDOW_MS,
+  HEALTH_STATUS,
+  INCIDENT_STATUS,
+  MONITOR_POPULATE_FIELDS,
+  TRIGGER_CHECK_POPULATE_FIELDS,
+} from "../config/constants.js";
+import {
+  startOfDayUTC,
+  endOfDayUTC,
+  msBefore,
+  isStale,
+} from "../utils/dateUtils.js";
 
 // ── Overview ─────────────────────────────────────────────────────────────────
 
@@ -73,7 +84,7 @@ export const getOverview = async () => {
           _id: null,
           totalChecks: { $sum: 1 },
           successfulChecks: {
-            $sum: { $cond: [{ $eq: ["$status", "up"] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
           },
           avgResponseTime: { $avg: "$responseTime" },
         },
@@ -81,18 +92,18 @@ export const getOverview = async () => {
     ]),
 
     // 4 ─ Active incident count
-    Incident.countDocuments({ status: { $ne: "resolved" } }),
+    Incident.countDocuments({ status: { $ne: INCIDENT_STATUS.RESOLVED } }),
 
     // 5 ─ Latest active incidents (preview — top 5)
-    Incident.find({ status: { $ne: "resolved" } })
-      .populate("monitor", "name url")
+    Incident.find({ status: { $ne: INCIDENT_STATUS.RESOLVED } })
+      .populate("monitor", MONITOR_POPULATE_FIELDS)
       .sort({ startedAt: -1 })
       .limit(5)
       .lean(),
 
     // 6 ─ Most recent health checks (last 10)
     HealthCheck.find()
-      .populate("monitor", "name url")
+      .populate("monitor", MONITOR_POPULATE_FIELDS)
       .select("-rawResponse -__v")
       .sort({ checkedAt: -1 })
       .limit(10)
@@ -103,25 +114,26 @@ export const getOverview = async () => {
 
   const counts = monitorCounts[0] || { total: 0, active: 0, inactive: 0 };
 
-  const currentStatus = { up: 0, down: 0, degraded: 0, unknown: 0 };
-  const now = Date.now();
+  const currentStatus = {
+    [HEALTH_STATUS.UP]: 0,
+    [HEALTH_STATUS.DOWN]: 0,
+    [HEALTH_STATUS.DEGRADED]: 0,
+    [HEALTH_STATUS.UNKNOWN]: 0,
+  };
 
   for (const doc of latestPerMonitor) {
-    const ageMs = now - new Date(doc.checkedAt).getTime();
-    const staleThresholdMs = (doc.interval || 300) * 2 * 1000;
-
-    if (ageMs > staleThresholdMs) {
-      currentStatus.unknown++;
+    if (isStale(doc.checkedAt, doc.interval || 300)) {
+      currentStatus[HEALTH_STATUS.UNKNOWN]++;
     } else if (doc.status in currentStatus) {
       currentStatus[doc.status]++;
     } else {
-      currentStatus.unknown++;
+      currentStatus[HEALTH_STATUS.UNKNOWN]++;
     }
   }
 
   // Active monitors that have never been checked have no HealthCheck document.
   const neverChecked = Math.max(0, counts.active - latestPerMonitor.length);
-  currentStatus.unknown += neverChecked;
+  currentStatus[HEALTH_STATUS.UNKNOWN] += neverChecked;
 
   const stats = systemStats[0] || {
     totalChecks: 0,
@@ -163,18 +175,15 @@ export const getOverview = async () => {
 // ── Active incidents (paginated) ─────────────────────────────────────────────
 
 export const getActiveIncidents = async ({ page, limit, severity }) => {
-  const filter = { status: { $ne: "resolved" } };
+  const filter = { status: { $ne: INCIDENT_STATUS.RESOLVED } };
   if (severity) filter.severity = severity;
 
   const skip = (page - 1) * limit;
 
   const [incidents, total] = await Promise.all([
     Incident.find(filter)
-      .populate("monitor", "name url")
-      .populate(
-        "triggerCheck",
-        "status responseTime httpStatus failureReason checkedAt",
-      )
+      .populate("monitor", MONITOR_POPULATE_FIELDS)
+      .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
       .sort({ startedAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -203,7 +212,7 @@ export const getRecentHealthChecks = async ({ monitorId, status, limit }) => {
   }
 
   return HealthCheck.find(filter)
-    .populate("monitor", "name url")
+    .populate("monitor", MONITOR_POPULATE_FIELDS)
     .select("-rawResponse -__v")
     .sort({ checkedAt: -1 })
     .limit(limit)
@@ -292,20 +301,17 @@ export const getMonitorStats = async (monitorId, { window }) => {
       .limit(20)
       .lean(),
     Incident.findActiveForMonitor(id)
-      .populate(
-        "triggerCheck",
-        "status responseTime httpStatus failureReason checkedAt",
-      )
+      .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
       .lean(),
   ]);
 
-  let currentStatus = latestCheck?.status || "unknown";
-  if (latestCheck && monitor.interval) {
-    const ageMs = Date.now() - new Date(latestCheck.checkedAt).getTime();
-    const staleThresholdMs = monitor.interval * 2 * 1000;
-    if (ageMs > staleThresholdMs) {
-      currentStatus = "unknown";
-    }
+  let currentStatus = latestCheck?.status || HEALTH_STATUS.UNKNOWN;
+  if (
+    latestCheck &&
+    monitor.interval &&
+    isStale(latestCheck.checkedAt, monitor.interval)
+  ) {
+    currentStatus = HEALTH_STATUS.UNKNOWN;
   }
 
   return {
@@ -363,16 +369,20 @@ export const getMonitorChartData = async (monitorId, { window }) => {
           maxResponseTime: { $max: "$responseTime" },
           totalChecks: { $sum: 1 },
           successfulChecks: {
-            $sum: { $cond: [{ $eq: ["$status", "up"] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
           },
           failedChecks: {
-            $sum: { $cond: [{ $eq: ["$status", "down"] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DOWN] }, 1, 0] },
           },
           degradedChecks: {
-            $sum: { $cond: [{ $eq: ["$status", "degraded"] }, 1, 0] },
+            $sum: {
+              $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0],
+            },
           },
           unknownChecks: {
-            $sum: { $cond: [{ $eq: ["$status", "unknown"] }, 1, 0] },
+            $sum: {
+              $cond: [{ $eq: ["$status", HEALTH_STATUS.UNKNOWN] }, 1, 0],
+            },
           },
         },
       },
@@ -391,9 +401,7 @@ export const getMonitorChartData = async (monitorId, { window }) => {
       unknownChecks: b.unknownChecks,
       uptimePercentage:
         b.totalChecks > 0
-          ? parseFloat(
-              ((b.successfulChecks / b.totalChecks) * 100).toFixed(2),
-            )
+          ? parseFloat(((b.successfulChecks / b.totalChecks) * 100).toFixed(2))
           : 0,
     }));
   } else {
