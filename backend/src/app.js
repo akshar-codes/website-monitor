@@ -3,10 +3,13 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import cookieParser from "cookie-parser";
+import session from "express-session";
 
 import env from "./config/env.js";
 import helmetOptions from "./config/helmet.js";
 import corsOptions from "./config/cors.js";
+import sessionConfig from "./config/session.js";
+import passport from "./config/passport.js";
 import routes from "./routes/index.js";
 import requestLogger from "./middlewares/requestLogger.js";
 import globalLimiter from "./middlewares/rateLimiter.js";
@@ -40,6 +43,11 @@ app.use(express.urlencoded({ extended: true, limit: env.MAX_BODY_SIZE }));
 
 // ── Cookies ──
 app.use(cookieParser(env.COOKIE_SECRET));
+
+// ── Sessions & authentication ──
+app.use(session(sessionConfig));
+app.use(passport.initialize());
+app.use(passport.session());
 
 // ── Input sanitisation ──
 app.use(sanitizeRequest);
