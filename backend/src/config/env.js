@@ -33,7 +33,7 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
 
-  // ── Redis (reserved for a future session store / queue integration) ──
+  // ── Redis (reserved for a future background-queue integration) ──
   REDIS_HOST: z.string().default("127.0.0.1"),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
 
@@ -65,6 +65,31 @@ const envSchema = z.object({
   COOKIE_SECRET: z
     .string({ required_error: "COOKIE_SECRET is required" })
     .min(32, "COOKIE_SECRET must be at least 32 characters"),
+
+  // ── Sessions & authentication ──
+
+  /** Signs the session-ID cookie (express-session) — required, min 32 chars. */
+  SESSION_SECRET: z
+    .string({ required_error: "SESSION_SECRET is required" })
+    .min(32, "SESSION_SECRET must be at least 32 characters"),
+
+  /** Name of the session cookie. */
+  SESSION_NAME: z.string().default("wm.sid"),
+
+  /** Session lifetime in milliseconds. Defaults to 7 days. */
+  SESSION_MAX_AGE_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(7 * 24 * 60 * 60 * 1000),
+
+  /** Rate-limit window/max applied specifically to /auth/login and /auth/register. */
+  AUTH_RATE_LIMIT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(900_000),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
 });
 
 const parsed = envSchema.safeParse(process.env);
