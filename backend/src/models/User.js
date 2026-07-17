@@ -64,18 +64,11 @@ const userSchema = new mongoose.Schema(
 );
 
 // ── Indexes ──
-userSchema.index({ email: 1 }, { unique: true });
 
 // ── Middleware ──
-userSchema.pre("save", async function hashPasswordHook(next) {
-  if (!this.isModified("password")) return next();
-
-  try {
-    this.password = await hashPassword(this.password);
-    return next();
-  } catch (error) {
-    return next(error);
-  }
+userSchema.pre("save", async function hashPasswordHook() {
+  if (!this.isModified("password")) return;
+  this.password = await hashPassword(this.password);
 });
 
 // ── Instance methods ──

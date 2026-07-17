@@ -79,7 +79,7 @@ export const updateDailyStat = async (monitor, healthCheck) => {
         },
       ],
 
-      { upsert: true, new: true, updatePipeline: true },
+      { upsert: true, returnDocument: 'after', updatePipeline: true },
     );
 
     return stat;

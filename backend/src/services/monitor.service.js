@@ -57,7 +57,7 @@ export const updateMonitor = async (id, data) => {
   }
 
   const monitor = await Monitor.findByIdAndUpdate(id, data, {
-    new: true,
+    returnDocument: 'after',
     runValidators: true,
   });
 
