@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Monitor,
@@ -11,6 +11,8 @@ import {
   User,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { useAuth } from "../../hooks/useAuth";
+import { ROUTES } from "../../constants/routes";
 
 const NAV_ITEMS = [
   {
@@ -77,6 +79,16 @@ function NavItem({ item, collapsed }) {
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate(ROUTES.LOGIN, { replace: true });
+    }
+  };
 
   return (
     <aside
@@ -114,24 +126,33 @@ export default function Sidebar() {
         </div>
       </nav>
 
-      {/* Footer */}
+      {/* Footer — account + sign out */}
       <div
         className={cn("border-t border-border-subtle px-2 py-3 space-y-0.5")}
       >
-        <button
+        <div
           className={cn(
-            "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#71717a] transition-all hover:bg-bg-overlay hover:text-white",
+            "flex items-center gap-3 rounded-lg px-3 py-2.5",
             collapsed && "justify-center px-2",
           )}
         >
-          <User
-            size={17}
-            className="shrink-0 text-text-muted group-hover:text-text-secondary"
-          />
-          {!collapsed && <span className="truncate">Profile</span>}
-        </button>
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[11px] font-bold text-emerald-400">
+            {user?.name?.charAt(0)?.toUpperCase() || <User size={14} />}
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-white">
+                {user?.name || "Account"}
+              </p>
+              <p className="truncate text-[10px] text-text-muted">
+                {user?.email || ""}
+              </p>
+            </div>
+          )}
+        </div>
 
         <button
+          onClick={handleLogout}
           className={cn(
             "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#71717a] transition-all hover:bg-red-500/10 hover:text-red-400",
             collapsed && "justify-center px-2",

@@ -1,10 +1,15 @@
 import { Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
+import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./components/routing/ProtectedRoute";
+import GuestRoute from "./components/routing/GuestRoute";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Monitors from "./pages/Monitors";
 import Insights from "./pages/Insights";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import { Skeleton } from "./components/ui/Skeleton";
 
 function PageFallback() {
@@ -25,53 +30,65 @@ function PageFallback() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            background: "#18181b",
-            border: "1px solid #27272a",
-            color: "#fafafa",
-            fontSize: "13px",
-            borderRadius: "12px",
-          },
-          classNames: {
-            success: "!text-emerald-400",
-            error: "!text-red-400",
-          },
-        }}
-        richColors
-      />
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route
-            path="/"
-            element={
-              <Suspense fallback={<PageFallback />}>
-                <Dashboard />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/monitors"
-            element={
-              <Suspense fallback={<PageFallback />}>
-                <Monitors />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/insights"
-            element={
-              <Suspense fallback={<PageFallback />}>
-                <Insights />
-              </Suspense>
-            }
-          />
+      <AuthProvider>
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: "#18181b",
+              border: "1px solid #27272a",
+              color: "#fafafa",
+              fontSize: "13px",
+              borderRadius: "12px",
+            },
+            classNames: {
+              success: "!text-emerald-400",
+              error: "!text-red-400",
+            },
+          }}
+          richColors
+        />
+        <Routes>
+          {/* Public — redirects to the dashboard if already logged in */}
+          <Route element={<GuestRoute />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+          </Route>
+
+          {/* Requires an authenticated session */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
+              <Route
+                path="/"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <Dashboard />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/monitors"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <Monitors />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/insights"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <Insights />
+                  </Suspense>
+                }
+              />
+            </Route>
+          </Route>
+
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }
