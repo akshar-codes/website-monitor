@@ -21,6 +21,8 @@ const registerPasswordField = z
   .regex(/[0-9]/, "Include at least one number")
   .regex(/[^A-Za-z0-9]/, "Include at least one special character");
 
+const rememberMeField = z.boolean().optional();
+
 export const registerSchema = z
   .object({
     name: nameField,
@@ -29,6 +31,8 @@ export const registerSchema = z
     confirmPassword: z.string({
       required_error: "Please confirm your password",
     }),
+
+    rememberMe: rememberMeField.default(true),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -40,4 +44,6 @@ export const loginSchema = z.object({
   password: z
     .string({ required_error: "Password is required" })
     .min(1, "Password is required"),
+
+  rememberMe: rememberMeField.default(false),
 });

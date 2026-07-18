@@ -44,3 +44,21 @@ export const validateObjectId =
 
     return next();
   };
+
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+
+export const validateSessionIdParam =
+  (paramName = "sessionId") =>
+  (req, res, next) => {
+    const value = req.params[paramName];
+
+    if (!SESSION_ID_PATTERN.test(value || "")) {
+      return next(
+        ApiError.validation([
+          { field: paramName, message: "Invalid session ID format" },
+        ]),
+      );
+    }
+
+    return next();
+  };
