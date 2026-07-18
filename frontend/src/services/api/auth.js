@@ -18,9 +18,44 @@ export async function login(payload) {
 
 /**
  * POST /api/auth/logout
+ * Ends the current device's session only.
  */
 export async function logout() {
   const { data } = await apiClient.post("/auth/logout");
+  return data;
+}
+
+/**
+ * POST /api/auth/logout-all
+ * Ends every session for this user, including the current device.
+ */
+export async function logoutAll() {
+  const { data } = await apiClient.post("/auth/logout-all");
+  return data;
+}
+
+/**
+ * POST /api/auth/logout-others
+ * Ends every session for this user except the current device.
+ */
+export async function logoutOthers() {
+  const { data } = await apiClient.post("/auth/logout-others");
+  return data;
+}
+
+/**
+ * GET /api/auth/sessions
+ */
+export async function getSessions() {
+  const { data } = await apiClient.get("/auth/sessions");
+  return data;
+}
+
+/**
+ * DELETE /api/auth/sessions/:sessionId
+ */
+export async function revokeSession(sessionId) {
+  const { data } = await apiClient.delete(`/auth/sessions/${sessionId}`);
   return data;
 }
 
