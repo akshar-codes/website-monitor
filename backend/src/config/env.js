@@ -76,12 +76,27 @@ const envSchema = z.object({
   /** Name of the session cookie. */
   SESSION_NAME: z.string().default("wm.sid"),
 
-  /** Session lifetime in milliseconds. Defaults to 7 days. */
-  SESSION_MAX_AGE_MS: z.coerce
+  /**
+   * Default session lifetime (no "remember me") in milliseconds.
+   * Combined with `rolling: true`, this acts as a sliding idle-timeout —
+   * active users stay signed in; idle ones expire. Defaults to 1 day.
+   */
+  SESSION_DEFAULT_MAX_AGE_MS: z.coerce
     .number()
     .int()
     .positive()
-    .default(7 * 24 * 60 * 60 * 1000),
+    .default(24 * 60 * 60 * 1000),
+
+  /**
+   * "Remember me" session lifetime in milliseconds — also used as the
+   * MongoStore fallback TTL so every session document has a hard upper
+   * bound even if `cookie.expires` is ever missing. Defaults to 30 days.
+   */
+  SESSION_REMEMBER_ME_MAX_AGE_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(30 * 24 * 60 * 60 * 1000),
 
   /** Rate-limit window/max applied specifically to /auth/login and /auth/register. */
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce
