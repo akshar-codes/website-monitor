@@ -33,26 +33,40 @@ export function AuthProvider({ children }) {
       window.removeEventListener("auth:session-expired", handleSessionExpired);
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const { data } = await authApi.login({ email, password });
+  const login = useCallback(async (email, password, rememberMe = false) => {
+    const { data } = await authApi.login({ email, password, rememberMe });
     setUser(data);
     return data;
   }, []);
 
-  const register = useCallback(async (name, email, password) => {
-    const { data } = await authApi.register({
-      name,
-      email,
-      password,
-      confirmPassword: password,
-    });
-    setUser(data);
-    return data;
-  }, []);
+  const register = useCallback(
+    async (name, email, password, rememberMe = true) => {
+      const { data } = await authApi.register({
+        name,
+        email,
+        password,
+        confirmPassword: password,
+        rememberMe,
+      });
+      setUser(data);
+      return data;
+    },
+    [],
+  );
 
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
+    } finally {
+      setUser(null);
+    }
+  }, []);
+
+  // Ends every session for this account, including the current device —
+  // used by the "sign out everywhere" action in Sidebar.
+  const logoutAll = useCallback(async () => {
+    try {
+      await authApi.logoutAll();
     } finally {
       setUser(null);
     }
@@ -64,6 +78,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    logoutAll,
     refetchUser: fetchCurrentUser,
   };
 

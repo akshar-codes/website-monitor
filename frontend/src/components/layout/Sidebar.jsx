@@ -8,11 +8,13 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  ShieldOff,
   User,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { useAuth } from "../../hooks/useAuth";
 import { ROUTES } from "../../constants/routes";
+import ConfirmDialog from "../ui/ConfirmDialog";
 
 const NAV_ITEMS = [
   {
@@ -79,7 +81,9 @@ function NavItem({ item, collapsed }) {
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const { user, logout } = useAuth();
+  const [confirmLogoutAllOpen, setConfirmLogoutAllOpen] = useState(false);
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
+  const { user, logout, logoutAll } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -87,6 +91,17 @@ export default function Sidebar() {
       await logout();
     } finally {
       navigate(ROUTES.LOGIN, { replace: true });
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    setLoggingOutAll(true);
+    try {
+      await logoutAll();
+      navigate(ROUTES.LOGIN, { replace: true });
+    } finally {
+      setLoggingOutAll(false);
+      setConfirmLogoutAllOpen(false);
     }
   };
 
@@ -165,6 +180,22 @@ export default function Sidebar() {
           {!collapsed && <span className="truncate">Sign out</span>}
         </button>
 
+        {/* Secondary destructive action — kept text-only and low-emphasis
+            so it doesn't compete with the primary "Sign out" button.
+            Hidden on the collapsed rail; expand the sidebar to access it. */}
+        {!collapsed && (
+          <button
+            onClick={() => setConfirmLogoutAllOpen(true)}
+            className="group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-text-disabled transition-all hover:bg-red-500/10 hover:text-red-400"
+          >
+            <ShieldOff
+              size={14}
+              className="shrink-0 text-text-disabled group-hover:text-red-400"
+            />
+            <span className="truncate">Sign out of all devices</span>
+          </button>
+        )}
+
         {/* Version */}
         {!collapsed && (
           <p className="px-3 pt-2 text-[11px] text-text-disabled">v1.0.0</p>
@@ -179,6 +210,16 @@ export default function Sidebar() {
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
       </button>
+
+      <ConfirmDialog
+        open={confirmLogoutAllOpen}
+        onClose={() => setConfirmLogoutAllOpen(false)}
+        onConfirm={handleLogoutAll}
+        title="Sign out of all devices?"
+        description="This ends every active session for your account, including this one. You'll need to sign in again everywhere."
+        confirmLabel="Sign out everywhere"
+        loading={loggingOutAll}
+      />
     </aside>
   );
 }
