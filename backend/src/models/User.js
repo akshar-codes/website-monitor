@@ -38,6 +38,43 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // ── Email verification ──
+    // A freshly registered account starts unverified; login is blocked
+    // (see auth.controller.js) until the user completes the emailed link.
+
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    emailVerifiedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Only the SHA-256 hash of the verification token is ever persisted —
+    // the raw token exists only in the outgoing email. select: false keeps
+    // it out of default query results (mirrors the `password` field).
+    emailVerificationTokenHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+
+    emailVerificationExpires: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+
+    // Powers the resend-verification cooldown so the endpoint can't be
+    // used to spam a mailbox.
+    emailVerificationLastSentAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -65,6 +102,9 @@ const userSchema = new mongoose.Schema(
 
 // ── Indexes ──
 
+// Fast lookup during email verification (findByValidVerificationToken).
+userSchema.index({ emailVerificationTokenHash: 1 });
+
 // ── Middleware ──
 userSchema.pre("save", async function hashPasswordHook() {
   if (!this.isModified("password")) return;
@@ -76,10 +116,51 @@ userSchema.methods.comparePassword = function (candidatePassword) {
   return comparePassword(candidatePassword, this.password);
 };
 
+/**
+ * Assigns a new (hashed) verification token and its expiry to this
+ * document. Does not save — callers persist alongside any other changes.
+ */
+userSchema.methods.setEmailVerificationToken = function (tokenHash, expiresAt) {
+  this.emailVerificationTokenHash = tokenHash;
+  this.emailVerificationExpires = expiresAt;
+};
+
+/**
+ * Flips the account to verified and clears the now-consumed token fields.
+ */
+userSchema.methods.markEmailVerified = function () {
+  this.emailVerified = true;
+  this.emailVerifiedAt = new Date();
+  this.emailVerificationTokenHash = null;
+  this.emailVerificationExpires = null;
+};
+
 // ── Statics ──
 
 userSchema.statics.findByEmail = function (email) {
   return this.findOne({ email: email.toLowerCase().trim() });
+};
+
+/**
+ * Same lookup as `findByEmail` but also returns the (normally hidden)
+ * verification bookkeeping fields — used by the resend-verification flow.
+ */
+userSchema.statics.findByEmailWithVerification = function (email) {
+  return this.findOne({ email: email.toLowerCase().trim() }).select(
+    "+emailVerificationTokenHash +emailVerificationExpires +emailVerificationLastSentAt",
+  );
+};
+
+/**
+ * Finds the user owning a given (hashed) verification token, provided it
+ * hasn't expired. Returns null for an invalid or expired token — callers
+ * should not distinguish between the two in user-facing error messages.
+ */
+userSchema.statics.findByValidVerificationToken = function (tokenHash) {
+  return this.findOne({
+    emailVerificationTokenHash: tokenHash,
+    emailVerificationExpires: { $gt: new Date() },
+  }).select("+emailVerificationTokenHash +emailVerificationExpires");
 };
 
 const User = mongoose.model("User", userSchema);

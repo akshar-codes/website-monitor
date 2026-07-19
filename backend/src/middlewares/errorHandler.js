@@ -70,6 +70,7 @@ const errorHandler = (err, req, res, _next) => {
     statusCode,
     message,
     errors: apiError.errors || undefined,
+    code: apiError.code || undefined,
     // Attach stack trace in development only
     ...(env.isDev && { stack: err.stack }),
   });

@@ -1,9 +1,16 @@
 class ApiError extends Error {
-  constructor(statusCode, message, isOperational = true, errors = null) {
+  constructor(
+    statusCode,
+    message,
+    isOperational = true,
+    errors = null,
+    code = null,
+  ) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = isOperational;
     this.errors = errors;
+    this.code = code;
     Error.captureStackTrace(this, this.constructor);
   }
 
@@ -36,6 +43,12 @@ class ApiError extends Error {
 
   static internal(message = "Internal server error") {
     return new ApiError(500, message, false);
+  }
+
+  static emailNotVerified(
+    message = "Please verify your email address before logging in.",
+  ) {
+    return new ApiError(403, message, true, null, "EMAIL_NOT_VERIFIED");
   }
 }
 
