@@ -47,3 +47,16 @@ export const loginSchema = z.object({
 
   rememberMe: rememberMeField.default(false),
 });
+
+// ── Email verification ──
+
+export const verifyEmailSchema = z.object({
+  token: z
+    .string({ required_error: "Verification token is required" })
+    .trim()
+    .min(1, "Verification token is required"),
+});
+
+export const resendVerificationSchema = z.object({
+  email: emailField,
+});

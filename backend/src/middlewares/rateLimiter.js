@@ -30,4 +30,19 @@ export const authLimiter = rateLimit({
   handler: rateLimitHandler,
 });
 
+/**
+ * Rate limiter for the email-verification endpoints. Unlike `authLimiter`,
+ * this does NOT skip successful requests: /resend-verification always
+ * responds 200 (by design, to avoid account enumeration), so a limiter
+ * that only counts failures would never actually throttle it and the
+ * endpoint could be used to spam a mailbox.
+ */
+export const verificationLimiter = rateLimit({
+  windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
+  max: env.AUTH_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
 export default globalLimiter;

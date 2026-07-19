@@ -1,14 +1,16 @@
 /**
  * Authentication routes
  *
- * POST   /api/auth/register        — create an account (auto-logs in)
- * POST   /api/auth/login           — authenticate with email + password
- * POST   /api/auth/logout          — destroy the current session
- * POST   /api/auth/logout-all      — destroy every session for this user
- * POST   /api/auth/logout-others   — destroy every session except the current one
- * GET    /api/auth/sessions        — list this user's active sessions
- * DELETE /api/auth/sessions/:id    — revoke a single other session
- * GET    /api/auth/me              — return the authenticated user
+ * POST   /api/auth/register            — create an account (unverified; sends a verification email)
+ * POST   /api/auth/verify-email        — confirm an email address using the emailed token
+ * POST   /api/auth/resend-verification — re-send the verification email
+ * POST   /api/auth/login               — authenticate with email + password (must be verified)
+ * POST   /api/auth/logout              — destroy the current session
+ * POST   /api/auth/logout-all          — destroy every session for this user
+ * POST   /api/auth/logout-others       — destroy every session except the current one
+ * GET    /api/auth/sessions            — list this user's active sessions
+ * DELETE /api/auth/sessions/:id        — revoke a single other session
+ * GET    /api/auth/me                  — return the authenticated user
  */
 
 import { Router } from "express";
@@ -21,11 +23,21 @@ import {
   listSessions,
   revokeSession,
   getMe,
+  verifyEmail,
+  resendVerification,
 } from "../controllers/auth.controller.js";
 import { isAuthenticated } from "../middlewares/authenticate.js";
 import { validate, validateSessionIdParam } from "../middlewares/validate.js";
-import { authLimiter } from "../middlewares/rateLimiter.js";
-import { registerSchema, loginSchema } from "../validators/auth.validator.js";
+import {
+  authLimiter,
+  verificationLimiter,
+} from "../middlewares/rateLimiter.js";
+import {
+  registerSchema,
+  loginSchema,
+  verifyEmailSchema,
+  resendVerificationSchema,
+} from "../validators/auth.validator.js";
 
 const router = Router();
 
@@ -35,6 +47,21 @@ router.post(
   validate(registerSchema, "body"),
   register,
 );
+
+router.post(
+  "/verify-email",
+  verificationLimiter,
+  validate(verifyEmailSchema, "body"),
+  verifyEmail,
+);
+
+router.post(
+  "/resend-verification",
+  verificationLimiter,
+  validate(resendVerificationSchema, "body"),
+  resendVerification,
+);
+
 router.post("/login", authLimiter, validate(loginSchema, "body"), login);
 router.post("/logout", isAuthenticated, logout);
 router.post("/logout-all", isAuthenticated, logoutAll);

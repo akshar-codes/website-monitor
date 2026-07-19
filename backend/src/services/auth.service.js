@@ -1,5 +1,9 @@
 import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
+import env from "../config/env.js";
+import { generateSecureToken, hashToken } from "../utils/tokenUtils.js";
+import { sendVerificationEmail } from "./email.service.js";
+import logger from "../utils/logger.js";
 
 // ── Registration ──────────────────────────────────────────────────────────────
 
@@ -11,6 +15,9 @@ export const registerUser = async ({ name, email, password }) => {
 
   // Password hashing happens in the User pre-save hook.
   const user = await User.create({ name, email, password });
+
+  await issueEmailVerificationToken(user);
+
   return user;
 };
 
@@ -32,4 +39,81 @@ export const validateCredentials = async (email, password) => {
 
 export const getUserById = async (id) => {
   return User.findById(id);
+};
+
+// ── Email verification ───────────────────────────────────────────────────────
+
+/**
+ * Generates a fresh verification token for a user, persists its hash, and
+ * dispatches the verification email. Shared by registration and the
+ * resend endpoint so token issuance always follows one code path.
+ */
+const issueEmailVerificationToken = async (user) => {
+  const { token, tokenHash } = generateSecureToken();
+  const expiresAt = new Date(
+    Date.now() + env.EMAIL_VERIFICATION_TOKEN_EXPIRES_MS,
+  );
+
+  user.setEmailVerificationToken(tokenHash, expiresAt);
+  user.emailVerificationLastSentAt = new Date();
+  await user.save({ validateBeforeSave: false });
+
+  await sendVerificationEmail(user, token);
+
+  return user;
+};
+
+/**
+ * Verifies a submitted raw token: hashes it, looks up a matching
+ * non-expired user document, and flips the account to verified.
+ * Throws on an invalid/expired token — the message deliberately doesn't
+ * distinguish "never existed" from "expired" to avoid leaking details.
+ */
+export const verifyEmail = async (rawToken) => {
+  const tokenHash = hashToken(rawToken);
+
+  const user = await User.findByValidVerificationToken(tokenHash);
+  if (!user) {
+    throw ApiError.badRequest(
+      "This verification link is invalid or has expired. Please request a new one.",
+    );
+  }
+
+  if (user.emailVerified) {
+    // Token was valid but the account was already verified (e.g. a stale
+    // browser tab reusing an old link) — treat as success, not an error.
+    return user;
+  }
+
+  user.markEmailVerified();
+  await user.save({ validateBeforeSave: false });
+
+  logger.info(`Email verified for user ${user._id} (${user.email})`);
+
+  return user;
+};
+
+/**
+ * Resends the verification email for an unverified account. Always
+ * resolves without throwing — the controller returns one generic response
+ * regardless of whether the account exists, is already verified, or is
+ * under cooldown, so the endpoint can't be used to enumerate accounts.
+ */
+export const resendVerificationEmail = async (email) => {
+  const user = await User.findByEmailWithVerification(email);
+
+  if (!user || user.emailVerified) {
+    return { sent: false };
+  }
+
+  const cooldownMs = env.EMAIL_VERIFICATION_RESEND_COOLDOWN_MS;
+  const lastSent = user.emailVerificationLastSentAt;
+  if (lastSent && Date.now() - lastSent.getTime() < cooldownMs) {
+    logger.debug(`Resend verification skipped for ${email} — cooldown active`);
+    return { sent: false };
+  }
+
+  await issueEmailVerificationToken(user);
+
+  return { sent: true };
 };

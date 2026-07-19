@@ -11,28 +11,27 @@ import { sendSuccess } from "../utils/apiResponse.js";
 
 /**
  * POST /api/auth/register
+ *
+ * BREAKING CHANGE: registration no longer establishes a session. The
+ * account is created in an unverified state and a verification email is
+ * sent; the user must verify before they're able to log in (see `login`
+ * below). This is intentional — accounts should not be usable before the
+ * email address behind them has been confirmed.
  */
-export const register = asyncHandler(async (req, res, next) => {
+export const register = asyncHandler(async (req, res) => {
   const {
     confirmPassword: _confirmPassword,
-    rememberMe,
+    rememberMe: _rememberMe,
     ...payload
   } = req.body;
+
   const user = await authService.registerUser(payload);
 
-  req.login(user, (err) => {
-    if (err) return next(err);
-
-    applySessionPersistence(req, { rememberMe });
-
-    req.session.save((saveErr) => {
-      if (saveErr) return next(saveErr);
-      return sendSuccess(res, {
-        statusCode: 201,
-        message: "Account created successfully",
-        data: user,
-      });
-    });
+  sendSuccess(res, {
+    statusCode: 201,
+    message:
+      "Account created successfully. Please check your email to verify your account before signing in.",
+    data: user,
   });
 });
 
@@ -46,6 +45,14 @@ export const login = asyncHandler(async (req, res, next) => {
       return next(
         ApiError.unauthorized(info?.message || "Incorrect email or password"),
       );
+    }
+
+    // Credentials are correct but the account hasn't confirmed its email
+    // yet — block session creation. The `EMAIL_NOT_VERIFIED` code lets the
+    // frontend surface a "resend verification email" action instead of a
+    // generic auth failure.
+    if (!user.emailVerified) {
+      return next(ApiError.emailNotVerified());
     }
 
     req.login(user, (loginErr) => {
@@ -160,4 +167,33 @@ export const revokeSession = asyncHandler(async (req, res) => {
  */
 export const getMe = asyncHandler(async (req, res) => {
   sendSuccess(res, { data: req.user });
+});
+
+/**
+ * POST /api/auth/verify-email
+ * Confirms a user's email address using the token from the emailed link.
+ */
+export const verifyEmail = asyncHandler(async (req, res) => {
+  const { token } = req.body;
+  const user = await authService.verifyEmail(token);
+
+  sendSuccess(res, {
+    message: "Email verified successfully. You can now sign in.",
+    data: { email: user.email, emailVerified: user.emailVerified },
+  });
+});
+
+/**
+ * POST /api/auth/resend-verification
+ * Re-sends the verification email for an unverified account. Always
+ * returns a generic success response — see auth.service.js for rationale.
+ */
+export const resendVerification = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  await authService.resendVerificationEmail(email);
+
+  sendSuccess(res, {
+    message:
+      "If an account with that email exists and isn't verified yet, a new verification email has been sent.",
+  });
 });

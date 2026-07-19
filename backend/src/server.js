@@ -4,6 +4,7 @@ import connectDB from "./config/db.js";
 import logger from "./utils/logger.js";
 import { registerProcessHandlers } from "./utils/processHandlers.js";
 import { start, stop } from "./workers/scheduler.js";
+import { verifyMailTransport } from "./config/mail.js";
 
 let server = null;
 let shuttingDown = false;
@@ -47,10 +48,13 @@ const startServer = async () => {
   // 1. Connect to MongoDB
   await connectDB();
 
-  // 2. Start the monitoring scheduler
+  // 2. Verify outbound email connectivity (non-fatal — see config/mail.js)
+  await verifyMailTransport();
+
+  // 3. Start the monitoring scheduler
   start();
 
-  // 3. Start listening
+  // 4. Start listening
   server = app.listen(env.PORT, () => {
     logger.info(
       `Server running in ${env.NODE_ENV} mode on http://localhost:${env.PORT}`,
