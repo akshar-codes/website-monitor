@@ -105,6 +105,51 @@ const envSchema = z.object({
     .positive()
     .default(900_000),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+
+  // ── Client / frontend ──
+
+  /** Canonical frontend origin used to build links embedded in emails. */
+  CLIENT_URL: z
+    .string({ required_error: "CLIENT_URL is required" })
+    .url("CLIENT_URL must be a valid URL"),
+
+  // ── Email / SMTP ──
+
+  SMTP_HOST: z
+    .string({ required_error: "SMTP_HOST is required" })
+    .min(1, "SMTP_HOST cannot be empty"),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: z
+    .enum(["true", "false"])
+    .optional()
+    .default("false")
+    .transform((v) => v === "true"),
+  SMTP_USER: z
+    .string({ required_error: "SMTP_USER is required" })
+    .min(1, "SMTP_USER cannot be empty"),
+  SMTP_PASS: z
+    .string({ required_error: "SMTP_PASS is required" })
+    .min(1, "SMTP_PASS cannot be empty"),
+  SMTP_FROM_EMAIL: z
+    .string({ required_error: "SMTP_FROM_EMAIL is required" })
+    .email("SMTP_FROM_EMAIL must be a valid email address"),
+  SMTP_FROM_NAME: z.string().default("WebMonitor"),
+
+  // ── Email verification ──
+
+  /** How long an issued verification token stays valid. Defaults to 24 hours. */
+  EMAIL_VERIFICATION_TOKEN_EXPIRES_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(24 * 60 * 60 * 1000),
+
+  /** Minimum gap between resend requests for the same account. Defaults to 60s. */
+  EMAIL_VERIFICATION_RESEND_COOLDOWN_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 1000),
 });
 
 const parsed = envSchema.safeParse(process.env);
