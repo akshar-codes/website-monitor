@@ -1,7 +1,13 @@
 import axios from "axios";
 import { toast } from "sonner";
 
-const SILENT_AUTH_PATHS = ["/auth/login", "/auth/register", "/auth/me"];
+const SILENT_AUTH_PATHS = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/me",
+  "/auth/verify-email",
+  "/auth/resend-verification",
+];
 
 const apiClient = axios.create({
   baseURL: "/api",

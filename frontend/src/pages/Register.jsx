@@ -9,6 +9,8 @@ import AuthLayout from "../components/auth/AuthLayout";
 import RegisterMarketingPanel from "../components/auth/RegisterMarketingPanel";
 import PasswordField from "../components/auth/PasswordField";
 import PasswordStrengthMeter from "../components/auth/PasswordStrengthMeter";
+import VerificationStatusCard from "../components/auth/VerificationStatusCard";
+import ResendVerificationForm from "../components/auth/ResendVerificationForm";
 import { Card } from "../components/ui/Card";
 import { FormField, Input } from "../components/ui/Input";
 import Button from "../components/ui/Button";
@@ -29,6 +31,10 @@ export default function Register() {
 
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState("");
+  // Set once registration succeeds — swaps the form for a "check your
+  // inbox" screen. Registration no longer creates a session (the account
+  // is unverified), so there's nowhere authenticated to navigate to yet.
+  const [registeredEmail, setRegisteredEmail] = useState("");
 
   const makeChangeHandler = (field) => (e) => {
     if (apiError) setApiError("");
@@ -45,7 +51,7 @@ export default function Register() {
     setSubmitting(true);
     try {
       await register(values.name.trim(), values.email.trim(), values.password);
-      navigate(ROUTES.DASHBOARD, { replace: true });
+      setRegisteredEmail(values.email.trim());
     } catch (err) {
       const mapped = mapAuthError(err, "register");
       if (err?.response?.status === 409) {
@@ -57,6 +63,29 @@ export default function Register() {
       setSubmitting(false);
     }
   };
+
+  if (registeredEmail) {
+    return (
+      <AuthLayout
+        animKey="register-success"
+        marketingPanel={<RegisterMarketingPanel />}
+      >
+        <VerificationStatusCard
+          status="success"
+          title="Check your inbox"
+          message={`We've sent a verification link to ${registeredEmail}. Verify your email to activate your account and sign in.`}
+        >
+          <ResendVerificationForm initialEmail={registeredEmail} />
+          <button
+            onClick={() => navigate(ROUTES.LOGIN)}
+            className="mt-4 w-full text-center text-sm font-semibold text-emerald-400 transition-colors hover:text-emerald-300"
+          >
+            Back to sign in
+          </button>
+        </VerificationStatusCard>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout animKey="register" marketingPanel={<RegisterMarketingPanel />}>

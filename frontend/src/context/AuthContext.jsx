@@ -39,6 +39,13 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  /**
+   * BREAKING CHANGE: registration no longer establishes a session — the
+   * backend creates the account in an unverified state and does not log
+   * it in. This intentionally does NOT call setUser(); the caller (the
+   * Register page) is responsible for showing a "check your inbox" state
+   * rather than treating the response as an authenticated user.
+   */
   const register = useCallback(
     async (name, email, password, rememberMe = true) => {
       const { data } = await authApi.register({
@@ -48,7 +55,6 @@ export function AuthProvider({ children }) {
         confirmPassword: password,
         rememberMe,
       });
-      setUser(data);
       return data;
     },
     [],

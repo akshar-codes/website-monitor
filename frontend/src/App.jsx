@@ -10,6 +10,7 @@ import Monitors from "./pages/Monitors";
 import Insights from "./pages/Insights";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import VerifyEmail from "./pages/VerifyEmail";
 import { Skeleton } from "./components/ui/Skeleton";
 
 function PageFallback() {
@@ -54,6 +55,14 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
           </Route>
+
+          {/*
+            Public and always accessible regardless of auth state — this is
+            a transactional link clicked from an email client, which may
+            open in a different browser/session than the one that
+            registered the account.
+          */}
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
           {/* Requires an authenticated session */}
           <Route element={<ProtectedRoute />}>

@@ -66,3 +66,21 @@ export async function getMe() {
   const { data } = await apiClient.get("/auth/me");
   return data;
 }
+
+/**
+ * POST /api/auth/verify-email
+ */
+export async function verifyEmail(token) {
+  const { data } = await apiClient.post("/auth/verify-email", { token });
+  return data;
+}
+
+/**
+ * POST /api/auth/resend-verification
+ */
+export async function resendVerification(email) {
+  const { data } = await apiClient.post("/auth/resend-verification", {
+    email,
+  });
+  return data;
+}

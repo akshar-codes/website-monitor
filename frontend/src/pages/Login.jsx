@@ -4,10 +4,11 @@ import { AlertTriangle, ArrowRight } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import useAuthForm from "../hooks/useAuthForm";
 import { ROUTES } from "../constants/routes";
-import { mapAuthError } from "../utils/AuthErrors";
+import { mapAuthError, getAuthErrorCode } from "../utils/AuthErrors";
 import AuthLayout from "../components/auth/AuthLayout";
 import LoginMarketingPanel from "../components/auth/LoginMarketingPanel";
 import PasswordField from "../components/auth/PasswordField";
+import ResendVerificationForm from "../components/auth/ResendVerificationForm";
 import { Card } from "../components/ui/Card";
 import { FormField, Input } from "../components/ui/Input";
 import Button from "../components/ui/Button";
@@ -23,15 +24,21 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState("");
+  // Set to the attempted email whenever login fails specifically because
+  // the account hasn't verified its email yet — renders an inline resend
+  // form pre-filled with that address.
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
 
   const makeChangeHandler = (field) => (e) => {
     if (apiError) setApiError("");
+    if (unverifiedEmail) setUnverifiedEmail("");
     handleChange(field)(e);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setApiError("");
+    setUnverifiedEmail("");
     clearErrors();
 
     if (!validateAll()) return;
@@ -43,6 +50,9 @@ export default function Login() {
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setApiError(mapAuthError(err, "login"));
+      if (getAuthErrorCode(err) === "EMAIL_NOT_VERIFIED") {
+        setUnverifiedEmail(values.email.trim());
+      }
     } finally {
       setSubmitting(false);
     }
@@ -68,6 +78,12 @@ export default function Login() {
           >
             <AlertTriangle size={16} className="mt-0.5 shrink-0" />
             <span>{apiError}</span>
+          </div>
+        )}
+
+        {unverifiedEmail && (
+          <div className="mb-4">
+            <ResendVerificationForm initialEmail={unverifiedEmail} compact />
           </div>
         )}
 
