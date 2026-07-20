@@ -12,9 +12,7 @@ const emailField = z
   .toLowerCase()
   .email("Enter a valid email address");
 
-// Mirrors the client-side strength checks (PasswordStrengthMeter) so the
-// same rules are enforced whether or not the browser's JS validation ran.
-const registerPasswordField = z
+const strongPasswordField = z
   .string({ required_error: "Password is required" })
   .min(8, "Password must be at least 8 characters")
   .regex(/[A-Z]/, "Include at least one uppercase letter")
@@ -27,7 +25,7 @@ export const registerSchema = z
   .object({
     name: nameField,
     email: emailField,
-    password: registerPasswordField,
+    password: strongPasswordField,
     confirmPassword: z.string({
       required_error: "Please confirm your password",
     }),
@@ -60,3 +58,25 @@ export const verifyEmailSchema = z.object({
 export const resendVerificationSchema = z.object({
   email: emailField,
 });
+
+// ── Password reset ──
+
+export const forgotPasswordSchema = z.object({
+  email: emailField,
+});
+
+export const resetPasswordSchema = z
+  .object({
+    token: z
+      .string({ required_error: "Reset token is required" })
+      .trim()
+      .min(1, "Reset token is required"),
+    password: strongPasswordField,
+    confirmPassword: z.string({
+      required_error: "Please confirm your password",
+    }),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });

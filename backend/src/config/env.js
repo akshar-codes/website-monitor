@@ -150,6 +150,13 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(60 * 1000),
+
+  // ── Password reset ──
+  PASSWORD_RESET_TOKEN_EXPIRES_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 1000),
 });
 
 const parsed = envSchema.safeParse(process.env);

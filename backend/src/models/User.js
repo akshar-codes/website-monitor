@@ -54,8 +54,7 @@ const userSchema = new mongoose.Schema(
     },
 
     // Only the SHA-256 hash of the verification token is ever persisted —
-    // the raw token exists only in the outgoing email. select: false keeps
-    // it out of default query results (mirrors the `password` field).
+
     emailVerificationTokenHash: {
       type: String,
       default: null,
@@ -71,6 +70,20 @@ const userSchema = new mongoose.Schema(
     // Powers the resend-verification cooldown so the endpoint can't be
     // used to spam a mailbox.
     emailVerificationLastSentAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+
+    // ── Password reset ──
+
+    passwordResetTokenHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+
+    passwordResetExpires: {
       type: Date,
       default: null,
       select: false,
@@ -105,6 +118,9 @@ const userSchema = new mongoose.Schema(
 // Fast lookup during email verification (findByValidVerificationToken).
 userSchema.index({ emailVerificationTokenHash: 1 });
 
+// Fast lookup during password reset (findByValidPasswordResetToken).
+userSchema.index({ passwordResetTokenHash: 1 });
+
 // ── Middleware ──
 userSchema.pre("save", async function hashPasswordHook() {
   if (!this.isModified("password")) return;
@@ -135,6 +151,23 @@ userSchema.methods.markEmailVerified = function () {
   this.emailVerificationExpires = null;
 };
 
+/**
+ * Assigns a new (hashed) password-reset token and its expiry to this
+ * document. Does not save — callers persist alongside any other changes.
+ */
+userSchema.methods.setPasswordResetToken = function (tokenHash, expiresAt) {
+  this.passwordResetTokenHash = tokenHash;
+  this.passwordResetExpires = expiresAt;
+};
+
+/**
+ * Clears the (now-consumed, or superseded) password-reset token fields.
+ */
+userSchema.methods.clearPasswordResetToken = function () {
+  this.passwordResetTokenHash = null;
+  this.passwordResetExpires = null;
+};
+
 // ── Statics ──
 
 userSchema.statics.findByEmail = function (email) {
@@ -152,15 +185,23 @@ userSchema.statics.findByEmailWithVerification = function (email) {
 };
 
 /**
- * Finds the user owning a given (hashed) verification token, provided it
- * hasn't expired. Returns null for an invalid or expired token — callers
- * should not distinguish between the two in user-facing error messages.
+ * Finds the user owning a given (hashed) verification token
  */
 userSchema.statics.findByValidVerificationToken = function (tokenHash) {
   return this.findOne({
     emailVerificationTokenHash: tokenHash,
     emailVerificationExpires: { $gt: new Date() },
   }).select("+emailVerificationTokenHash +emailVerificationExpires");
+};
+
+/**
+ * Finds the user owning a given (hashed) password-reset token, provided
+ */
+userSchema.statics.findByValidPasswordResetToken = function (tokenHash) {
+  return this.findOne({
+    passwordResetTokenHash: tokenHash,
+    passwordResetExpires: { $gt: new Date() },
+  }).select("+passwordResetTokenHash +passwordResetExpires");
 };
 
 const User = mongoose.model("User", userSchema);
