@@ -5,6 +5,10 @@
  * POST   /api/auth/verify-email        — confirm an email address using the emailed token
  * POST   /api/auth/resend-verification — re-send the verification email
  * POST   /api/auth/login               — authenticate with email + password (must be verified)
+ * GET    /api/auth/google              — start Google OAuth               (see oauth.routes.js)
+ * GET    /api/auth/google/callback     — Google OAuth callback            (see oauth.routes.js)
+ * GET    /api/auth/github              — start GitHub OAuth               (see oauth.routes.js)
+ * GET    /api/auth/github/callback     — GitHub OAuth callback            (see oauth.routes.js)
  * POST   /api/auth/logout              — destroy the current session
  * POST   /api/auth/logout-all          — destroy every session for this user
  * POST   /api/auth/logout-others       — destroy every session except the current one
@@ -45,8 +49,14 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
 } from "../validators/auth.validator.js";
+import oauthRoutes from "./oauth.routes.js";
 
 const router = Router();
+
+// OAuth provider routes (/google, /google/callback, /github, /github/callback
+// — only mounted for fully-configured providers). Kept in their own router
+// so the OAuth surface can grow without cluttering this file.
+router.use(oauthRoutes);
 
 router.post(
   "/register",
