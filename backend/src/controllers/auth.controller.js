@@ -197,3 +197,35 @@ export const resendVerification = asyncHandler(async (req, res) => {
       "If an account with that email exists and isn't verified yet, a new verification email has been sent.",
   });
 });
+
+/**
+ * POST /api/auth/forgot-password
+ * Issues a password-reset email for the given address. Always returns a
+ * generic success response regardless of whether the account exists —
+ * see auth.service.js for the anti-enumeration rationale.
+ */
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  await authService.forgotPassword(email);
+
+  sendSuccess(res, {
+    message:
+      "If an account with that email exists, a password reset link has been sent.",
+  });
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Consumes a password-reset token and sets a new password. Every existing
+ * session for the account is invalidated as part of the reset — the user
+ * must sign back in with the new password afterward.
+ */
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+  await authService.resetPassword(token, password);
+
+  sendSuccess(res, {
+    message:
+      "Your password has been reset successfully. Please sign in with your new password.",
+  });
+});

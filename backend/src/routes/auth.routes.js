@@ -11,6 +11,8 @@
  * GET    /api/auth/sessions            — list this user's active sessions
  * DELETE /api/auth/sessions/:id        — revoke a single other session
  * GET    /api/auth/me                  — return the authenticated user
+ * POST   /api/auth/forgot-password     — issue a password-reset email
+ * POST   /api/auth/reset-password      — consume a reset token and set a new password
  */
 
 import { Router } from "express";
@@ -25,18 +27,23 @@ import {
   getMe,
   verifyEmail,
   resendVerification,
+  forgotPassword,
+  resetPassword,
 } from "../controllers/auth.controller.js";
 import { isAuthenticated } from "../middlewares/authenticate.js";
 import { validate, validateSessionIdParam } from "../middlewares/validate.js";
 import {
   authLimiter,
   verificationLimiter,
+  passwordResetLimiter,
 } from "../middlewares/rateLimiter.js";
 import {
   registerSchema,
   loginSchema,
   verifyEmailSchema,
   resendVerificationSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from "../validators/auth.validator.js";
 
 const router = Router();
@@ -74,5 +81,19 @@ router.delete(
   revokeSession,
 );
 router.get("/me", isAuthenticated, getMe);
+
+router.post(
+  "/forgot-password",
+  passwordResetLimiter,
+  validate(forgotPasswordSchema, "body"),
+  forgotPassword,
+);
+
+router.post(
+  "/reset-password",
+  passwordResetLimiter,
+  validate(resetPasswordSchema, "body"),
+  resetPassword,
+);
 
 export default router;
