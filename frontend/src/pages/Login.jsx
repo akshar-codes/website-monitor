@@ -9,6 +9,8 @@ import AuthLayout from "../components/auth/AuthLayout";
 import LoginMarketingPanel from "../components/auth/LoginMarketingPanel";
 import PasswordField from "../components/auth/PasswordField";
 import ResendVerificationForm from "../components/auth/ResendVerificationForm";
+import AuthDivider from "../components/auth/AuthDivider";
+import OAuthButtons from "../components/auth/OAuthButtons";
 import { Card } from "../components/ui/Card";
 import { FormField, Input } from "../components/ui/Input";
 import Button from "../components/ui/Button";
@@ -151,6 +153,9 @@ export default function Login() {
             {submitting ? "Signing in…" : "Sign in to your account"}
           </Button>
         </form>
+
+        <AuthDivider />
+        <OAuthButtons disabled={submitting} />
       </Card>
 
       <p className="mt-4 text-center text-sm text-text-muted">

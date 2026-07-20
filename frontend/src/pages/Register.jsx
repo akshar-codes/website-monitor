@@ -11,6 +11,8 @@ import PasswordField from "../components/auth/PasswordField";
 import PasswordStrengthMeter from "../components/auth/PasswordStrengthMeter";
 import VerificationStatusCard from "../components/auth/VerificationStatusCard";
 import ResendVerificationForm from "../components/auth/ResendVerificationForm";
+import AuthDivider from "../components/auth/AuthDivider";
+import OAuthButtons from "../components/auth/OAuthButtons";
 import { Card } from "../components/ui/Card";
 import { FormField, Input } from "../components/ui/Input";
 import Button from "../components/ui/Button";
@@ -186,6 +188,9 @@ export default function Register() {
             {submitting ? "Creating account…" : "Create free account"}
           </Button>
         </form>
+
+        <AuthDivider />
+        <OAuthButtons disabled={submitting} />
       </Card>
 
       <p className="mt-4 text-center text-sm text-text-muted">
