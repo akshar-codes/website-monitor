@@ -2,7 +2,12 @@ import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import env from "../config/env.js";
 import { generateSecureToken, hashToken } from "../utils/tokenUtils.js";
-import { sendVerificationEmail } from "./email.service.js";
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendPasswordChangedEmail,
+} from "./email.service.js";
+import { destroyAllUserSessions } from "./session.service.js";
 import logger from "../utils/logger.js";
 
 // ── Registration ──────────────────────────────────────────────────────────────
@@ -116,4 +121,66 @@ export const resendVerificationEmail = async (email) => {
   await issueEmailVerificationToken(user);
 
   return { sent: true };
+};
+
+// ── Password reset ───────────────────────────────────────────────────────────
+
+/**
+ * Issues a password-reset token for the account matching `email`
+ */
+export const forgotPassword = async (email) => {
+  const user = await User.findByEmail(email);
+
+  if (!user || !user.active) {
+    return { sent: false };
+  }
+
+  const { token, tokenHash } = generateSecureToken();
+  const expiresAt = new Date(Date.now() + env.PASSWORD_RESET_TOKEN_EXPIRES_MS);
+
+  user.setPasswordResetToken(tokenHash, expiresAt);
+  await user.save({ validateBeforeSave: false });
+
+  await sendPasswordResetEmail(user, token);
+
+  logger.info(`Password reset requested for user ${user._id} (${user.email})`);
+
+  return { sent: true };
+};
+
+/**
+ * Verifies a submitted raw reset token, sets the new password
+ */
+export const resetPassword = async (rawToken, newPassword) => {
+  const tokenHash = hashToken(rawToken);
+
+  const user = await User.findByValidPasswordResetToken(tokenHash);
+  if (!user) {
+    throw ApiError.badRequest(
+      "This password reset link is invalid or has expired. Please request a new one.",
+    );
+  }
+
+  user.password = newPassword; // re-hashed by the pre-save hook
+  user.clearPasswordResetToken();
+  await user.save();
+
+  const destroyedCount = await destroyAllUserSessions(user._id.toString());
+
+  logger.info(
+    `Password reset for user ${user._id} (${user.email}) — ${destroyedCount} session(s) invalidated`,
+  );
+
+  // Best-effort notification — a delivery failure here must not fail the
+  // password reset itself, which has already succeeded and persisted.
+  try {
+    await sendPasswordChangedEmail(user);
+  } catch (error) {
+    logger.error(
+      `Failed to send password-changed notification to ${user.email}: ${error.message}`,
+      { stack: error.stack },
+    );
+  }
+
+  return user;
 };
