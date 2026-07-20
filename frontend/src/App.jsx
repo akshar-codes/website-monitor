@@ -13,6 +13,7 @@ import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import OAuthCallback from "./pages/OAuthCallback";
 import { Skeleton } from "./components/ui/Skeleton";
 
 function PageFallback() {
@@ -61,12 +62,14 @@ export default function App() {
 
           {/*
             Public and always accessible regardless of auth state — these
-            are transactional links clicked from an email client, which
-            may open in a different browser/session than the one that
-            triggered the request.
+            are transactional links clicked from an email client (or, for
+            /oauth/callback, a redirect from the backend after an OAuth
+            attempt), which may land in a different browser/session than
+            the one that triggered the request.
           */}
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
 
           {/* Requires an authenticated session */}
           <Route element={<ProtectedRoute />}>

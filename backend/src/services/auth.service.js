@@ -50,10 +50,11 @@ export const getUserById = async (id) => {
 
 /**
  * Generates a fresh verification token for a user, persists its hash, and
- * dispatches the verification email. Shared by registration and the
- * resend endpoint so token issuance always follows one code path.
+ * dispatches the verification email. Shared by registration, the resend
+ * endpoint, and OAuth sign-ups whose provider couldn't confirm an email
+ * address, so token issuance always follows one code path.
  */
-const issueEmailVerificationToken = async (user) => {
+export const issueEmailVerificationToken = async (user) => {
   const { token, tokenHash } = generateSecureToken();
   const expiresAt = new Date(
     Date.now() + env.EMAIL_VERIFICATION_TOKEN_EXPIRES_MS,
