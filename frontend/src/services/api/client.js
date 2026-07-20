@@ -7,6 +7,8 @@ const SILENT_AUTH_PATHS = [
   "/auth/me",
   "/auth/verify-email",
   "/auth/resend-verification",
+  "/auth/forgot-password",
+  "/auth/reset-password",
 ];
 
 const apiClient = axios.create({

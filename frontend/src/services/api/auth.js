@@ -84,3 +84,23 @@ export async function resendVerification(email) {
   });
   return data;
 }
+
+/**
+ * POST /api/auth/forgot-password
+ */
+export async function forgotPassword(email) {
+  const { data } = await apiClient.post("/auth/forgot-password", { email });
+  return data;
+}
+
+/**
+ * POST /api/auth/reset-password
+ */
+export async function resetPassword({ token, password, confirmPassword }) {
+  const { data } = await apiClient.post("/auth/reset-password", {
+    token,
+    password,
+    confirmPassword,
+  });
+  return data;
+}
