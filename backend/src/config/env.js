@@ -157,6 +157,30 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(60 * 60 * 1000),
+
+  // ── OAuth providers ──
+  // All optional: a provider is only registered with Passport once its
+  // clientID + clientSecret + callbackURL are ALL present (see
+  // config/oauth/providers.config.js). Omitting a provider's vars entirely
+  // disables it without breaking startup — existing deployments that don't
+  // configure OAuth keep working unchanged.
+
+  /** Where the browser lands after an OAuth attempt (success or failure). */
+  OAUTH_CALLBACK_PATH: z.string().default("/oauth/callback"),
+
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CALLBACK_URL: z
+    .string()
+    .url("GOOGLE_CALLBACK_URL must be a valid URL")
+    .optional(),
+
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GITHUB_CALLBACK_URL: z
+    .string()
+    .url("GITHUB_CALLBACK_URL must be a valid URL")
+    .optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
