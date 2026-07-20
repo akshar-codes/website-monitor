@@ -11,6 +11,8 @@ import Insights from "./pages/Insights";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import { Skeleton } from "./components/ui/Skeleton";
 
 function PageFallback() {
@@ -54,15 +56,17 @@ export default function App() {
           <Route element={<GuestRoute />}>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
           </Route>
 
           {/*
-            Public and always accessible regardless of auth state — this is
-            a transactional link clicked from an email client, which may
-            open in a different browser/session than the one that
-            registered the account.
+            Public and always accessible regardless of auth state — these
+            are transactional links clicked from an email client, which
+            may open in a different browser/session than the one that
+            triggered the request.
           */}
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Requires an authenticated session */}
           <Route element={<ProtectedRoute />}>

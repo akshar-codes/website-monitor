@@ -113,21 +113,31 @@ export default function Login() {
             disabled={submitting}
           />
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="rememberMe"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              disabled={submitting}
-              className="h-4 w-4 rounded border-border-strong bg-bg-subtle accent-emerald-500"
-            />
-            <label
-              htmlFor="rememberMe"
-              className="cursor-pointer select-none text-sm text-text-secondary"
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={submitting}
+                className="h-4 w-4 rounded border-border-strong bg-bg-subtle accent-emerald-500"
+              />
+              <label
+                htmlFor="rememberMe"
+                className="cursor-pointer select-none text-sm text-text-secondary"
+              >
+                Keep me signed in
+              </label>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate(ROUTES.FORGOT_PASSWORD)}
+              className="text-sm font-medium text-emerald-400 transition-colors hover:text-emerald-300"
             >
-              Keep me signed in
-            </label>
+              Forgot password?
+            </button>
           </div>
 
           <Button
