@@ -5,10 +5,18 @@ import { registerOAuthStrategies } from "./oauth/index.js";
 
 passport.use(
   new LocalStrategy(
-    { usernameField: "email", passwordField: "password" },
-    async (email, password, done) => {
+    {
+      usernameField: "email",
+      passwordField: "password",
+      // Needed so the verify callback can read req.ip for login-activity
+      // tracking (see services/auth.service.js#validateCredentials).
+      passReqToCallback: true,
+    },
+    async (req, email, password, done) => {
       try {
-        const user = await authService.validateCredentials(email, password);
+        const user = await authService.validateCredentials(email, password, {
+          ip: req.ip,
+        });
         if (!user) {
           return done(null, false, {
             message: "Incorrect email or password",

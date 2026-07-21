@@ -62,8 +62,19 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
 
+    // ── Login activity tracking ──
+    // Updated on every successful authentication, regardless of method
+    // (local password, Google OAuth, GitHub OAuth) — see
+    // services/auth.service.js#validateCredentials and
+    // controllers/oauth.controller.js.
+
     lastLoginAt: {
       type: Date,
+      default: null,
+    },
+
+    lastLoginIp: {
+      type: String,
       default: null,
     },
 
@@ -236,6 +247,16 @@ userSchema.methods.setPasswordResetToken = function (tokenHash, expiresAt) {
 userSchema.methods.clearPasswordResetToken = function () {
   this.passwordResetTokenHash = null;
   this.passwordResetExpires = null;
+};
+
+/**
+ * Records a successful authentication, regardless of method. Does not
+ * save — callers persist alongside any other changes (e.g. the OAuth
+ * callback flow saves this together with profile-sync fields).
+ */
+userSchema.methods.recordLogin = function (ip) {
+  this.lastLoginAt = new Date();
+  if (ip) this.lastLoginIp = ip;
 };
 
 /**

@@ -27,15 +27,27 @@ export const registerUser = async ({ name, email, password }) => {
 };
 
 // ── Login ────────────────────────────────────────────────────────────────────
-export const validateCredentials = async (email, password) => {
+
+/**
+ * Validates local (email/password) credentials and records login activity
+ * on success. `meta.ip` is optional — passed through from the Local
+ * strategy's `passReqToCallback` so every successful local sign-in is
+ * attributable to a client IP, mirroring what the OAuth callback flow
+ * records (see controllers/oauth.controller.js).
+ */
+export const validateCredentials = async (email, password, meta = {}) => {
   const user = await User.findByEmail(email).select("+password");
   if (!user || !user.active) return null;
 
   const isMatch = await user.comparePassword(password);
   if (!isMatch) return null;
 
-  user.lastLoginAt = new Date();
+  user.recordLogin(meta.ip);
   await user.save({ validateBeforeSave: false });
+
+  logger.info(
+    `Local login succeeded for user ${user._id} (${user.email})${meta.ip ? ` from ${meta.ip}` : ""}`,
+  );
 
   return User.findById(user._id); // re-fetch without the password field
 };
