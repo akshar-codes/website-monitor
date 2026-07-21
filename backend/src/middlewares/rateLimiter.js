@@ -21,35 +21,41 @@ const globalLimiter = rateLimit({
   handler: rateLimitHandler,
 });
 
-export const authLimiter = rateLimit({
-  windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
-  max: env.AUTH_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
+/**
+ * Factory for sensitive-auth-endpoint limiters. Each call returns an
+ * independent limiter instance with its own counter bucket, so traffic
+ * against one endpoint category (login, verification, password reset,
+ * OAuth initiation) never eats into another's quota — while the shared
+ * config lives in exactly one place instead of being copy-pasted per
+ * limiter.
+ */
+const createAuthRateLimiter = (overrides = {}) =>
+  rateLimit({
+    windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
+    max: env.AUTH_RATE_LIMIT_MAX,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: rateLimitHandler,
+    ...overrides,
+  });
+
+/**
+ * Rate limiter for /auth/login, /auth/register, and the OAuth-initiation
+ * endpoints. Successful requests don't count against the quota so a
+ * legitimate user isn't penalised by their own successful logins.
+ */
+export const authLimiter = createAuthRateLimiter({
   skipSuccessfulRequests: true,
-  handler: rateLimitHandler,
 });
 
 /**
- * Rate limiter for the email-verification endpoints
+ * Rate limiter for the email-verification endpoints.
  */
-export const verificationLimiter = rateLimit({
-  windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
-  max: env.AUTH_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: rateLimitHandler,
-});
+export const verificationLimiter = createAuthRateLimiter();
 
 /**
- * Rate limiter for the password-reset endpoints
+ * Rate limiter for the password-reset endpoints.
  */
-export const passwordResetLimiter = rateLimit({
-  windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
-  max: env.AUTH_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: rateLimitHandler,
-});
+export const passwordResetLimiter = createAuthRateLimiter();
 
 export default globalLimiter;

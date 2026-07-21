@@ -51,6 +51,7 @@ export const INCIDENT_STATUS = Object.freeze({
 
 /**
  * Query-param sentinel meaning "any non-resolved status" — not a real
+ * status value, used only for filtering the incident list endpoint.
  */
 export const INCIDENT_STATUS_FILTER_ACTIVE = "active";
 
@@ -60,6 +61,26 @@ export const INCIDENT_SEVERITY = Object.freeze({
   MAJOR: "major",
   MINOR: "minor",
 });
+
+// ── Authentication / OAuth ───────────────────────────────────────────────────
+
+/**
+ * Supported OAuth providers. Adding a new provider (Facebook, Microsoft,
+ * Discord, ...) starts here — add the key, then a matching strategy file
+ * under config/oauth/ and an entry in config/oauth/providers.config.js.
+ *
+ * This is the single source of truth for OAuth provider identifiers.
+ * Referenced by models/User.js (oauthAccounts enum), config/oauth/*.strategy.js,
+ * config/oauth/providers.config.js, and controllers/oauth.controller.js.
+ */
+export const OAUTH_PROVIDERS = Object.freeze({
+  GOOGLE: "google",
+  GITHUB: "github",
+});
+
+export const OAUTH_PROVIDER_VALUES = Object.freeze(
+  Object.values(OAUTH_PROVIDERS),
+);
 
 // ── Shared Mongoose populate projections ──────────────────────────────────────
 
