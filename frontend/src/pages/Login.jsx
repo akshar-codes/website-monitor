@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import useAuthForm from "../hooks/useAuthForm";
 import { ROUTES } from "../constants/routes";
@@ -9,6 +9,7 @@ import AuthLayout from "../components/auth/AuthLayout";
 import LoginMarketingPanel from "../components/auth/LoginMarketingPanel";
 import PasswordField from "../components/auth/PasswordField";
 import ResendVerificationForm from "../components/auth/ResendVerificationForm";
+import AuthErrorBanner from "../components/auth/AuthErrorBanner";
 import AuthDivider from "../components/auth/AuthDivider";
 import OAuthButtons from "../components/auth/OAuthButtons";
 import { Card } from "../components/ui/Card";
@@ -72,16 +73,7 @@ export default function Login() {
       </div>
 
       <Card>
-        {apiError && (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
-          >
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-            <span>{apiError}</span>
-          </div>
-        )}
+        <AuthErrorBanner message={apiError} />
 
         {unverifiedEmail && (
           <div className="mb-4">

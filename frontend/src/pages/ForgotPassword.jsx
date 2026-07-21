@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Send } from "lucide-react";
+import { ArrowRight, Send } from "lucide-react";
 import useAuthForm from "../hooks/useAuthForm";
 import { ROUTES } from "../constants/routes";
 import { mapAuthError } from "../utils/AuthErrors";
 import AuthLayout from "../components/auth/AuthLayout";
 import LoginMarketingPanel from "../components/auth/LoginMarketingPanel";
 import VerificationStatusCard from "../components/auth/VerificationStatusCard";
+import AuthErrorBanner from "../components/auth/AuthErrorBanner";
 import { Card } from "../components/ui/Card";
 import { FormField, Input } from "../components/ui/Input";
 import Button from "../components/ui/Button";
@@ -89,16 +90,7 @@ export default function ForgotPassword() {
       </div>
 
       <Card>
-        {apiError && (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
-          >
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-            <span>{apiError}</span>
-          </div>
-        )}
+        <AuthErrorBanner message={apiError} />
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <FormField label="Email address" error={errors.email} required>

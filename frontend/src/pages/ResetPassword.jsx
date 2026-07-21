@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import useAuthForm from "../hooks/useAuthForm";
 import { ROUTES } from "../constants/routes";
 import { mapAuthError } from "../utils/AuthErrors";
@@ -9,6 +9,7 @@ import LoginMarketingPanel from "../components/auth/LoginMarketingPanel";
 import VerificationStatusCard from "../components/auth/VerificationStatusCard";
 import PasswordField from "../components/auth/PasswordField";
 import PasswordStrengthMeter from "../components/auth/PasswordStrengthMeter";
+import AuthErrorBanner from "../components/auth/AuthErrorBanner";
 import { Card } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import * as authApi from "../services/api/auth";
@@ -127,16 +128,7 @@ export default function ResetPassword() {
       </div>
 
       <Card>
-        {apiError && (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
-          >
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-            <span>{apiError}</span>
-          </div>
-        )}
+        <AuthErrorBanner message={apiError} />
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
