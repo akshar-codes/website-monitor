@@ -34,7 +34,7 @@ import {
   forgotPassword,
   resetPassword,
 } from "../controllers/auth.controller.js";
-import { isAuthenticated } from "../middlewares/authenticate.js";
+import { isAuthenticated, isGuest } from "../middlewares/authenticate.js";
 import { validate, validateSessionIdParam } from "../middlewares/validate.js";
 import {
   authLimiter,
@@ -58,8 +58,13 @@ const router = Router();
 // so the OAuth surface can grow without cluttering this file.
 router.use(oauthRoutes);
 
+// `isGuest` is a defense-in-depth guard — the frontend already keeps
+// authenticated users off these pages via GuestRoute — so an already
+// logged-in session hitting these endpoints directly gets a clear 400
+// instead of silently re-authenticating or creating a duplicate account.
 router.post(
   "/register",
+  isGuest,
   authLimiter,
   validate(registerSchema, "body"),
   register,
@@ -79,7 +84,13 @@ router.post(
   resendVerification,
 );
 
-router.post("/login", authLimiter, validate(loginSchema, "body"), login);
+router.post(
+  "/login",
+  isGuest,
+  authLimiter,
+  validate(loginSchema, "body"),
+  login,
+);
 router.post("/logout", isAuthenticated, logout);
 router.post("/logout-all", isAuthenticated, logoutAll);
 router.post("/logout-others", isAuthenticated, logoutOtherSessions);

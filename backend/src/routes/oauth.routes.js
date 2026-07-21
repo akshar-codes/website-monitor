@@ -15,6 +15,7 @@ import { Router } from "express";
 import passport from "../config/passport.js";
 import { googleCallback, githubCallback } from "../controllers/oauth.controller.js";
 import { authLimiter } from "../middlewares/rateLimiter.js";
+import { isGuest } from "../middlewares/authenticate.js";
 import {
   PROVIDER_DEFINITIONS,
   getEnabledProviders,
@@ -27,6 +28,7 @@ const enabled = getEnabledProviders();
 if (enabled[OAUTH_PROVIDERS.GOOGLE]) {
   router.get(
     "/google",
+    isGuest,
     authLimiter,
     passport.authenticate(OAUTH_PROVIDERS.GOOGLE, {
       scope: PROVIDER_DEFINITIONS[OAUTH_PROVIDERS.GOOGLE].scope,
@@ -34,12 +36,16 @@ if (enabled[OAUTH_PROVIDERS.GOOGLE]) {
     }),
   );
 
+  // Not guarded by isGuest — the provider redirects back here regardless
+  // of the caller's session state, and the callback itself decides what
+  // to do with the resolved identity.
   router.get("/google/callback", googleCallback);
 }
 
 if (enabled[OAUTH_PROVIDERS.GITHUB]) {
   router.get(
     "/github",
+    isGuest,
     authLimiter,
     passport.authenticate(OAUTH_PROVIDERS.GITHUB, {
       scope: PROVIDER_DEFINITIONS[OAUTH_PROVIDERS.GITHUB].scope,
