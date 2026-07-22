@@ -4,10 +4,13 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/routing/ProtectedRoute";
 import GuestRoute from "./components/routing/GuestRoute";
+import RoleProtectedRoute from "./components/routing/RoleProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Monitors from "./pages/Monitors";
 import Insights from "./pages/Insights";
+import AdminUsers from "./pages/AdminUsers";
+import Unauthorized from "./pages/Unauthorized";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -15,6 +18,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import OAuthCallback from "./pages/OAuthCallback";
 import { Skeleton } from "./components/ui/Skeleton";
+import { ROLES } from "./constants/roles";
 
 function PageFallback() {
   return (
@@ -98,6 +102,24 @@ export default function App() {
                   </Suspense>
                 }
               />
+
+              {/* Reachable by any authenticated user regardless of role —
+                  this is where a role mismatch on the routes below lands. */}
+              <Route path="/unauthorized" element={<Unauthorized />} />
+
+              {/* Requires an authenticated session AND the admin role */}
+              <Route
+                element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN]} />}
+              >
+                <Route
+                  path="/admin/users"
+                  element={
+                    <Suspense fallback={<PageFallback />}>
+                      <AdminUsers />
+                    </Suspense>
+                  }
+                />
+              </Route>
             </Route>
           </Route>
 

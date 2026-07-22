@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -9,6 +9,7 @@ import {
   ChevronRight,
   LogOut,
   ShieldOff,
+  ShieldCheck,
   User,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
@@ -16,7 +17,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { ROUTES } from "../../constants/routes";
 import ConfirmDialog from "../ui/ConfirmDialog";
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   {
     label: "Dashboard",
     path: "/",
@@ -34,6 +35,12 @@ const NAV_ITEMS = [
     icon: BarChart3,
   },
 ];
+
+const ADMIN_NAV_ITEM = {
+  label: "Users",
+  path: ROUTES.ADMIN_USERS,
+  icon: ShieldCheck,
+};
 
 function NavItem({ item, collapsed }) {
   const Icon = item.icon;
@@ -83,8 +90,15 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [confirmLogoutAllOpen, setConfirmLogoutAllOpen] = useState(false);
   const [loggingOutAll, setLoggingOutAll] = useState(false);
-  const { user, logout, logoutAll } = useAuth();
+  const { user, isAdmin, logout, logoutAll } = useAuth();
   const navigate = useNavigate();
+
+  // Admin-only entries are appended, never inserted in the middle, so the
+  // core navigation order stays identical for every user regardless of role.
+  const navItems = useMemo(
+    () => (isAdmin ? [...BASE_NAV_ITEMS, ADMIN_NAV_ITEM] : BASE_NAV_ITEMS),
+    [isAdmin],
+  );
 
   const handleLogout = async () => {
     try {
@@ -135,7 +149,7 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-4">
         <div className="space-y-0.5">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavItem key={item.path} item={item} collapsed={collapsed} />
           ))}
         </div>
@@ -156,9 +170,16 @@ export default function Sidebar() {
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-white">
-                {user?.name || "Account"}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="truncate text-xs font-medium text-white">
+                  {user?.name || "Account"}
+                </p>
+                {isAdmin && (
+                  <span className="shrink-0 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-emerald-400">
+                    Admin
+                  </span>
+                )}
+              </div>
               <p className="truncate text-[10px] text-text-muted">
                 {user?.email || ""}
               </p>
