@@ -82,6 +82,26 @@ export const OAUTH_PROVIDER_VALUES = Object.freeze(
   Object.values(OAUTH_PROVIDERS),
 );
 
+// ── Authorization (roles) ────────────────────────────────────────────────────
+
+/**
+ * Application-level roles — govern what a user is PERMITTED to do
+ * (authorization). Deliberately kept separate from any future
+ * subscription/billing "plan" concept, which would govern what a user is
+ * ENTITLED to (limits, feature gates). A role change must never silently
+ * affect billing, and a plan change must never grant elevated permissions —
+ * so these two concerns must never be merged into a single field.
+ *
+ * Single source of truth — referenced by models/User.js (schema enum +
+ * default), middlewares/authorize.js callers, and validators/admin.validator.js.
+ */
+export const ROLES = Object.freeze({
+  USER: "user",
+  ADMIN: "admin",
+});
+
+export const ROLE_VALUES = Object.freeze(Object.values(ROLES));
+
 // ── Shared Mongoose populate projections ──────────────────────────────────────
 
 /** Fields selected when populating a `monitor` reference. */

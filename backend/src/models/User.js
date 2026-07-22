@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { hashPassword, comparePassword } from "../utils/password.js";
-import { OAUTH_PROVIDER_VALUES } from "../config/constants.js";
+import { OAUTH_PROVIDER_VALUES, ROLES, ROLE_VALUES } from "../config/constants.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -60,6 +60,23 @@ const userSchema = new mongoose.Schema(
     active: {
       type: Boolean,
       default: true,
+    },
+
+    // ── Authorization ──
+    // Governs what a user is PERMITTED to do. Deliberately separate from
+    // any future subscription/billing "plan" field — see ROLES in
+    // config/constants.js for the rationale. Every account gets "user" by
+    // default; promotion to "admin" happens exclusively through the
+    // admin-role-management endpoint (services/admin.service.js), never via
+    // client-supplied input on register/OAuth sign-up.
+    role: {
+      type: String,
+      required: [true, "Role is required"],
+      enum: {
+        values: ROLE_VALUES,
+        message: `Role must be one of: ${ROLE_VALUES.join(", ")}`,
+      },
+      default: ROLES.USER,
     },
 
     // ── Login activity tracking ──
@@ -188,6 +205,9 @@ userSchema.index(
   { unique: true, sparse: true },
 );
 
+// Admin user-management listing — filter/sort by role.
+userSchema.index({ role: 1, createdAt: -1 });
+
 // ── Middleware ──
 userSchema.pre("save", async function hashPasswordHook() {
   if (!this.isModified("password")) return;
@@ -279,6 +299,15 @@ userSchema.methods.linkOAuthAccount = function (provider, providerId) {
   }
 };
 
+/**
+ * True when this account holds the admin role. Small readability helper
+ * for call sites that would otherwise compare `user.role === ROLES.ADMIN`
+ * inline.
+ */
+userSchema.methods.isAdmin = function () {
+  return this.role === ROLES.ADMIN;
+};
+
 // ── Statics ──
 
 userSchema.statics.findByEmail = function (email) {
@@ -324,6 +353,9 @@ userSchema.statics.findByOAuthAccount = function (provider, providerId) {
     oauthAccounts: { $elemMatch: { provider, providerId } },
   }).select("+oauthAccounts");
 };
+
+// ── Expose enum for external use ──
+userSchema.statics.ROLES = ROLES;
 
 const User = mongoose.model("User", userSchema);
 
