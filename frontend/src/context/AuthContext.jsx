@@ -1,5 +1,6 @@
 import { createContext, useCallback, useEffect, useState } from "react";
 import * as authApi from "../services/api/auth";
+import { ROLES } from "../constants/roles";
 
 export const AuthContext = createContext(null);
 
@@ -81,6 +82,10 @@ export function AuthProvider({ children }) {
   const value = {
     user,
     loading,
+    // Role is part of the user document returned by /auth/me, login, and
+    // register — no separate fetch is needed. Exposed as a derived boolean
+    // so components don't have to know the underlying role string.
+    isAdmin: user?.role === ROLES.ADMIN,
     login,
     register,
     logout,
