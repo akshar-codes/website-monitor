@@ -2,7 +2,12 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "../../utils/cn";
 
-export function Modal({ open, onClose, children }) {
+export function Modal({
+  open,
+  onClose,
+  children,
+  maxWidthClassName = "max-w-lg",
+}) {
   return (
     <Dialog.Root open={open} onOpenChange={(val) => !val && onClose?.()}>
       <Dialog.Portal>
@@ -10,7 +15,8 @@ export function Modal({ open, onClose, children }) {
         <Dialog.Content
           className={cn(
             "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
-            "w-full max-w-lg rounded-2xl border border-border-default bg-bg-surface shadow-2xl",
+            "w-full rounded-2xl border border-border-default bg-bg-surface shadow-2xl",
+            maxWidthClassName,
             "data-[state=open]:animate-fade-in",
             "focus:outline-none",
           )}
