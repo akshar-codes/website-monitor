@@ -102,6 +102,41 @@ export const ROLES = Object.freeze({
 
 export const ROLE_VALUES = Object.freeze(Object.values(ROLES));
 
+// ── Subscription Plans ───────────────────────────────────────────────────────
+
+/**
+ * Subscription plan identifiers. Deliberately independent of ROLES above —
+ * a plan governs entitlements (monitor limits, check-interval floor, data
+ * retention), a role governs permissions. The two must never be merged.
+ *
+ * This is the single source of truth for plan identifiers. Full plan
+ * metadata (pricing, limits, marketing feature copy) lives in
+ * config/plans.js, mirroring how OAUTH_PROVIDERS (identifiers, here) is
+ * split from config/oauth/providers.config.js (definitions).
+ *
+ * To add a new plan tier:
+ *   1. Add its key here
+ *   2. Add its definition to config/plans.js (assign the next `rank`)
+ *   3. Nothing else needs to change — validation, upgrade/downgrade
+ *      comparison, and the frontend catalog all read from that map.
+ */
+export const PLANS = Object.freeze({
+  FREE: "free",
+  PRO: "pro",
+  UNLIMITED: "unlimited",
+});
+
+export const PLAN_VALUES = Object.freeze(Object.values(PLANS));
+
+/** Lifecycle status of a user's current plan subscription. */
+export const PLAN_STATUS = Object.freeze({
+  ACTIVE: "active",
+  CANCELED: "canceled",
+  EXPIRED: "expired",
+});
+
+export const PLAN_STATUS_VALUES = Object.freeze(Object.values(PLAN_STATUS));
+
 // ── Shared Mongoose populate projections ──────────────────────────────────────
 
 /** Fields selected when populating a `monitor` reference. */
