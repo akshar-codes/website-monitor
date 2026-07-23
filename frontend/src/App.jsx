@@ -9,6 +9,7 @@ import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Monitors from "./pages/Monitors";
 import Insights from "./pages/Insights";
+import Billing from "./pages/Billing";
 import AdminUsers from "./pages/AdminUsers";
 import Unauthorized from "./pages/Unauthorized";
 import Login from "./pages/Login";
@@ -99,6 +100,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageFallback />}>
                     <Insights />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/billing"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <Billing />
                   </Suspense>
                 }
               />
