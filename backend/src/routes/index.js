@@ -6,6 +6,7 @@
 import { Router } from "express";
 import healthRoutes from "./health.routes.js";
 import authRoutes from "./auth.routes.js";
+import planRoutes from "./plan.routes.js";
 import monitorRoutes from "./monitor.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
 import incidentRoutes from "./incident.routes.js";
@@ -17,8 +18,12 @@ import { ROLES } from "../config/constants.js";
 const router = Router();
 
 // ── Public ──
+// (planRoutes is public at its mount point — GET /api/plans/current and
+// POST /api/plans/change are individually guarded by isAuthenticated
+// inside plan.routes.js, mirroring how authRoutes self-guards internally.)
 router.use("/health", healthRoutes);
 router.use("/auth", authRoutes);
+router.use("/plans", planRoutes);
 
 // ── Requires an authenticated session ──
 router.use("/monitors", isAuthenticated, monitorRoutes);
