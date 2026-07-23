@@ -1,6 +1,14 @@
 import mongoose from "mongoose";
 import { hashPassword, comparePassword } from "../utils/password.js";
-import { OAUTH_PROVIDER_VALUES, ROLES, ROLE_VALUES } from "../config/constants.js";
+import {
+  OAUTH_PROVIDER_VALUES,
+  ROLES,
+  ROLE_VALUES,
+  PLANS,
+  PLAN_VALUES,
+  PLAN_STATUS,
+  PLAN_STATUS_VALUES,
+} from "../config/constants.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -25,6 +33,34 @@ const oauthAccountSchema = new mongoose.Schema(
     connectedAt: {
       type: Date,
       default: Date.now,
+    },
+  },
+  { _id: false },
+);
+
+// Sub-schema recording each plan transition — an append-only audit trail.
+// `changedBy` is null for self-service changes and set to an admin's ID
+// when an operator changes it on the user's behalf.
+const planHistoryEntrySchema = new mongoose.Schema(
+  {
+    from: {
+      type: String,
+      enum: PLAN_VALUES,
+      default: null,
+    },
+    to: {
+      type: String,
+      enum: PLAN_VALUES,
+      required: true,
+    },
+    changedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    changedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
   },
   { _id: false },
@@ -64,7 +100,7 @@ const userSchema = new mongoose.Schema(
 
     // ── Authorization ──
     // Governs what a user is PERMITTED to do. Deliberately separate from
-    // any future subscription/billing "plan" field — see ROLES in
+    // the subscription `plan` fields below — see ROLES/PLANS in
     // config/constants.js for the rationale. Every account gets "user" by
     // default; promotion to "admin" happens exclusively through the
     // admin-role-management endpoint (services/admin.service.js), never via
@@ -77,6 +113,76 @@ const userSchema = new mongoose.Schema(
         message: `Role must be one of: ${ROLE_VALUES.join(", ")}`,
       },
       default: ROLES.USER,
+    },
+
+    // ── Subscription plan ──
+    // Governs what a user is ENTITLED to (monitor limits, check-interval
+    // floor, data retention, team size) — see config/plans.js for the full
+    // per-tier definitions. Deliberately separate from `role` above.
+    plan: {
+      type: String,
+      required: [true, "Plan is required"],
+      enum: {
+        values: PLAN_VALUES,
+        message: `Plan must be one of: ${PLAN_VALUES.join(", ")}`,
+      },
+      default: PLANS.FREE,
+    },
+
+    planStatus: {
+      type: String,
+      enum: {
+        values: PLAN_STATUS_VALUES,
+        message: `Plan status must be one of: ${PLAN_STATUS_VALUES.join(", ")}`,
+      },
+      default: PLAN_STATUS.ACTIVE,
+    },
+
+    planStartedAt: {
+      type: Date,
+      default: Date.now,
+    },
+
+    // Set by the (future) billing integration for paid, auto-renewing
+    // plans. Null for the Free plan and for any plan not currently backed
+    // by a recurring subscription.
+    planRenewsAt: {
+      type: Date,
+      default: null,
+    },
+
+    planCanceledAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Append-only audit trail of plan transitions. Hidden from default
+    // queries — not needed on every user fetch, only when explicitly
+    // inspecting history (see services/plan.service.js).
+    planHistory: {
+      type: [planHistoryEntrySchema],
+      default: [],
+      select: false,
+    },
+
+    // Placeholder linkage for a future payment provider (Stripe, Paddle,
+    // ...). Not used by any code path yet — `provider` stays null until a
+    // payment integration is wired up; see services/plan.service.js.
+    billing: {
+      provider: {
+        type: String,
+        default: null,
+      },
+      customerId: {
+        type: String,
+        default: null,
+        select: false,
+      },
+      subscriptionId: {
+        type: String,
+        default: null,
+        select: false,
+      },
     },
 
     // ── Login activity tracking ──
@@ -208,6 +314,9 @@ userSchema.index(
 // Admin user-management listing — filter/sort by role.
 userSchema.index({ role: 1, createdAt: -1 });
 
+// Plan-based analytics / admin filtering (e.g. "list every Pro user").
+userSchema.index({ plan: 1, createdAt: -1 });
+
 // ── Middleware ──
 userSchema.pre("save", async function hashPasswordHook() {
   if (!this.isModified("password")) return;
@@ -308,6 +417,36 @@ userSchema.methods.isAdmin = function () {
   return this.role === ROLES.ADMIN;
 };
 
+/**
+ * Switches this user onto `newPlan` and appends the transition to
+ * `planHistory`. `changedByUserId` is null for a self-service change, or
+ * an admin's ID when the change was made on the user's behalf.
+ *
+ * Does not save — callers persist explicitly (see services/plan.service.js,
+ * which also ensures `planHistory` has been re-selected before calling
+ * this, since it's `select: false` by default and would otherwise be
+ * silently overwritten rather than appended to).
+ */
+userSchema.methods.changePlan = function (newPlan, changedByUserId = null) {
+  const previousPlan = this.plan;
+
+  this.plan = newPlan;
+  this.planStatus = PLAN_STATUS.ACTIVE;
+  this.planStartedAt = new Date();
+  this.planCanceledAt = null;
+
+  if (!Array.isArray(this.planHistory)) {
+    this.planHistory = [];
+  }
+
+  this.planHistory.push({
+    from: previousPlan,
+    to: newPlan,
+    changedAt: new Date(),
+    changedBy: changedByUserId,
+  });
+};
+
 // ── Statics ──
 
 userSchema.statics.findByEmail = function (email) {
@@ -354,8 +493,9 @@ userSchema.statics.findByOAuthAccount = function (provider, providerId) {
   }).select("+oauthAccounts");
 };
 
-// ── Expose enum for external use ──
+// ── Expose enums for external use ──
 userSchema.statics.ROLES = ROLES;
+userSchema.statics.PLANS = PLANS;
 
 const User = mongoose.model("User", userSchema);
 
