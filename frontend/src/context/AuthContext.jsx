@@ -1,6 +1,7 @@
 import { createContext, useCallback, useEffect, useState } from "react";
 import * as authApi from "../services/api/auth";
 import { ROLES } from "../constants/roles";
+import { PLANS } from "../constants/plans";
 
 export const AuthContext = createContext(null);
 
@@ -86,6 +87,10 @@ export function AuthProvider({ children }) {
     // register — no separate fetch is needed. Exposed as a derived boolean
     // so components don't have to know the underlying role string.
     isAdmin: user?.role === ROLES.ADMIN,
+    // Same pattern for the subscription plan — part of the same user
+    // document, exposed directly so components don't need to guard
+    // against a missing/undefined value on a not-yet-loaded user.
+    plan: user?.plan || PLANS.FREE,
     login,
     register,
     logout,

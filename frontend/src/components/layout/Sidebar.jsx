@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Monitor,
   BarChart3,
+  CreditCard,
   Activity,
   ChevronLeft,
   ChevronRight,
@@ -15,7 +16,10 @@ import {
 import { cn } from "../../utils/cn";
 import { useAuth } from "../../hooks/useAuth";
 import { ROUTES } from "../../constants/routes";
+import { PLANS } from "../../constants/plans";
 import ConfirmDialog from "../ui/ConfirmDialog";
+import PlanBadge from "../ui/PlanBadge";
+import UpgradePrompt from "../../features/plans/UpgradePrompt";
 
 const BASE_NAV_ITEMS = [
   {
@@ -33,6 +37,11 @@ const BASE_NAV_ITEMS = [
     label: "Insights",
     path: "/insights",
     icon: BarChart3,
+  },
+  {
+    label: "Billing",
+    path: ROUTES.BILLING,
+    icon: CreditCard,
   },
 ];
 
@@ -90,7 +99,7 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [confirmLogoutAllOpen, setConfirmLogoutAllOpen] = useState(false);
   const [loggingOutAll, setLoggingOutAll] = useState(false);
-  const { user, isAdmin, logout, logoutAll } = useAuth();
+  const { user, isAdmin, plan, logout, logoutAll } = useAuth();
   const navigate = useNavigate();
 
   // Admin-only entries are appended, never inserted in the middle, so the
@@ -180,9 +189,17 @@ export default function Sidebar() {
                   </span>
                 )}
               </div>
-              <p className="truncate text-[10px] text-text-muted">
-                {user?.email || ""}
-              </p>
+              <div className="mt-1 flex items-center gap-1.5">
+                <p className="truncate text-[10px] text-text-muted">
+                  {user?.email || ""}
+                </p>
+                <PlanBadge
+                  plan={plan}
+                  size="sm"
+                  showIcon={false}
+                  className="shrink-0 px-1.5 py-0"
+                />
+              </div>
             </div>
           )}
         </div>
@@ -215,6 +232,17 @@ export default function Sidebar() {
             />
             <span className="truncate">Sign out of all devices</span>
           </button>
+        )}
+
+        {/* Upgrade nudge — only shown to Free-plan users, hidden on the
+            collapsed rail alongside the other secondary actions. */}
+        {!collapsed && plan === PLANS.FREE && (
+          <UpgradePrompt
+            plan={plan}
+            variant="compact"
+            onUpgradeClick={() => navigate(ROUTES.BILLING)}
+            className="mt-1"
+          />
         )}
 
         {/* Version */}
