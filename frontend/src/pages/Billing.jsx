@@ -5,12 +5,14 @@ import PageHeader from "../components/layout/PageHeader";
 import CurrentPlanSummary from "../features/plans/CurrentPlanSummary";
 import UpgradePrompt from "../features/plans/UpgradePrompt";
 import PlanChangeModal from "../features/plans/PlanChangeModal";
+import UsageDashboard from "../features/usage/UsageDashboard";
 import Button from "../components/ui/Button";
 import {
   useCurrentPlan,
   usePlanCatalog,
   usePlanChange,
 } from "../hooks/usePlans";
+import { useUsage } from "../hooks/useUsage";
 import { useAuth } from "../hooks/useAuth";
 import { getPlanChangeType } from "../utils/planCompare";
 
@@ -25,14 +27,17 @@ export default function Billing() {
     refetch: refetchCurrentPlan,
   } = useCurrentPlan();
   const { data: catalogData, loading: catalogLoading } = usePlanCatalog();
+  const { data: usageData, loading: usageLoading, refetch: refetchUsage } =
+    useUsage();
 
   const currentPlan = currentPlanData?.data;
   const plans = catalogData?.data || [];
+  const usage = usageData?.data;
 
   const handlePlanChangeSuccess = async () => {
     setChangingPlan(null);
     setModalOpen(false);
-    await Promise.all([refetchCurrentPlan(), refetchUser()]);
+    await Promise.all([refetchCurrentPlan(), refetchUser(), refetchUsage()]);
   };
 
   const { changePlan } = usePlanChange(handlePlanChangeSuccess);
@@ -47,17 +52,22 @@ export default function Billing() {
     if (!changingPlan) setModalOpen(false);
   };
 
+  const handleRefresh = () => {
+    refetchCurrentPlan();
+    refetchUsage();
+  };
+
   return (
     <PageContainer>
       <PageHeader
         title="Billing & Plan"
-        subtitle="Manage your subscription plan and view your current limits"
+        subtitle="Manage your subscription plan and view your current usage"
         actions={
           <Button
             variant="secondary"
             size="sm"
             icon={RefreshCw}
-            onClick={refetchCurrentPlan}
+            onClick={handleRefresh}
           >
             Refresh
           </Button>
@@ -65,11 +75,12 @@ export default function Billing() {
         className="mb-6"
       />
 
-      <div className="mb-6">
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CurrentPlanSummary
           currentPlan={currentPlan}
           loading={currentPlanLoading}
         />
+        <UsageDashboard usage={usage} loading={usageLoading} />
       </div>
 
       {currentPlan?.plan && (
