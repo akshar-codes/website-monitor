@@ -17,11 +17,32 @@ import {
   msBefore,
   isStale,
 } from "../utils/dateUtils.js";
+import { getOwnedMonitorIds } from "./monitor.service.js";
+
+const resolveOwnerObjectId = (user) =>
+  new mongoose.Types.ObjectId(user.id || user._id);
+
+/**
+ * Narrows a monitor-id filter to the caller's owned monitors, optionally
+ * intersected with a single requested monitor ID. If the requested ID
+ * isn't one of the caller's own, the filter resolves to an impossible
+ * match ($in: []) rather than throwing — list endpoints degrade to an
+ * empty result instead of leaking whether the ID exists for someone else.
+ */
+const resolveMonitorFilter = (ownedIds, monitorId) => {
+  if (!monitorId) return { $in: ownedIds };
+  const requested = new mongoose.Types.ObjectId(monitorId);
+  return ownedIds.some((id) => id.equals(requested))
+    ? requested
+    : { $in: [] };
+};
 
 // ── Overview ─────────────────────────────────────────────────────────────────
 
-export const getOverview = async () => {
+export const getOverview = async (user) => {
   const since = msBefore(WINDOW_MS["24h"]);
+  const ownedIds = await getOwnedMonitorIds(user);
+  const ownerId = resolveOwnerObjectId(user);
 
   const [
     monitorCounts,
@@ -31,8 +52,9 @@ export const getOverview = async () => {
     latestIncidents,
     recentChecks,
   ] = await Promise.all([
-    // 1 ─ Monitor counts (single pass, tiny collection)
+    // 1 ─ Monitor counts, scoped to the caller
     Monitor.aggregate([
+      { $match: { owner: ownerId } },
       {
         $group: {
           _id: null,
@@ -43,9 +65,9 @@ export const getOverview = async () => {
       },
     ]),
 
-    // 2 ─ Latest health check per active monitor
-    //     Uses compound index { monitor: 1, checkedAt: -1 }
+    // 2 ─ Latest health check per active monitor owned by the caller
     HealthCheck.aggregate([
+      { $match: { monitor: { $in: ownedIds } } },
       { $sort: { monitor: 1, checkedAt: -1 } },
       {
         $group: {
@@ -76,9 +98,14 @@ export const getOverview = async () => {
       { $project: { _monitor: 0 } },
     ]),
 
-    // 3 ─ System-wide uptime + avg response time (last 24 h)
+    // 3 ─ Uptime + avg response time (last 24 h), scoped to the caller
     HealthCheck.aggregate([
-      { $match: { checkedAt: { $gte: since } } },
+      {
+        $match: {
+          monitor: { $in: ownedIds },
+          checkedAt: { $gte: since },
+        },
+      },
       {
         $group: {
           _id: null,
@@ -91,18 +118,24 @@ export const getOverview = async () => {
       },
     ]),
 
-    // 4 ─ Active incident count
-    Incident.countDocuments({ status: { $ne: INCIDENT_STATUS.RESOLVED } }),
+    // 4 ─ Active incident count, scoped to the caller
+    Incident.countDocuments({
+      status: { $ne: INCIDENT_STATUS.RESOLVED },
+      monitor: { $in: ownedIds },
+    }),
 
-    // 5 ─ Latest active incidents (preview — top 5)
-    Incident.find({ status: { $ne: INCIDENT_STATUS.RESOLVED } })
+    // 5 ─ Latest active incidents (preview — top 5), scoped to the caller
+    Incident.find({
+      status: { $ne: INCIDENT_STATUS.RESOLVED },
+      monitor: { $in: ownedIds },
+    })
       .populate("monitor", MONITOR_POPULATE_FIELDS)
       .sort({ startedAt: -1 })
       .limit(5)
       .lean(),
 
-    // 6 ─ Most recent health checks (last 10)
-    HealthCheck.find()
+    // 6 ─ Most recent health checks (last 10), scoped to the caller
+    HealthCheck.find({ monitor: { $in: ownedIds } })
       .populate("monitor", MONITOR_POPULATE_FIELDS)
       .select("-rawResponse -__v")
       .sort({ checkedAt: -1 })
@@ -131,7 +164,6 @@ export const getOverview = async () => {
     }
   }
 
-  // Active monitors that have never been checked have no HealthCheck document.
   const neverChecked = Math.max(0, counts.active - latestPerMonitor.length);
   currentStatus[HEALTH_STATUS.UNKNOWN] += neverChecked;
 
@@ -174,8 +206,13 @@ export const getOverview = async () => {
 
 // ── Active incidents (paginated) ─────────────────────────────────────────────
 
-export const getActiveIncidents = async ({ page, limit, severity }) => {
-  const filter = { status: { $ne: INCIDENT_STATUS.RESOLVED } };
+export const getActiveIncidents = async ({ page, limit, severity }, user) => {
+  const ownedIds = await getOwnedMonitorIds(user);
+
+  const filter = {
+    status: { $ne: INCIDENT_STATUS.RESOLVED },
+    monitor: { $in: ownedIds },
+  };
   if (severity) filter.severity = severity;
 
   const skip = (page - 1) * limit;
@@ -201,12 +238,13 @@ export const getActiveIncidents = async ({ page, limit, severity }) => {
 
 // ── Recent health checks ──────────────────────────────────────────────────────
 
-export const getRecentHealthChecks = async ({ monitorId, status, limit }) => {
-  const filter = {};
+export const getRecentHealthChecks = async (
+  { monitorId, status, limit },
+  user,
+) => {
+  const ownedIds = await getOwnedMonitorIds(user);
 
-  if (monitorId) {
-    filter.monitor = new mongoose.Types.ObjectId(monitorId);
-  }
+  const filter = { monitor: resolveMonitorFilter(ownedIds, monitorId) };
   if (status) {
     filter.status = status;
   }
@@ -221,10 +259,11 @@ export const getRecentHealthChecks = async ({ monitorId, status, limit }) => {
 
 // ── Per-monitor stats ─────────────────────────────────────────────────────────
 
-export const getMonitorStats = async (monitorId, { window }) => {
+export const getMonitorStats = async (monitorId, { window }, user) => {
+  const ownerId = user.id || user._id.toString();
   const id = new mongoose.Types.ObjectId(monitorId);
 
-  const monitor = await Monitor.findById(id)
+  const monitor = await Monitor.findOne({ _id: id, owner: ownerId })
     .select(
       "name url active interval lastCheckedAt nextCheckAt consecutiveFailures",
     )
@@ -340,10 +379,13 @@ export const getMonitorStats = async (monitorId, { window }) => {
 
 // ── Per-monitor chart data ────────────────────────────────────────────────────
 
-export const getMonitorChartData = async (monitorId, { window }) => {
+export const getMonitorChartData = async (monitorId, { window }, user) => {
+  const ownerId = user.id || user._id.toString();
   const id = new mongoose.Types.ObjectId(monitorId);
 
-  const monitor = await Monitor.findById(id).select("_id").lean();
+  const monitor = await Monitor.findOne({ _id: id, owner: ownerId })
+    .select("_id")
+    .lean();
   if (!monitor) {
     throw ApiError.notFound(`Monitor not found with id: ${monitorId}`);
   }

@@ -10,6 +10,7 @@ import {
   TRIGGER_CHECK_DETAIL_POPULATE_FIELDS,
 } from "../config/constants.js";
 import { msBefore } from "../utils/dateUtils.js";
+import { getOwnedMonitorIds } from "./monitor.service.js";
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
@@ -28,16 +29,29 @@ const ALLOWED_TRANSITIONS = {
   [INCIDENT_STATUS.RESOLVED]: [], // terminal
 };
 
+/**
+ * Narrows a monitor-id filter to the caller's owned monitors, optionally
+ * intersected with a single requested monitor ID. A monitorId that isn't
+ * one of the caller's own resolves to an impossible match ($in: [])
+ * rather than leaking whether it exists for someone else.
+ */
+const resolveMonitorFilter = (ownedIds, monitorId) => {
+  if (!monitorId) return { $in: ownedIds };
+  const requested = new mongoose.Types.ObjectId(monitorId);
+  return ownedIds.some((id) => id.equals(requested))
+    ? requested
+    : { $in: [] };
+};
+
 // ── List incidents ────────────────────────────────────────────────────────────
 
-export const getIncidents = async ({
-  page,
-  limit,
-  severity,
-  status,
-  monitorId,
-}) => {
-  const filter = {};
+export const getIncidents = async (
+  { page, limit, severity, status, monitorId },
+  user,
+) => {
+  const ownedIds = await getOwnedMonitorIds(user);
+
+  const filter = { monitor: resolveMonitorFilter(ownedIds, monitorId) };
 
   if (status === "active") {
     filter.status = { $ne: INCIDENT_STATUS.RESOLVED };
@@ -47,10 +61,6 @@ export const getIncidents = async ({
 
   if (severity) {
     filter.severity = severity;
-  }
-
-  if (monitorId) {
-    filter.monitor = new mongoose.Types.ObjectId(monitorId);
   }
 
   const skip = (page - 1) * limit;
@@ -76,8 +86,13 @@ export const getIncidents = async ({
 
 // ── Single incident ───────────────────────────────────────────────────────────
 
-export const getIncidentById = async (id) => {
-  const incident = await Incident.findById(id)
+export const getIncidentById = async (id, user) => {
+  const ownedIds = await getOwnedMonitorIds(user);
+
+  const incident = await Incident.findOne({
+    _id: id,
+    monitor: { $in: ownedIds },
+  })
     .populate("monitor", MONITOR_POPULATE_FIELDS)
     .populate("triggerCheck", TRIGGER_CHECK_DETAIL_POPULATE_FIELDS)
     .lean();
@@ -94,8 +109,14 @@ export const getIncidentById = async (id) => {
 export const updateIncidentStatus = async (
   id,
   { status, rootCause, resolutionNotes },
+  user,
 ) => {
-  const incident = await Incident.findById(id);
+  const ownedIds = await getOwnedMonitorIds(user);
+
+  const incident = await Incident.findOne({
+    _id: id,
+    monitor: { $in: ownedIds },
+  });
   if (!incident) {
     throw ApiError.notFound(`Incident not found with id: ${id}`);
   }
@@ -127,13 +148,14 @@ export const updateIncidentStatus = async (
 
 // ── Downtime statistics ───────────────────────────────────────────────────────
 
-export const getDowntimeStats = async ({ monitorId, window }) => {
+export const getDowntimeStats = async ({ monitorId, window }, user) => {
+  const ownedIds = await getOwnedMonitorIds(user);
   const since = msBefore(WINDOW_MS[window]);
 
-  const matchFilter = { startedAt: { $gte: since } };
-  if (monitorId) {
-    matchFilter.monitor = new mongoose.Types.ObjectId(monitorId);
-  }
+  const matchFilter = {
+    startedAt: { $gte: since },
+    monitor: resolveMonitorFilter(ownedIds, monitorId),
+  };
 
   const [aggResult] = await Incident.aggregate([
     { $match: matchFilter },

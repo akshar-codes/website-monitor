@@ -6,21 +6,22 @@ import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
 
 /**
  * GET /api/dashboard/overview
- * Main dashboard — everything in one round-trip.
+ * Main dashboard — everything in one round-trip, scoped to the caller's
+ * own monitors.
  */
-export const getOverview = asyncHandler(async (_req, res) => {
-  const data = await dashboardService.getOverview();
+export const getOverview = asyncHandler(async (req, res) => {
+  const data = await dashboardService.getOverview(req.user);
 
   sendSuccess(res, { data });
 });
 
 /**
  * GET /api/dashboard/incidents
- * Paginated active incidents.
+ * Paginated active incidents, scoped to the caller.
  */
 export const getActiveIncidents = asyncHandler(async (req, res) => {
   const query = req.validatedQuery;
-  const result = await dashboardService.getActiveIncidents(query);
+  const result = await dashboardService.getActiveIncidents(query, req.user);
 
   sendPaginated(res, {
     data: result.incidents,
@@ -32,11 +33,12 @@ export const getActiveIncidents = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/dashboard/health-checks
- * Recent health checks with optional filters.
+ * Recent health checks with optional filters, scoped to the caller.
  */
 export const getRecentHealthChecks = asyncHandler(async (req, res) => {
   const checks = await dashboardService.getRecentHealthChecks(
     req.validatedQuery,
+    req.user,
   );
 
   sendSuccess(res, { data: checks });
@@ -44,12 +46,14 @@ export const getRecentHealthChecks = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/dashboard/monitors/:id/stats
- * Per-monitor detail page stats.
+ * Per-monitor detail page stats. 404s if the monitor isn't owned by the
+ * caller.
  */
 export const getMonitorStats = asyncHandler(async (req, res) => {
   const data = await dashboardService.getMonitorStats(
     req.params.id,
     req.validatedQuery,
+    req.user,
   );
 
   sendSuccess(res, { data });
@@ -57,12 +61,14 @@ export const getMonitorStats = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/dashboard/monitors/:id/chart-data
- * Per-monitor time-series chart data.
+ * Per-monitor time-series chart data. 404s if the monitor isn't owned by
+ * the caller.
  */
 export const getMonitorChartData = asyncHandler(async (req, res) => {
   const data = await dashboardService.getMonitorChartData(
     req.params.id,
     req.validatedQuery,
+    req.user,
   );
 
   sendSuccess(res, { data });
