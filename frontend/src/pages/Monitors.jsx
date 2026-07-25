@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Search, Monitor, RefreshCw } from "lucide-react";
 import PageContainer from "../components/layout/PageContainer";
 import PageHeader from "../components/layout/PageHeader";
@@ -10,9 +11,14 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Pagination from "../components/ui/Pagination";
 import EmptyState from "../components/ui/EmptyState";
 import { SkeletonRow } from "../components/ui/Skeleton";
+import UsageIndicator from "../features/usage/UsageIndicator";
+import LimitExceededBanner from "../features/usage/LimitExceededBanner";
 import { useMonitorList, useMonitorMutations } from "../hooks/useMonitors";
+import { useUsage } from "../hooks/useUsage";
 import { useQuery } from "../hooks/useQuery";
 import * as dashboardApi from "../services/api/dashboard";
+import { isUpgradeRequiredError, getAccessErrorMessage } from "../utils/accessErrors";
+import { ROUTES } from "../constants/routes";
 import { cn } from "../utils/cn";
 
 const STATUS_FILTERS = [
@@ -55,12 +61,14 @@ function useMonitorsWithStats(monitors = []) {
 }
 
 export default function Monitors() {
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editMonitor, setEditMonitor] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [limitMessage, setLimitMessage] = useState("");
 
   const listParams = useMemo(() => {
     const params = { page, limit: 20 };
@@ -73,6 +81,10 @@ export default function Monitors() {
   const monitors = useMemo(() => monitorsData?.data || [], [monitorsData]);
   const pagination = monitorsData?.pagination;
 
+  const { data: usageData, loading: usageLoading, refetch: refetchUsage } =
+    useUsage();
+  const usage = usageData?.data;
+
   // statsMap initializes as null from useQuery; guard with ?? {} so map access
   // never throws regardless of fetch state (null default only catches undefined).
   const { data: statsMapRaw } =
@@ -83,8 +95,17 @@ export default function Monitors() {
     setFormOpen(false);
     setEditMonitor(null);
     setDeleteTarget(null);
+    setLimitMessage("");
     refetch();
-  }, [refetch]);
+    refetchUsage();
+  }, [refetch, refetchUsage]);
+
+  const handleMutationError = useCallback((err) => {
+    if (isUpgradeRequiredError(err)) {
+      setFormOpen(false);
+      setLimitMessage(getAccessErrorMessage(err));
+    }
+  }, []);
 
   const {
     createMonitor,
@@ -92,7 +113,7 @@ export default function Monitors() {
     deleteMonitor,
     toggleMonitor,
     submitting,
-  } = useMonitorMutations(handleMutationSuccess);
+  } = useMonitorMutations(handleMutationSuccess, handleMutationError);
 
   const filteredMonitors = useMemo(() => {
     if (!search.trim()) return monitors;
@@ -113,11 +134,22 @@ export default function Monitors() {
 
   const openEdit = (monitor) => {
     setEditMonitor(monitor);
+    setLimitMessage("");
     setFormOpen(true);
   };
 
   const openCreate = () => {
+    // Preemptive client-side check — the backend re-validates this on
+    // submit regardless, but checking here avoids opening a form the
+    // user can't actually submit.
+    if (usage && !usage.monitors.unlimited && usage.monitors.atLimit) {
+      setLimitMessage(
+        `You've used all ${usage.monitors.limit} monitors on your ${usage.planName} plan. Upgrade to add more.`,
+      );
+      return;
+    }
     setEditMonitor(null);
+    setLimitMessage("");
     setFormOpen(true);
   };
 
@@ -127,12 +159,16 @@ export default function Monitors() {
         title="Monitors"
         subtitle="Manage and track all your monitored endpoints"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <UsageIndicator usage={usage} loading={usageLoading} />
             <Button
               variant="secondary"
               size="sm"
               icon={RefreshCw}
-              onClick={refetch}
+              onClick={() => {
+                refetch();
+                refetchUsage();
+              }}
             >
               Refresh
             </Button>
@@ -148,6 +184,14 @@ export default function Monitors() {
         }
         className="mb-6"
       />
+
+      {limitMessage && (
+        <LimitExceededBanner
+          message={limitMessage}
+          onUpgradeClick={() => navigate(ROUTES.BILLING)}
+          className="mb-5"
+        />
+      )}
 
       {/* Filters bar */}
       <div className="mb-5 flex items-center gap-3 flex-wrap">
@@ -273,6 +317,7 @@ export default function Monitors() {
         onSubmit={handleFormSubmit}
         monitor={editMonitor}
         loading={submitting}
+        minIntervalSeconds={usage?.interval?.minSeconds ?? 30}
       />
 
       <ConfirmDialog

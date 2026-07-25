@@ -42,7 +42,14 @@ export function useActiveIncidents(params = {}) {
   return useQuery(() => dashboardApi.getActiveIncidents(params), [paramsKey]);
 }
 
-export function useMonitorMutations(onSuccess) {
+/**
+ * `onError` is optional and currently only wired up for createMonitor —
+ * it lets the caller react to a specific failure (e.g. the plan's
+ * monitor limit being hit, surfaced as a 403 UPGRADE_REQUIRED) with a
+ * dedicated UI instead of relying solely on the generic toast the axios
+ * interceptor already shows for every failed request.
+ */
+export function useMonitorMutations(onSuccess, onError) {
   const [submitting, setSubmitting] = useState(false);
 
   const createMonitor = useCallback(
@@ -52,13 +59,15 @@ export function useMonitorMutations(onSuccess) {
         await monitorsApi.createMonitor(payload);
         toast.success("Monitor created successfully");
         onSuccess?.("create");
-      } catch {
-        // Error toast handled by axios interceptor
+      } catch (err) {
+        // Error toast handled by axios interceptor; onError lets the
+        // caller additionally branch on specific failure reasons.
+        onError?.(err);
       } finally {
         setSubmitting(false);
       }
     },
-    [onSuccess],
+    [onSuccess, onError],
   );
 
   const updateMonitor = useCallback(
@@ -68,13 +77,13 @@ export function useMonitorMutations(onSuccess) {
         await monitorsApi.updateMonitor(id, payload);
         toast.success("Monitor updated successfully");
         onSuccess?.("update");
-      } catch {
-        // Error toast handled by axios interceptor
+      } catch (err) {
+        onError?.(err);
       } finally {
         setSubmitting(false);
       }
     },
-    [onSuccess],
+    [onSuccess, onError],
   );
 
   const deleteMonitor = useCallback(
@@ -84,13 +93,13 @@ export function useMonitorMutations(onSuccess) {
         await monitorsApi.deleteMonitor(id);
         toast.success(`"${name}" has been deleted`);
         onSuccess?.("delete");
-      } catch {
-        // Error toast handled by axios interceptor
+      } catch (err) {
+        onError?.(err);
       } finally {
         setSubmitting(false);
       }
     },
-    [onSuccess],
+    [onSuccess, onError],
   );
 
   const toggleMonitor = useCallback(
@@ -100,13 +109,13 @@ export function useMonitorMutations(onSuccess) {
         await monitorsApi.updateMonitor(id, { active });
         toast.success(`"${name}" has been ${active ? "resumed" : "paused"}`);
         onSuccess?.("toggle");
-      } catch {
-        // Error toast handled by axios interceptor
+      } catch (err) {
+        onError?.(err);
       } finally {
         setSubmitting(false);
       }
     },
-    [onSuccess],
+    [onSuccess, onError],
   );
 
   return {
