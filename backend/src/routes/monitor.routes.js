@@ -1,20 +1,17 @@
 /**
  * Monitor routes
  *
- * POST   /api/monitors      — create
- * GET    /api/monitors      — list (paginated)
- * GET    /api/monitors/:id  — get by id
- * PUT    /api/monitors/:id  — update
- * DELETE /api/monitors/:id  — delete
+ * POST   /api/monitors      — create (blocked once the caller's plan
+ *                              monitor limit is reached — see
+ *                              requireWithinLimit below)
+ * GET    /api/monitors      — list (paginated, scoped to the caller)
+ * GET    /api/monitors/:id  — get by id (scoped to the caller)
+ * PUT    /api/monitors/:id  — update (scoped to the caller; interval
+ *                              changes are re-checked against the plan's
+ *                              minimum interval)
+ * DELETE /api/monitors/:id  — delete (scoped to the caller)
  *
  * Authentication is enforced once at the mount point (routes/index.js).
- * Each handler below additionally declares the granular permission it
- * requires via requirePermission — see middlewares/permission.js and
- * config/permissions.js. Today every "user" role already holds every
- * monitor:* permission, so this is a non-breaking, purely declarative
- * addition; it's what lets a future restricted role (e.g. a read-only
- * "viewer") be introduced later with a one-line change to
- * config/permissions.js instead of touching route files.
  */
 
 import { Router } from "express";
@@ -27,6 +24,9 @@ import {
 } from "../controllers/monitor.controller.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
 import { requirePermission } from "../middlewares/permission.js";
+import { requireWithinLimit } from "../middlewares/featureAccess.js";
+import { getMonitorLimit } from "../utils/planUtils.js";
+import { countOwnedMonitors } from "../services/monitor.service.js";
 import {
   createMonitorSchema,
   updateMonitorSchema,
@@ -39,6 +39,11 @@ router
   .route("/")
   .post(
     requirePermission("monitor:create"),
+    requireWithinLimit({
+      limitFn: getMonitorLimit,
+      countFn: (req) => countOwnedMonitors(req.user),
+      resourceName: "monitor",
+    }),
     validate(createMonitorSchema, "body"),
     createMonitor,
   )

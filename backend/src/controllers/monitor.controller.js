@@ -6,9 +6,12 @@ import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
 
 /**
  * POST /api/monitors
+ * The monitor limit for the caller's plan is enforced upstream by
+ * requireWithinLimit (see routes/monitor.routes.js) before this handler
+ * ever runs.
  */
 export const createMonitor = asyncHandler(async (req, res) => {
-  const monitor = await monitorService.createMonitor(req.body);
+  const monitor = await monitorService.createMonitor(req.body, req.user);
 
   sendSuccess(res, {
     statusCode: 201,
@@ -22,7 +25,7 @@ export const createMonitor = asyncHandler(async (req, res) => {
  */
 export const getMonitors = asyncHandler(async (req, res) => {
   const query = req.validatedQuery;
-  const result = await monitorService.getMonitors(query);
+  const result = await monitorService.getMonitors(query, req.user);
 
   sendPaginated(res, {
     data: result.monitors,
@@ -36,7 +39,7 @@ export const getMonitors = asyncHandler(async (req, res) => {
  * GET /api/monitors/:id
  */
 export const getMonitorById = asyncHandler(async (req, res) => {
-  const monitor = await monitorService.getMonitorById(req.params.id);
+  const monitor = await monitorService.getMonitorById(req.params.id, req.user);
 
   sendSuccess(res, { data: monitor });
 });
@@ -45,7 +48,11 @@ export const getMonitorById = asyncHandler(async (req, res) => {
  * PUT /api/monitors/:id
  */
 export const updateMonitor = asyncHandler(async (req, res) => {
-  const monitor = await monitorService.updateMonitor(req.params.id, req.body);
+  const monitor = await monitorService.updateMonitor(
+    req.params.id,
+    req.body,
+    req.user,
+  );
 
   sendSuccess(res, {
     message: "Monitor updated successfully",
@@ -57,7 +64,7 @@ export const updateMonitor = asyncHandler(async (req, res) => {
  * DELETE /api/monitors/:id
  */
 export const deleteMonitor = asyncHandler(async (req, res) => {
-  await monitorService.deleteMonitor(req.params.id);
+  await monitorService.deleteMonitor(req.params.id, req.user);
 
   sendSuccess(res, { message: "Monitor deleted successfully" });
 });
