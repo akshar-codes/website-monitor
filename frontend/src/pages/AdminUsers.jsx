@@ -1,159 +1,133 @@
 import { useState, useMemo } from "react";
-import { Search, Users, RefreshCw, MoreHorizontal, ShieldCheck, ShieldOff } from "lucide-react";
+import { Users, RefreshCw } from "lucide-react";
 import PageContainer from "../components/layout/PageContainer";
 import PageHeader from "../components/layout/PageHeader";
 import Button from "../components/ui/Button";
-import { Input } from "../components/ui/Input";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Pagination from "../components/ui/Pagination";
 import EmptyState from "../components/ui/EmptyState";
 import { SkeletonRow } from "../components/ui/Skeleton";
-import { useUserList, useUpdateUserRole } from "../hooks/useAdmin";
+import UserFilters from "../features/admin/UserFilters";
+import UserRow from "../features/admin/UserRow";
+import ChangePlanDialog from "../features/admin/ChangePlanDialog";
+import {
+  useUserList,
+  useUpdateUserRole,
+  useUpdateUserPlan,
+  useSuspendUser,
+  useReactivateUser,
+  useDeleteUser,
+} from "../hooks/useAdmin";
 import { useAuth } from "../hooks/useAuth";
-import { formatDate } from "../utils/format";
 import { ROLES } from "../constants/roles";
-import { cn } from "../utils/cn";
 
-const ROLE_FILTERS = [
-  { label: "All", value: "all" },
-  { label: "Admins", value: ROLES.ADMIN },
-  { label: "Users", value: ROLES.USER },
-];
-
-const COLUMN_HEADERS = ["User", "Role", "Joined", ""];
-
-function RoleBadge({ role }) {
-  const isAdmin = role === ROLES.ADMIN;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-        isAdmin
-          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-          : "border-zinc-500/20 bg-zinc-500/10 text-zinc-400",
-      )}
-    >
-      {isAdmin ? <ShieldCheck size={11} /> : <ShieldOff size={11} />}
-      {isAdmin ? "Admin" : "User"}
-    </span>
-  );
-}
-
-function UserActionMenu({ targetUser, currentUserId, onRequestRoleChange }) {
-  const [open, setOpen] = useState(false);
-
-  // An admin can never change their own role from this menu — mirrors the
-  // backend guard in admin.service.js#updateUserRole.
-  if (targetUser.id === currentUserId) {
-    return <span className="text-[11px] text-text-disabled">You</span>;
-  }
-
-  const nextRole = targetUser.role === ROLES.ADMIN ? ROLES.USER : ROLES.ADMIN;
-
-  return (
-    <div className="relative">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-bg-subtle hover:text-white"
-      >
-        <MoreHorizontal size={15} />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-20 w-48 rounded-xl border border-border-default bg-bg-elevated py-1 shadow-2xl">
-            <button
-              onClick={() => {
-                setOpen(false);
-                onRequestRoleChange(targetUser, nextRole);
-              }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-white"
-            >
-              {nextRole === ROLES.ADMIN ? (
-                <ShieldCheck size={13} />
-              ) : (
-                <ShieldOff size={13} />
-              )}
-              {nextRole === ROLES.ADMIN ? "Make admin" : "Remove admin"}
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function UserRow({ user, currentUserId, onRequestRoleChange }) {
-  return (
-    <div className="grid grid-cols-[1fr_100px_140px_44px] items-center gap-3 border-b border-[#1a1a1d] px-5 py-4 transition-colors hover:bg-[#131315] last:border-0">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-white">{user.name}</p>
-        <p className="truncate text-xs text-text-muted">{user.email}</p>
-      </div>
-      <div>
-        <RoleBadge role={user.role} />
-      </div>
-      <div>
-        <p className="text-xs text-text-secondary">
-          {formatDate(user.createdAt)}
-        </p>
-      </div>
-      <UserActionMenu
-        targetUser={user}
-        currentUserId={currentUserId}
-        onRequestRoleChange={onRequestRoleChange}
-      />
-    </div>
-  );
-}
+const COLUMN_HEADERS = ["User", "Role", "Plan", "Status", "Joined", ""];
 
 export default function AdminUsers() {
   const { user: currentUser } = useAuth();
+
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [pendingChange, setPendingChange] = useState(null); // { user, nextRole }
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [planFilter, setPlanFilter] = useState("all");
+
+  // Every destructive/state-changing action goes through one of these
+  // "pending" slots before it actually fires — each renders its own
+  // confirmation UI and only calls the mutation once the admin confirms.
+  const [pendingRoleChange, setPendingRoleChange] = useState(null); // { user, nextRole }
+  const [pendingPlanChange, setPendingPlanChange] = useState(null); // user
+  const [pendingSuspend, setPendingSuspend] = useState(null); // user
+  const [pendingReactivate, setPendingReactivate] = useState(null); // user
+  const [pendingDelete, setPendingDelete] = useState(null); // user
 
   const listParams = useMemo(() => {
     const params = { page, limit: 20 };
     if (roleFilter !== "all") params.role = roleFilter;
+    if (statusFilter !== "all") params.status = statusFilter;
+    if (planFilter !== "all") params.plan = planFilter;
+    if (search.trim()) params.search = search.trim();
     return params;
-  }, [page, roleFilter]);
+  }, [page, roleFilter, statusFilter, planFilter, search]);
 
   const { data: usersData, loading, refetch } = useUserList(listParams);
   const users = useMemo(() => usersData?.data || [], [usersData]);
   const pagination = usersData?.pagination;
 
-  const handleRoleChangeSuccess = () => {
-    setPendingChange(null);
+  const handleMutationSuccess = () => {
+    setPendingRoleChange(null);
+    setPendingPlanChange(null);
+    setPendingSuspend(null);
+    setPendingReactivate(null);
+    setPendingDelete(null);
     refetch();
   };
 
-  const { updateRole, submitting } = useUpdateUserRole(handleRoleChangeSuccess);
+  const { updateRole, submitting: roleSubmitting } =
+    useUpdateUserRole(handleMutationSuccess);
+  const { updatePlan, submitting: planSubmitting } =
+    useUpdateUserPlan(handleMutationSuccess);
+  const { suspend, submitting: suspendSubmitting } =
+    useSuspendUser(handleMutationSuccess);
+  const { reactivate, submitting: reactivateSubmitting } =
+    useReactivateUser(handleMutationSuccess);
+  const { removeUser, submitting: deleteSubmitting } =
+    useDeleteUser(handleMutationSuccess);
 
-  const filteredUsers = useMemo(() => {
-    if (!search.trim()) return users;
-    const q = search.toLowerCase();
-    return users.filter(
-      (u) =>
-        u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
-    );
-  }, [users, search]);
+  const handleSearchChange = (value) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const handleRoleFilterChange = (value) => {
+    setRoleFilter(value);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (value) => {
+    setStatusFilter(value);
+    setPage(1);
+  };
+
+  const handlePlanFilterChange = (value) => {
+    setPlanFilter(value);
+    setPage(1);
+  };
 
   const handleConfirmRoleChange = () => {
-    if (!pendingChange) return;
-    updateRole(pendingChange.user.id, pendingChange.nextRole, pendingChange.user.name);
+    if (!pendingRoleChange) return;
+    updateRole(
+      pendingRoleChange.user.id,
+      pendingRoleChange.nextRole,
+      pendingRoleChange.user.name,
+    );
+  };
+
+  const handleConfirmPlanChange = (plan) => {
+    if (!pendingPlanChange) return;
+    updatePlan(pendingPlanChange.id, plan, pendingPlanChange.name);
+  };
+
+  const handleConfirmSuspend = () => {
+    if (!pendingSuspend) return;
+    suspend(pendingSuspend.id, pendingSuspend.name);
+  };
+
+  const handleConfirmReactivate = () => {
+    if (!pendingReactivate) return;
+    reactivate(pendingReactivate.id, pendingReactivate.name);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!pendingDelete) return;
+    removeUser(pendingDelete.id, pendingDelete.name);
   };
 
   return (
     <PageContainer>
       <PageHeader
         title="Users"
-        subtitle="Manage account roles and admin access"
+        subtitle="Manage accounts, roles, subscription plans, and account status"
         actions={
           <Button variant="secondary" size="sm" icon={RefreshCw} onClick={refetch}>
             Refresh
@@ -162,51 +136,21 @@ export default function AdminUsers() {
         className="mb-6"
       />
 
-      {/* Filters bar */}
-      <div className="mb-5 flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-60 max-w-sm">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
-          />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email…"
-            className="pl-9"
-          />
-        </div>
-
-        <div className="flex items-center gap-1 rounded-lg border border-border-default bg-bg-elevated p-1">
-          {ROLE_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => {
-                setRoleFilter(f.value);
-                setPage(1);
-              }}
-              className={cn(
-                "rounded-md px-3 py-1 text-xs font-medium transition-all",
-                roleFilter === f.value
-                  ? "bg-bg-subtle text-white"
-                  : "text-text-muted hover:text-text-secondary",
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {pagination && (
-          <p className="ml-auto text-xs text-text-muted">
-            {pagination.total} user{pagination.total !== 1 ? "s" : ""}
-          </p>
-        )}
-      </div>
+      <UserFilters
+        search={search}
+        onSearchChange={handleSearchChange}
+        roleFilter={roleFilter}
+        onRoleFilterChange={handleRoleFilterChange}
+        planFilter={planFilter}
+        onPlanFilterChange={handlePlanFilterChange}
+        statusFilter={statusFilter}
+        onStatusFilterChange={handleStatusFilterChange}
+        totalCount={pagination?.total}
+      />
 
       {/* Table */}
       <div className="rounded-xl border border-border-subtle bg-bg-surface">
-        <div className="grid grid-cols-[1fr_100px_140px_44px] items-center gap-3 border-b border-border-subtle px-5 py-3">
+        <div className="grid grid-cols-[1fr_90px_100px_100px_120px_44px] items-center gap-3 border-b border-border-subtle px-5 py-3">
           {COLUMN_HEADERS.map((h, i) => (
             <p
               key={i}
@@ -219,26 +163,34 @@ export default function AdminUsers() {
 
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
-        ) : !filteredUsers.length ? (
+        ) : !users.length ? (
           <EmptyState
             icon={Users}
             title={search ? "No users match your search" : "No users found"}
             description={
               search
-                ? "Try a different search term."
+                ? "Try a different search term or clear your filters."
                 : "Users will appear here once they register."
             }
             className="py-16"
           />
         ) : (
-          filteredUsers.map((u) => (
+          users.map((u) => (
             <UserRow
               key={u.id}
               user={u}
               currentUserId={currentUser?.id}
               onRequestRoleChange={(targetUser, nextRole) =>
-                setPendingChange({ user: targetUser, nextRole })
+                setPendingRoleChange({ user: targetUser, nextRole })
               }
+              onRequestPlanChange={(targetUser) =>
+                setPendingPlanChange(targetUser)
+              }
+              onRequestSuspend={(targetUser) => setPendingSuspend(targetUser)}
+              onRequestReactivate={(targetUser) =>
+                setPendingReactivate(targetUser)
+              }
+              onRequestDelete={(targetUser) => setPendingDelete(targetUser)}
             />
           ))
         )}
@@ -253,25 +205,75 @@ export default function AdminUsers() {
         />
       )}
 
+      {/* Role change confirmation */}
       <ConfirmDialog
-        open={!!pendingChange}
-        onClose={() => setPendingChange(null)}
+        open={!!pendingRoleChange}
+        onClose={() => setPendingRoleChange(null)}
         onConfirm={handleConfirmRoleChange}
         title={
-          pendingChange?.nextRole === ROLES.ADMIN
+          pendingRoleChange?.nextRole === ROLES.ADMIN
             ? "Grant admin access?"
             : "Remove admin access?"
         }
         description={
-          pendingChange?.nextRole === ROLES.ADMIN
-            ? `"${pendingChange?.user?.name}" will be able to manage all users and their roles.`
-            : `"${pendingChange?.user?.name}" will lose admin access immediately.`
+          pendingRoleChange?.nextRole === ROLES.ADMIN
+            ? `"${pendingRoleChange?.user?.name}" will be able to manage all users and their roles.`
+            : `"${pendingRoleChange?.user?.name}" will lose admin access immediately.`
         }
         confirmLabel={
-          pendingChange?.nextRole === ROLES.ADMIN ? "Make admin" : "Remove admin"
+          pendingRoleChange?.nextRole === ROLES.ADMIN
+            ? "Make admin"
+            : "Remove admin"
         }
-        confirmVariant={pendingChange?.nextRole === ROLES.ADMIN ? "primary" : "danger"}
-        loading={submitting}
+        confirmVariant={
+          pendingRoleChange?.nextRole === ROLES.ADMIN ? "primary" : "danger"
+        }
+        loading={roleSubmitting}
+      />
+
+      {/* Plan change */}
+      <ChangePlanDialog
+        open={!!pendingPlanChange}
+        onClose={() => setPendingPlanChange(null)}
+        onConfirm={handleConfirmPlanChange}
+        targetUser={pendingPlanChange}
+        loading={planSubmitting}
+      />
+
+      {/* Suspend confirmation */}
+      <ConfirmDialog
+        open={!!pendingSuspend}
+        onClose={() => setPendingSuspend(null)}
+        onConfirm={handleConfirmSuspend}
+        title="Suspend this account?"
+        description={`"${pendingSuspend?.name}" will be immediately signed out of every device and won't be able to log back in until reactivated.`}
+        confirmLabel="Suspend account"
+        confirmVariant="danger"
+        loading={suspendSubmitting}
+      />
+
+      {/* Reactivate confirmation */}
+      <ConfirmDialog
+        open={!!pendingReactivate}
+        onClose={() => setPendingReactivate(null)}
+        onConfirm={handleConfirmReactivate}
+        title="Reactivate this account?"
+        description={`"${pendingReactivate?.name}" will be able to log in again.`}
+        confirmLabel="Reactivate account"
+        confirmVariant="primary"
+        loading={reactivateSubmitting}
+      />
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete this user permanently?"
+        description={`"${pendingDelete?.name}" and all of their monitors, incidents, and health-check history will be permanently deleted. This cannot be undone.`}
+        confirmLabel="Delete user"
+        confirmVariant="danger"
+        loading={deleteSubmitting}
       />
     </PageContainer>
   );
