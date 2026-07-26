@@ -70,6 +70,20 @@ const createOAuthCallbackHandler = (providerName) =>
           );
         }
 
+        // Mirrors the local-login rule in services/auth.service.js#validateCredentials
+        // — a suspended account (see services/admin.service.js#suspendUser)
+        // must never be able to establish a new session, regardless of
+        // authentication method.
+        if (user.active === false) {
+          return res.redirect(
+            buildOAuthRedirectUrl({
+              status: "error",
+              message:
+                "Your account has been suspended. Please contact support.",
+            }),
+          );
+        }
+
         // Login-activity tracking — mirrors what the Local strategy records
         // via services/auth.service.js#validateCredentials, so "last seen"
         // data is consistent regardless of authentication method.
