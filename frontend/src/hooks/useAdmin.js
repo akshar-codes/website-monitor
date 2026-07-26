@@ -31,3 +31,93 @@ export function useUpdateUserRole(onSuccess) {
 
   return { updateRole, submitting };
 }
+
+export function useUpdateUserPlan(onSuccess) {
+  const [submitting, setSubmitting] = useState(false);
+
+  const updatePlan = useCallback(
+    async (userId, plan, name) => {
+      setSubmitting(true);
+      try {
+        const { message } = await adminApi.updateUserPlan(userId, plan);
+        toast.success(
+          message || `${name ? `"${name}"'s` : "User's"} plan updated`,
+        );
+        onSuccess?.();
+      } catch {
+        // Error toast handled by axios interceptor
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [onSuccess],
+  );
+
+  return { updatePlan, submitting };
+}
+
+export function useSuspendUser(onSuccess) {
+  const [submitting, setSubmitting] = useState(false);
+
+  const suspend = useCallback(
+    async (userId, name) => {
+      setSubmitting(true);
+      try {
+        await adminApi.suspendUser(userId);
+        toast.success(`${name ? `"${name}"` : "User"} has been suspended`);
+        onSuccess?.();
+      } catch {
+        // Error toast handled by axios interceptor
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [onSuccess],
+  );
+
+  return { suspend, submitting };
+}
+
+export function useReactivateUser(onSuccess) {
+  const [submitting, setSubmitting] = useState(false);
+
+  const reactivate = useCallback(
+    async (userId, name) => {
+      setSubmitting(true);
+      try {
+        await adminApi.reactivateUser(userId);
+        toast.success(`${name ? `"${name}"` : "User"} has been reactivated`);
+        onSuccess?.();
+      } catch {
+        // Error toast handled by axios interceptor
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [onSuccess],
+  );
+
+  return { reactivate, submitting };
+}
+
+export function useDeleteUser(onSuccess) {
+  const [submitting, setSubmitting] = useState(false);
+
+  const removeUser = useCallback(
+    async (userId, name) => {
+      setSubmitting(true);
+      try {
+        await adminApi.deleteUser(userId);
+        toast.success(`${name ? `"${name}"` : "User"} has been deleted`);
+        onSuccess?.();
+      } catch {
+        // Error toast handled by axios interceptor
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [onSuccess],
+  );
+
+  return { removeUser, submitting };
+}
