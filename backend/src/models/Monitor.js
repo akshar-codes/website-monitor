@@ -94,10 +94,9 @@ const monitorSchema = new mongoose.Schema(
 
 // ── Indexes ──
 
-// Fast lookup by URL. Uniqueness intentionally stays global (not scoped
-// per-owner) — the existing "one monitor per URL" invariant is preserved
-// as-is rather than silently changed as part of this feature.
-monitorSchema.index({ url: 1 }, { unique: true });
+// Fast lookup by URL. Uniqueness is scoped per-owner so different
+// users can monitor the same URL.
+monitorSchema.index({ owner: 1, url: 1 }, { unique: true });
 
 // Query active monitors quickly (scheduler's hot path — global, unscoped
 // by design; the polling worker has no concept of "the current user").

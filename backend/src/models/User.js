@@ -345,15 +345,13 @@ userSchema.pre("save", async function hashPasswordHook() {
 // A password is required UNLESS the account has at least one linked OAuth
 // identity. This keeps the local-auth invariant (password always present)
 // while allowing OAuth-only accounts to never set one.
-userSchema.pre("validate", function enforcePasswordUnlessOAuth(next) {
+userSchema.pre("validate", function enforcePasswordUnlessOAuth() {
   const hasOAuthAccount =
     Array.isArray(this.oauthAccounts) && this.oauthAccounts.length > 0;
 
   if (!this.password && !hasOAuthAccount) {
     this.invalidate("password", "Password is required");
   }
-
-  next();
 });
 
 // ── Instance methods ──

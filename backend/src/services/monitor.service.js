@@ -54,9 +54,9 @@ export const createMonitor = async (data, user) => {
 
   assertIntervalAllowedForPlan(user.plan, data.interval);
 
-  const existing = await Monitor.findOne({ url: data.url });
+  const existing = await Monitor.findOne({ owner: ownerId, url: data.url });
   if (existing) {
-    throw ApiError.conflict(`A monitor for "${data.url}" already exists`);
+    throw ApiError.conflict(`You already have a monitor for "${data.url}"`);
   }
 
   return Monitor.create({ ...data, owner: ownerId });
@@ -108,11 +108,12 @@ export const updateMonitor = async (id, data, user) => {
 
   if (data.url) {
     const existing = await Monitor.findOne({
+      owner: ownerId,
       url: data.url,
       _id: { $ne: id },
     });
     if (existing) {
-      throw ApiError.conflict(`A monitor for "${data.url}" already exists`);
+      throw ApiError.conflict(`You already have a monitor for "${data.url}"`);
     }
   }
 

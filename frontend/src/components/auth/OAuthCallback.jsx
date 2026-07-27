@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
-import AuthLayout from "../components/auth/AuthLayout";
-import LoginMarketingPanel from "../components/auth/LoginMarketingPanel";
-import VerificationStatusCard from "../components/auth/VerificationStatusCard";
-import ResendVerificationForm from "../components/auth/ResendVerificationForm";
-import Button from "../components/ui/Button";
-import { useAuth } from "../hooks/useAuth";
-import { ROUTES } from "../constants/routes";
+import AuthLayout from "./AuthLayout";
+import LoginMarketingPanel from "./LoginMarketingPanel";
+import VerificationStatusCard from "./VerificationStatusCard";
+import ResendVerificationForm from "./ResendVerificationForm";
+import Button from "../ui/Button";
+import { useAuth } from "../../hooks/useAuth";
+import { ROUTES } from "../../constants/routes";
 
 /**
  * Lands here after the backend finishes handling an OAuth redirect

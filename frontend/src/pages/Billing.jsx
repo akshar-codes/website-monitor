@@ -5,7 +5,7 @@ import PageHeader from "../components/layout/PageHeader";
 import CurrentPlanSummary from "../features/plans/CurrentPlanSummary";
 import UpgradePrompt from "../features/plans/UpgradePrompt";
 import PlanChangeModal from "../features/plans/PlanChangeModal";
-import UsageDashboard from "../features/usage/UsageDashboard";
+import UsageDashboard from "../components/usage/UsageDashboard";
 import Button from "../components/ui/Button";
 import {
   useCurrentPlan,

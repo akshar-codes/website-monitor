@@ -20,7 +20,7 @@ import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import OAuthCallback from "./pages/OAuthCallback";
+import OAuthCallback from "./components/auth/OAuthCallback";
 import { Skeleton } from "./components/ui/Skeleton";
 import { ROLES } from "./constants/roles";
 

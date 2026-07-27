@@ -13,6 +13,7 @@ import PageHeader from "../components/layout/PageHeader";
 import StatCard from "../components/cards/StatCard";
 import SectionLabel from "../components/ui/SectionLabel";
 import Button from "../components/ui/Button";
+import QuickActions from "../features/dashboard/QuickActions";
 import RecentActivity from "../features/dashboard/RecentActivity";
 import ActiveIncidents from "../features/dashboard/ActiveIncidents";
 import OverviewChart from "../features/dashboard/OverviewChart";
@@ -162,6 +163,11 @@ export default function Dashboard() {
         }
         className="mb-6"
       />
+
+      {/* Quick actions */}
+      <div className="mb-6">
+        <QuickActions />
+      </div>
 
       {/* KPI Cards */}
       <div className="mb-6">
