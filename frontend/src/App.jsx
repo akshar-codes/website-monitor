@@ -6,6 +6,7 @@ import { PermissionsProvider } from "./context/PermissionsContext";
 import ProtectedRoute from "./components/routing/ProtectedRoute";
 import GuestRoute from "./components/routing/GuestRoute";
 import RoleProtectedRoute from "./components/routing/RoleProtectedRoute";
+import AccessErrorListener from "./components/access/AccessErrorListener";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Monitors from "./pages/Monitors";
@@ -60,6 +61,12 @@ export default function App() {
             }}
             richColors
           />
+          {/* Listens for the `access:denied` event dispatched by
+              services/api/client.js and presents every role/permission/
+              plan authorization failure with a single, consistent toast
+              (with an upgrade CTA where relevant). Needs to live inside
+              <BrowserRouter> for useNavigate. */}
+          <AccessErrorListener />
           <Routes>
             {/* Public — redirects to the dashboard if already logged in */}
             <Route element={<GuestRoute />}>
