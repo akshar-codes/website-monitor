@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { useAuth } from "../../hooks/useAuth";
+import { usePermissions } from "../../hooks/usePermissions";
 import { ROUTES } from "../../constants/routes";
 import { PLANS } from "../../constants/plans";
 import ConfirmDialog from "../ui/ConfirmDialog";
@@ -45,10 +46,17 @@ const BASE_NAV_ITEMS = [
   },
 ];
 
+// `permission` is checked against the current user's permission list (see
+// hooks/usePermissions -> context/PermissionsContext.jsx, sourced from
+// backend/src/config/permissions.js) rather than a raw role comparison —
+// navigation is now driven by permissions, not roles directly, so a
+// future permission change (e.g. a new "moderator" role that also gets
+// user:read) doesn't require touching this component.
 const ADMIN_NAV_ITEM = {
   label: "Users",
   path: ROUTES.ADMIN_USERS,
   icon: ShieldCheck,
+  permission: "user:read",
 };
 
 function NavItem({ item, collapsed }) {
@@ -100,13 +108,19 @@ export default function Sidebar() {
   const [confirmLogoutAllOpen, setConfirmLogoutAllOpen] = useState(false);
   const [loggingOutAll, setLoggingOutAll] = useState(false);
   const { user, isAdmin, plan, logout, logoutAll } = useAuth();
+  const { can } = usePermissions();
   const navigate = useNavigate();
 
   // Admin-only entries are appended, never inserted in the middle, so the
-  // core navigation order stays identical for every user regardless of role.
+  // core navigation order stays identical for every user regardless of
+  // role/permissions. Filtered by permission rather than the `isAdmin`
+  // flag directly — see ADMIN_NAV_ITEM's comment above.
   const navItems = useMemo(
-    () => (isAdmin ? [...BASE_NAV_ITEMS, ADMIN_NAV_ITEM] : BASE_NAV_ITEMS),
-    [isAdmin],
+    () =>
+      can(ADMIN_NAV_ITEM.permission)
+        ? [...BASE_NAV_ITEMS, ADMIN_NAV_ITEM]
+        : BASE_NAV_ITEMS,
+    [can],
   );
 
   const handleLogout = async () => {
