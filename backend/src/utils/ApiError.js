@@ -29,8 +29,16 @@ class ApiError extends Error {
     return new ApiError(401, message);
   }
 
-  static forbidden(message = "Forbidden") {
-    return new ApiError(403, message);
+  /**
+   * Generalized 403. `code` is optional and lets callers attach a
+   * machine-readable reason (e.g. "ROLE_FORBIDDEN", "PERMISSION_DENIED",
+   * "OWNERSHIP_REQUIRED") without every authorization layer needing its
+   * own bespoke static factory — the frontend's
+   * utils/accessErrors.js reads this same `code` field to decide how to
+   * present the failure (see services/api/client.js).
+   */
+  static forbidden(message = "Forbidden", code = null) {
+    return new ApiError(403, message, true, null, code);
   }
 
   static notFound(message = "Resource not found") {
@@ -58,7 +66,7 @@ class ApiError extends Error {
    * the frontend can deep-link straight to the right upgrade option
    * instead of parsing the message string. Used by
    * middlewares/planAuthorization.js and middlewares/featureAccess.js
-   * (requireWithinLimit).
+   * (requireWithinLimit, requireWindowWithinRetention).
    */
   static upgradeRequired(
     message = "This action requires a higher subscription plan.",

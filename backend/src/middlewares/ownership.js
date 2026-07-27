@@ -8,13 +8,13 @@ import { ROLES } from "../config/constants.js";
  * (admins, by default). The loaded document is attached to
  * `req[attachAs]` so the downstream handler doesn't have to re-fetch it.
  *
- * Not currently wired to any route: every resource in this codebase today
- * (Monitor, Incident, HealthCheck, DailyStat) is org-wide/shared rather
- * than owned by an individual user — see utils/planUtils.js's note on
- * per-user monitor limits for the related discussion. This factory is
- * ready for the first user-owned resource without any changes to the
- * pattern itself; just add an `owner` ref to that resource's schema and
- * apply `requireOwnership(Model)` to its routes:
+ * Not currently wired to any route: every user-scoped resource in this
+ * codebase (Monitor, Incident, HealthCheck, DailyStat) is already scoped
+ * to `owner` directly inside its service layer (see
+ * services/monitor.service.js#getOwnedMonitorIds and its callers), so
+ * there is no route today that needs a *generic* ownership check on top
+ * of that. This factory is kept ready for the next user-owned resource
+ * that doesn't want to duplicate that per-service scoping pattern:
  *
  *   router.get(
  *     "/:id",
@@ -56,6 +56,7 @@ export const requireOwnership =
         return next(
           ApiError.forbidden(
             "You do not have permission to access this resource",
+            "OWNERSHIP_REQUIRED",
           ),
         );
       }

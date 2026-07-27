@@ -25,6 +25,7 @@ export const authorize =
       return next(
         ApiError.forbidden(
           "You do not have permission to perform this action",
+          "ROLE_FORBIDDEN",
         ),
       );
     }

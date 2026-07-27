@@ -13,6 +13,14 @@ import ApiError from "../utils/ApiError.js";
  * covers the edge case of a request already in flight the instant the
  * suspension happens, and fails closed rather than trusting session
  * destruction as the only enforcement point.
+ *
+ * NOTE: this used to also exist (with this exact check) as a second,
+ * unused copy at backend/src/middleware/authenticate.js (singular
+ * folder). That file was dead code shadowed by this one — every route
+ * imports from `../middlewares/authenticate.js` (plural) — which meant
+ * the suspended-account check it contained was never actually running.
+ * That duplicate has been removed; this is now the single source of
+ * truth for authentication middleware.
  */
 export const isAuthenticated = (req, _res, next) => {
   if (req.isAuthenticated && req.isAuthenticated()) {
