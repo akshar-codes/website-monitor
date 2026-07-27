@@ -19,7 +19,10 @@ export const requirePermission =
 
     if (!userHasAllPermissions(req.user, permissions)) {
       return next(
-        ApiError.forbidden("You do not have permission to perform this action"),
+        ApiError.forbidden(
+          "You do not have permission to perform this action",
+          "PERMISSION_DENIED",
+        ),
       );
     }
 
@@ -39,7 +42,10 @@ export const requireAnyPermission =
 
     if (!userHasAnyPermission(req.user, permissions)) {
       return next(
-        ApiError.forbidden("You do not have permission to perform this action"),
+        ApiError.forbidden(
+          "You do not have permission to perform this action",
+          "PERMISSION_DENIED",
+        ),
       );
     }
 

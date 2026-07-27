@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { hashPassword, comparePassword } from "../utils/password.js";
+import { getPermissionsForUser } from "../utils/permissions.js";
 import {
   OAUTH_PROVIDER_VALUES,
   ROLES,
@@ -316,6 +317,24 @@ userSchema.index({ role: 1, createdAt: -1 });
 
 // Plan-based analytics / admin filtering (e.g. "list every Pro user").
 userSchema.index({ plan: 1, createdAt: -1 });
+
+// ── Virtuals ──
+
+/**
+ * The flat list of permission strings the user's role grants (see
+ * config/permissions.js). Computed on read rather than stored — a role
+ * change takes effect immediately without a migration, and there is
+ * exactly one place (config/permissions.js) this mapping is defined.
+ *
+ * Included automatically in every JSON/object serialization of a user
+ * document (toJSON/toObject both set `virtuals: true` above), which means
+ * /auth/me, /auth/login, and /auth/register responses all carry it. The
+ * frontend's PermissionsContext reads this directly instead of
+ * maintaining its own duplicate role→permission map.
+ */
+userSchema.virtual("permissions").get(function () {
+  return getPermissionsForUser(this);
+});
 
 // ── Middleware ──
 userSchema.pre("save", async function hashPasswordHook() {
