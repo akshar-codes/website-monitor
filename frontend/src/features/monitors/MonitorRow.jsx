@@ -8,6 +8,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import StatusBadge from "../../components/ui/StatusBadge";
+import Can from "../../components/access/Can";
+import { usePermissions } from "../../hooks/usePermissions";
 import {
   formatResponseTime,
   formatUptime,
@@ -17,6 +19,13 @@ import {
 
 function ActionMenu({ monitor, onEdit, onToggle, onDelete }) {
   const [open, setOpen] = useState(false);
+  const { can } = usePermissions();
+
+  // Hide the menu entirely when the user can't do anything through it —
+  // an empty kebab menu is worse than no menu at all.
+  if (!can("monitor:update") && !can("monitor:delete")) {
+    return null;
+  }
 
   return (
     <div className="relative">
@@ -34,35 +43,43 @@ function ActionMenu({ monitor, onEdit, onToggle, onDelete }) {
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-8 z-20 w-44 rounded-xl border border-border-default bg-bg-elevated py-1 shadow-2xl">
-            <button
-              onClick={() => {
-                setOpen(false);
-                onEdit();
-              }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-white"
-            >
-              <Edit2 size={13} /> Edit
-            </button>
-            <button
-              onClick={() => {
-                setOpen(false);
-                onToggle();
-              }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-white"
-            >
-              {monitor.active ? <Pause size={13} /> : <Play size={13} />}
-              {monitor.active ? "Pause" : "Resume"}
-            </button>
-            <div className="my-1 h-px bg-bg-subtle" />
-            <button
-              onClick={() => {
-                setOpen(false);
-                onDelete();
-              }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"
-            >
-              <Trash2 size={13} /> Delete
-            </button>
+            <Can permission="monitor:update">
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onEdit();
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-white"
+              >
+                <Edit2 size={13} /> Edit
+              </button>
+            </Can>
+            <Can permission="monitor:update">
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onToggle();
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-white"
+              >
+                {monitor.active ? <Pause size={13} /> : <Play size={13} />}
+                {monitor.active ? "Pause" : "Resume"}
+              </button>
+            </Can>
+            <Can permission="monitor:delete">
+              <>
+                <div className="my-1 h-px bg-bg-subtle" />
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    onDelete();
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+              </>
+            </Can>
           </div>
         </>
       )}

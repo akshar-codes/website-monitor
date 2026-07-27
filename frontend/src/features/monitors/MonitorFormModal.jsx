@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -50,8 +50,26 @@ export default function MonitorFormModal({
   onSubmit,
   monitor,
   loading,
+  // Fastest interval (seconds) the caller's plan allows (see
+  // hooks/useUsage -> GET /api/usage, wired up by pages/Monitors.jsx).
+  // Faster presets are hidden from the picker entirely rather than shown
+  // disabled — the backend (services/monitor.service.js#assertIntervalAllowedForPlan)
+  // remains the source of truth and re-validates on submit regardless of
+  // what the client renders here; this is purely to avoid presenting an
+  // option the request would just get rejected for.
+  minIntervalSeconds = 30,
 }) {
   const isEdit = !!monitor;
+
+  const allowedPresets = useMemo(
+    () => INTERVAL_PRESETS.filter((s) => s >= minIntervalSeconds),
+    [minIntervalSeconds],
+  );
+
+  const defaultInterval = useMemo(() => {
+    if (allowedPresets.includes(300)) return 300;
+    return allowedPresets[0] ?? INTERVAL_PRESETS[INTERVAL_PRESETS.length - 1];
+  }, [allowedPresets]);
 
   const {
     register,
@@ -63,7 +81,7 @@ export default function MonitorFormModal({
     defaultValues: {
       name: "",
       url: "",
-      interval: 300,
+      interval: defaultInterval,
       active: true,
     },
   });
@@ -74,18 +92,29 @@ export default function MonitorFormModal({
         reset({
           name: monitor.name || "",
           url: monitor.url || "",
-          interval: monitor.interval || 300,
+          interval: monitor.interval || defaultInterval,
           active: monitor.active ?? true,
         });
       } else {
-        reset({ name: "", url: "", interval: 300, active: true });
+        reset({ name: "", url: "", interval: defaultInterval, active: true });
       }
     }
-  }, [open, monitor, reset]);
+  }, [open, monitor, reset, defaultInterval]);
 
   const handleFormSubmit = (data) => {
     onSubmit(data);
   };
+
+  // When editing a monitor whose interval predates a plan downgrade, keep
+  // it selectable in the list even though it's no longer offered for new
+  // selections — otherwise the field would silently jump to a different
+  // value on open.
+  const intervalOptions = useMemo(() => {
+    if (monitor && !allowedPresets.includes(monitor.interval)) {
+      return [monitor.interval, ...allowedPresets].sort((a, b) => a - b);
+    }
+    return allowedPresets;
+  }, [monitor, allowedPresets]);
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -126,9 +155,10 @@ export default function MonitorFormModal({
             label="Check interval"
             error={errors.interval?.message}
             required
+            hint={`Your plan allows checks as often as every ${minIntervalSeconds}s. Upgrade for faster polling.`}
           >
             <Select {...register("interval")} error={!!errors.interval}>
-              {INTERVAL_PRESETS.map((s) => (
+              {intervalOptions.map((s) => (
                 <option key={s} value={s}>
                   Every {formatInterval(s)}
                 </option>
