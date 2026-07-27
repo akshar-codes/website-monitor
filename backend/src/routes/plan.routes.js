@@ -13,16 +13,23 @@ import {
   changePlan,
 } from "../controllers/plan.controller.js";
 import { isAuthenticated } from "../middlewares/authenticate.js";
+import { requirePermission } from "../middlewares/permission.js";
 import { validate } from "../middlewares/validate.js";
 import { changePlanSchema } from "../validators/plan.validator.js";
 
 const router = Router();
 
 router.get("/", getPlans);
-router.get("/current", isAuthenticated, getCurrentPlan);
+router.get(
+  "/current",
+  isAuthenticated,
+  requirePermission("plan:read"),
+  getCurrentPlan,
+);
 router.post(
   "/change",
   isAuthenticated,
+  requirePermission("plan:change"),
   validate(changePlanSchema, "body"),
   changePlan,
 );
