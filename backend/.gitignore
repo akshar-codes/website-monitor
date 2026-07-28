@@ -24,3 +24,6 @@ coverage/
 # Build outputs (if you ever add TypeScript or build steps)
 dist/
 build/
+
+# User-uploaded files (profile avatars — see config/env.js#AVATAR_UPLOAD_DIR)
+uploads/

@@ -181,6 +181,25 @@ const envSchema = z.object({
     .string()
     .url("GITHUB_CALLBACK_URL must be a valid URL")
     .optional(),
+
+  // ── Profile / avatar uploads ──
+  // Local-disk storage — no cloud object storage (S3/Cloudinary/etc.) is
+  // configured anywhere else in this stack, so profile avatars are served
+  // straight off disk via express.static (see app.js) rather than pulling
+  // in a cloud SDK for a single upload path. Swapping to cloud storage
+  // later only requires changing middlewares/uploadAvatar.js and
+  // services/profile.service.js — nothing else depends on the storage
+  // mechanism.
+
+  /** Directory (relative to the backend project root) avatar files are written to. */
+  AVATAR_UPLOAD_DIR: z.string().default("uploads/avatars"),
+
+  /** Maximum accepted avatar upload size, in bytes. Defaults to 2 MB. */
+  AVATAR_MAX_FILE_SIZE_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(2 * 1024 * 1024),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -12,6 +12,7 @@ import {
 } from "../config/constants.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_REGEX_PROTOCOLS = ["http:", "https:"];
 
 // Sub-schema for a single linked OAuth identity. Deliberately generic
 // (provider + providerId) rather than one field per provider (googleId,
@@ -97,6 +98,54 @@ const userSchema = new mongoose.Schema(
     active: {
       type: Boolean,
       default: true,
+    },
+
+    // ── Public / account profile ──
+    // Optional, user-editable metadata surfaced on the profile page and
+    // (for a subset of fields) the public profile endpoint — see
+    // services/profile.service.js and routes/profile.routes.js. Every
+    // field defaults to an empty string rather than being required, so
+    // existing accounts created before this feature shipped continue to
+    // load correctly: Mongoose applies schema defaults at document
+    // hydration time for any path missing from the stored document, so no
+    // backfill migration is needed for pre-existing users.
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: [500, "Bio cannot exceed 500 characters"],
+      default: "",
+    },
+
+    location: {
+      type: String,
+      trim: true,
+      maxlength: [120, "Location cannot exceed 120 characters"],
+      default: "",
+    },
+
+    website: {
+      type: String,
+      trim: true,
+      maxlength: [200, "Website URL cannot exceed 200 characters"],
+      validate: {
+        validator(v) {
+          if (!v) return true;
+          try {
+            return URL_REGEX_PROTOCOLS.includes(new URL(v).protocol);
+          } catch {
+            return false;
+          }
+        },
+        message: "Website must be a valid HTTP or HTTPS URL",
+      },
+      default: "",
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      maxlength: [30, "Phone number cannot exceed 30 characters"],
+      default: "",
     },
 
     // ── Authorization ──
@@ -202,8 +251,13 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Profile picture synced from whichever OAuth provider supplied one
-    // (see services/oauth.service.js). Left null for password-only accounts.
+    // Profile picture. Synced from whichever OAuth provider supplied one
+    // (see services/oauth.service.js), or set by the user directly via
+    // POST /api/profile/avatar (see services/profile.service.js). Locally
+    // uploaded avatars are stored as a relative path
+    // ("/uploads/avatars/<file>"); OAuth-provided avatars are stored as
+    // the provider's full external URL — services/profile.service.js
+    // distinguishes the two so it only ever deletes files it manages.
     avatarUrl: {
       type: String,
       default: null,
