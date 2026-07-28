@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Monitors from "./pages/Monitors";
 import Insights from "./pages/Insights";
 import Billing from "./pages/Billing";
+import Profile from "./pages/Profile";
 import AdminUsers from "./pages/AdminUsers";
 import Unauthorized from "./pages/Unauthorized";
 import UpgradeRequired from "./pages/UpgradeRequired";
@@ -118,6 +119,14 @@ export default function App() {
                   element={
                     <Suspense fallback={<PageFallback />}>
                       <Billing />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <Suspense fallback={<PageFallback />}>
+                      <Profile />
                     </Suspense>
                   }
                 />

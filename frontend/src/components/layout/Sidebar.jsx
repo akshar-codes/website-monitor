@@ -182,14 +182,26 @@ export default function Sidebar() {
       <div
         className={cn("border-t border-border-subtle px-2 py-3 space-y-0.5")}
       >
-        <div
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2.5",
-            collapsed && "justify-center px-2",
-          )}
+        <NavLink
+          to={ROUTES.PROFILE}
+          className={({ isActive }) =>
+            cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-bg-overlay",
+              isActive && "bg-bg-overlay",
+              collapsed && "justify-center px-2",
+            )
+          }
         >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[11px] font-bold text-emerald-400">
-            {user?.name?.charAt(0)?.toUpperCase() || <User size={14} />}
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-500/10 text-[11px] font-bold text-emerald-400">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name || "Profile avatar"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              user?.name?.charAt(0)?.toUpperCase() || <User size={14} />
+            )}
           </div>
           {!collapsed && (
             <div className="min-w-0">
@@ -216,7 +228,7 @@ export default function Sidebar() {
               </div>
             </div>
           )}
-        </div>
+        </NavLink>
 
         <button
           onClick={handleLogout}

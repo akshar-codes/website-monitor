@@ -19,6 +19,14 @@ export default defineConfig({
         target: "http://localhost:5000",
         changeOrigin: true,
       },
+      // Locally-stored profile avatars are served by the backend at
+      // /uploads/avatars (see backend/src/app.js) — proxied the same way
+      // as /api so <img src="/uploads/avatars/..."> resolves in dev
+      // without hardcoding the backend origin into stored URLs.
+      "/uploads": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+      },
     },
   },
 });
