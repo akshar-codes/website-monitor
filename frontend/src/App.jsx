@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider } from "./context/AuthContext";
 import { PermissionsProvider } from "./context/PermissionsContext";
+import { PreferencesProvider } from "./context/PreferencesContext";
 import ProtectedRoute from "./components/routing/ProtectedRoute";
 import GuestRoute from "./components/routing/GuestRoute";
 import RoleProtectedRoute from "./components/routing/RoleProtectedRoute";
@@ -13,6 +14,7 @@ import Monitors from "./pages/Monitors";
 import Insights from "./pages/Insights";
 import Billing from "./pages/Billing";
 import Profile from "./pages/Profile";
+import Preferences from "./pages/Preferences";
 import AdminUsers from "./pages/AdminUsers";
 import Unauthorized from "./pages/Unauthorized";
 import UpgradeRequired from "./pages/UpgradeRequired";
@@ -45,130 +47,140 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <PermissionsProvider>
-          <Toaster
-            position="bottom-right"
-            toastOptions={{
-              style: {
-                background: "#18181b",
-                border: "1px solid #27272a",
-                color: "#fafafa",
-                fontSize: "13px",
-                borderRadius: "12px",
-              },
-              classNames: {
-                success: "!text-emerald-400",
-                error: "!text-red-400",
-              },
-            }}
-            richColors
-          />
-          {/* Listens for the `access:denied` event dispatched by
-              services/api/client.js and presents every role/permission/
-              plan authorization failure with a single, consistent toast
-              (with an upgrade CTA where relevant). Needs to live inside
-              <BrowserRouter> for useNavigate. */}
-          <AccessErrorListener />
-          <Routes>
-            {/* Public — redirects to the dashboard if already logged in */}
-            <Route element={<GuestRoute />}>
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-            </Route>
+          <PreferencesProvider>
+            <Toaster
+              position="bottom-right"
+              toastOptions={{
+                style: {
+                  background: "#18181b",
+                  border: "1px solid #27272a",
+                  color: "#fafafa",
+                  fontSize: "13px",
+                  borderRadius: "12px",
+                },
+                classNames: {
+                  success: "!text-emerald-400",
+                  error: "!text-red-400",
+                },
+              }}
+              richColors
+            />
+            {/* Listens for the `access:denied` event dispatched by
+                services/api/client.js and presents every role/permission/
+                plan authorization failure with a single, consistent toast
+                (with an upgrade CTA where relevant). Needs to live inside
+                <BrowserRouter> for useNavigate. */}
+            <AccessErrorListener />
+            <Routes>
+              {/* Public — redirects to the dashboard if already logged in */}
+              <Route element={<GuestRoute />}>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+              </Route>
 
-            {/*
-              Public and always accessible regardless of auth state — these
-              are transactional links clicked from an email client (or, for
-              /oauth/callback, a redirect from the backend after an OAuth
-              attempt), which may land in a different browser/session than
-              the one that triggered the request.
-            */}
-            <Route path="/verify-email" element={<VerifyEmail />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/oauth/callback" element={<OAuthCallback />} />
+              {/*
+                Public and always accessible regardless of auth state — these
+                are transactional links clicked from an email client (or, for
+                /oauth/callback, a redirect from the backend after an OAuth
+                attempt), which may land in a different browser/session than
+                the one that triggered the request.
+              */}
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/oauth/callback" element={<OAuthCallback />} />
 
-            {/* Requires an authenticated session */}
-            <Route element={<ProtectedRoute />}>
-              <Route element={<AppLayout />}>
-                <Route
-                  path="/"
-                  element={
-                    <Suspense fallback={<PageFallback />}>
-                      <Dashboard />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path="/monitors"
-                  element={
-                    <Suspense fallback={<PageFallback />}>
-                      <Monitors />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path="/insights"
-                  element={
-                    <Suspense fallback={<PageFallback />}>
-                      <Insights />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path="/billing"
-                  element={
-                    <Suspense fallback={<PageFallback />}>
-                      <Billing />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path="/profile"
-                  element={
-                    <Suspense fallback={<PageFallback />}>
-                      <Profile />
-                    </Suspense>
-                  }
-                />
-
-                {/* Reachable by any authenticated user regardless of role
-                    or plan — these are where a denied access attempt lands. */}
-                <Route path="/unauthorized" element={<Unauthorized />} />
-                <Route
-                  path="/upgrade-required"
-                  element={<UpgradeRequired />}
-                />
-
-                {/* Requires an authenticated session AND the admin role */}
-                <Route
-                  element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN]} />}
-                >
+              {/* Requires an authenticated session */}
+              <Route element={<ProtectedRoute />}>
+                <Route element={<AppLayout />}>
                   <Route
-                    path="/admin/users"
+                    path="/"
                     element={
                       <Suspense fallback={<PageFallback />}>
-                        <AdminUsers />
+                        <Dashboard />
                       </Suspense>
                     }
                   />
-                </Route>
+                  <Route
+                    path="/monitors"
+                    element={
+                      <Suspense fallback={<PageFallback />}>
+                        <Monitors />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/insights"
+                    element={
+                      <Suspense fallback={<PageFallback />}>
+                        <Insights />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/billing"
+                    element={
+                      <Suspense fallback={<PageFallback />}>
+                        <Billing />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/profile"
+                    element={
+                      <Suspense fallback={<PageFallback />}>
+                        <Profile />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/preferences"
+                    element={
+                      <Suspense fallback={<PageFallback />}>
+                        <Preferences />
+                      </Suspense>
+                    }
+                  />
 
-                {/*
-                  Example of gating a route behind a plan feature — nest a
-                  route tree inside <PlanProtectedRoute feature={...}>
-                  the same way /admin/users is nested inside
-                  <RoleProtectedRoute> above:
+                  {/* Reachable by any authenticated user regardless of role
+                      or plan — these are where a denied access attempt lands. */}
+                  <Route path="/unauthorized" element={<Unauthorized />} />
+                  <Route
+                    path="/upgrade-required"
+                    element={<UpgradeRequired />}
+                  />
 
-                  <Route element={<PlanProtectedRoute feature={FEATURES.TEAM_ACCESS} />}>
-                    <Route path="/team" element={<TeamSettings />} />
+                  {/* Requires an authenticated session AND the admin role */}
+                  <Route
+                    element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN]} />}
+                  >
+                    <Route
+                      path="/admin/users"
+                      element={
+                        <Suspense fallback={<PageFallback />}>
+                          <AdminUsers />
+                        </Suspense>
+                      }
+                    />
                   </Route>
-                */}
-              </Route>
-            </Route>
 
-            {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+                  {/*
+                    Example of gating a route behind a plan feature — nest a
+                    route tree inside <PlanProtectedRoute feature={...}>
+                    the same way /admin/users is nested inside
+                    <RoleProtectedRoute> above:
+
+                    <Route element={<PlanProtectedRoute feature={FEATURES.TEAM_ACCESS} />}>
+                      <Route path="/team" element={<TeamSettings />} />
+                    </Route>
+                  */}
+                </Route>
+              </Route>
+
+              {/* Catch-all */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </PreferencesProvider>
         </PermissionsProvider>
       </AuthProvider>
     </BrowserRouter>

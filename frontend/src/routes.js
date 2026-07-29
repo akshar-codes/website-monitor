@@ -12,5 +12,6 @@ export const ROUTES = Object.freeze({
   INSIGHTS: "/insights",
   BILLING: "/billing",
   PROFILE: "/profile",
+  PREFERENCES: "/preferences",
   ADMIN_USERS: "/admin/users",
 });

@@ -12,6 +12,7 @@ import {
   ShieldOff,
   ShieldCheck,
   User,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { useAuth } from "../../hooks/useAuth";
@@ -228,6 +229,20 @@ export default function Sidebar() {
               </div>
             </div>
           )}
+        </NavLink>
+
+        <NavLink
+          to={ROUTES.PREFERENCES}
+          className={({ isActive }) =>
+            cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-bg-overlay",
+              isActive ? "bg-bg-overlay text-white" : "text-text-muted",
+              collapsed && "justify-center px-2",
+            )
+          }
+        >
+          <SlidersHorizontal size={16} className="shrink-0" />
+          {!collapsed && <span className="truncate">Preferences</span>}
         </NavLink>
 
         <button
