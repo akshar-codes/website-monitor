@@ -7,6 +7,7 @@ import { Router } from "express";
 import healthRoutes from "./health.routes.js";
 import authRoutes from "./auth.routes.js";
 import profileRoutes from "./profile.routes.js";
+import preferenceRoutes from "./preference.routes.js";
 import planRoutes from "./plan.routes.js";
 import usageRoutes from "./usage.routes.js";
 import monitorRoutes from "./monitor.routes.js";
@@ -31,6 +32,7 @@ router.use("/profile", profileRoutes);
 router.use("/plans", planRoutes);
 
 // ── Requires an authenticated session ──
+router.use("/preferences", isAuthenticated, preferenceRoutes);
 router.use("/usage", isAuthenticated, usageRoutes);
 router.use("/monitors", isAuthenticated, monitorRoutes);
 router.use("/dashboard", isAuthenticated, dashboardRoutes);
