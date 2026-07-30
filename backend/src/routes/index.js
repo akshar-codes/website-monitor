@@ -13,6 +13,7 @@ import usageRoutes from "./usage.routes.js";
 import monitorRoutes from "./monitor.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
 import incidentRoutes from "./incident.routes.js";
+import notificationRoutes from "./notification.routes.js";
 import adminRoutes from "./admin.routes.js";
 import { isAuthenticated } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
@@ -37,6 +38,7 @@ router.use("/usage", isAuthenticated, usageRoutes);
 router.use("/monitors", isAuthenticated, monitorRoutes);
 router.use("/dashboard", isAuthenticated, dashboardRoutes);
 router.use("/incidents", isAuthenticated, incidentRoutes);
+router.use("/notifications", isAuthenticated, notificationRoutes);
 
 // ── Requires an authenticated session AND the admin role ──
 router.use("/admin", isAuthenticated, authorize(ROLES.ADMIN), adminRoutes);
