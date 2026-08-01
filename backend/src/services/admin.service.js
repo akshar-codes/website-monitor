@@ -9,6 +9,11 @@ import { escapeRegExp } from "../utils/regex.js";
 import { ROLES } from "../config/constants.js";
 import { changeUserPlan as changePlanForUser } from "./plan.service.js";
 import { destroyAllUserSessions } from "./session.service.js";
+import { logActivity } from "../utils/activityLogger.js";
+import {
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_ACTIONS,
+} from "../config/activityConstants.js";
 
 const resolveActingUserId = (actingUser) =>
   actingUser.id || actingUser._id.toString();
@@ -76,11 +81,22 @@ export const updateUserRole = async (targetUserId, role, actingUser) => {
     }
   }
 
+  const previousRole = user.role;
   user.role = role;
   // Role is not part of the password/validation chain — skip full
   // document revalidation the same way other metadata-only updates do
   // (e.g. recordLogin) to avoid re-checking unrelated fields.
   await user.save({ validateBeforeSave: false });
+
+  await logActivity({
+    userId: actingUserId,
+    category: ACTIVITY_CATEGORIES.ADMIN,
+    action: ACTIVITY_ACTIONS.ADMIN_USER_ROLE_CHANGED,
+    description: `Changed ${user.email}'s role from ${previousRole} to ${role}`,
+    entityType: "User",
+    entityId: user._id,
+    metadata: { targetEmail: user.email, from: previousRole, to: role },
+  });
 
   return user;
 };
@@ -104,7 +120,23 @@ export const updateUserPlan = async (targetUserId, plan, actingUser) => {
     throw ApiError.badRequest("Use the Billing page to change your own plan");
   }
 
-  return changePlanForUser(targetUserId, plan, actingUser);
+  const result = await changePlanForUser(targetUserId, plan, actingUser);
+
+  // plan.service.js already logs a PLAN-category entry on the target
+  // user's own timeline; this additional ADMIN-category entry on the
+  // acting admin's timeline is what surfaces the action in the admin's
+  // own activity history.
+  await logActivity({
+    userId: actingUserId,
+    category: ACTIVITY_CATEGORIES.ADMIN,
+    action: ACTIVITY_ACTIONS.ADMIN_USER_PLAN_CHANGED,
+    description: `Changed ${result.user.email}'s plan to ${plan}`,
+    entityType: "User",
+    entityId: result.user._id,
+    metadata: { targetEmail: result.user.email, to: plan },
+  });
+
+  return result;
 };
 
 // ── Status management (suspend / reactivate) ────────────────────────────────
@@ -154,6 +186,16 @@ export const suspendUser = async (targetUserId, actingUser) => {
     `User ${targetUserId} (${user.email}) suspended by admin ${actingUserId} — ${destroyedCount} session(s) invalidated`,
   );
 
+  await logActivity({
+    userId: actingUserId,
+    category: ACTIVITY_CATEGORIES.ADMIN,
+    action: ACTIVITY_ACTIONS.ADMIN_USER_SUSPENDED,
+    description: `Suspended account ${user.email}`,
+    entityType: "User",
+    entityId: user._id,
+    metadata: { targetEmail: user.email, sessionsInvalidated: destroyedCount },
+  });
+
   return user;
 };
 
@@ -179,6 +221,16 @@ export const reactivateUser = async (targetUserId, actingUser) => {
     `User ${targetUserId} (${user.email}) reactivated by admin ${actingUserId}`,
   );
 
+  await logActivity({
+    userId: actingUserId,
+    category: ACTIVITY_CATEGORIES.ADMIN,
+    action: ACTIVITY_ACTIONS.ADMIN_USER_REACTIVATED,
+    description: `Reactivated account ${user.email}`,
+    entityType: "User",
+    entityId: user._id,
+    metadata: { targetEmail: user.email },
+  });
+
   return user;
 };
 
@@ -196,6 +248,12 @@ export const reactivateUser = async (targetUserId, actingUser) => {
  * Two invariants mirror updateUserRole's safety checks:
  *   1. An admin can never delete their OWN account through this endpoint.
  *   2. The last remaining admin can never be deleted.
+ *
+ * Note: the deleted user's OWN activity log is intentionally left as-is
+ * (Activity documents reference `user` but aren't cascade-deleted here) —
+ * an audit trail losing entries the moment the account it concerns is
+ * removed would defeat its purpose. The acting admin's log records the
+ * deletion itself.
  */
 export const deleteUser = async (targetUserId, actingUser) => {
   const actingUserId = resolveActingUserId(actingUser);
@@ -237,6 +295,19 @@ export const deleteUser = async (targetUserId, actingUser) => {
   logger.info(
     `User ${targetUserId} (${user.email}) deleted by admin ${actingUserId} — cascaded ${ownedMonitorIds.length} monitor(s) and their dependent records`,
   );
+
+  await logActivity({
+    userId: actingUserId,
+    category: ACTIVITY_CATEGORIES.ADMIN,
+    action: ACTIVITY_ACTIONS.ADMIN_USER_DELETED,
+    description: `Deleted account ${user.email}`,
+    entityType: "User",
+    entityId: targetUserId,
+    metadata: {
+      targetEmail: user.email,
+      cascadedMonitors: ownedMonitorIds.length,
+    },
+  });
 
   return {
     deletedUserId: targetUserId,
