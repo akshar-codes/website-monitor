@@ -6,6 +6,11 @@ import * as authService from "../services/auth.service.js";
 import * as sessionService from "../services/session.service.js";
 import { applySessionPersistence } from "../utils/sessionMeta.js";
 import { sendSuccess } from "../utils/apiResponse.js";
+import { logActivity } from "../utils/activityLogger.js";
+import {
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_ACTIONS,
+} from "../config/activityConstants.js";
 
 // ── Controllers ──────────────────────────────────────────────────────────────
 
@@ -26,6 +31,16 @@ export const register = asyncHandler(async (req, res) => {
   } = req.body;
 
   const user = await authService.registerUser(payload);
+
+  await logActivity({
+    userId: user.id || user._id,
+    category: ACTIVITY_CATEGORIES.AUTH,
+    action: ACTIVITY_ACTIONS.REGISTER,
+    description: "Account created",
+    entityType: "User",
+    entityId: user.id || user._id,
+    req,
+  });
 
   sendSuccess(res, {
     statusCode: 201,
@@ -60,8 +75,17 @@ export const login = asyncHandler(async (req, res, next) => {
 
       applySessionPersistence(req, { rememberMe: req.body.rememberMe });
 
-      req.session.save((saveErr) => {
+      req.session.save(async (saveErr) => {
         if (saveErr) return next(saveErr);
+
+        await logActivity({
+          userId: user.id || user._id,
+          category: ACTIVITY_CATEGORIES.AUTH,
+          action: ACTIVITY_ACTIONS.LOGIN,
+          description: "Signed in",
+          req,
+        });
+
         return sendSuccess(res, {
           message: "Logged in successfully",
           data: user,
@@ -76,12 +100,25 @@ export const login = asyncHandler(async (req, res, next) => {
  * Ends the current device's session only.
  */
 export const logout = asyncHandler(async (req, res, next) => {
+  const userId = req.user?.id || req.user?._id;
+
   req.logout((err) => {
     if (err) return next(err);
 
-    req.session.destroy((destroyErr) => {
+    req.session.destroy(async (destroyErr) => {
       if (destroyErr) return next(destroyErr);
       res.clearCookie(env.SESSION_NAME);
+
+      if (userId) {
+        await logActivity({
+          userId,
+          category: ACTIVITY_CATEGORIES.AUTH,
+          action: ACTIVITY_ACTIONS.LOGOUT,
+          description: "Signed out",
+          req,
+        });
+      }
+
       return sendSuccess(res, { message: "Logged out successfully" });
     });
   });
@@ -99,9 +136,18 @@ export const logoutAll = asyncHandler(async (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
 
-    req.session.destroy((destroyErr) => {
+    req.session.destroy(async (destroyErr) => {
       if (destroyErr) return next(destroyErr);
       res.clearCookie(env.SESSION_NAME);
+
+      await logActivity({
+        userId,
+        category: ACTIVITY_CATEGORIES.AUTH,
+        action: ACTIVITY_ACTIONS.LOGOUT_ALL,
+        description: "Signed out from all devices",
+        req,
+      });
+
       return sendSuccess(res, { message: "Logged out from all devices" });
     });
   });
@@ -116,6 +162,18 @@ export const logoutOtherSessions = asyncHandler(async (req, res) => {
 
   const count = await sessionService.destroyAllUserSessions(userId, {
     exceptSessionId: req.sessionID,
+  });
+
+  await logActivity({
+    userId,
+    category: ACTIVITY_CATEGORIES.AUTH,
+    action: ACTIVITY_ACTIONS.LOGOUT_OTHERS,
+    description:
+      count > 0
+        ? `Signed out from ${count} other device${count === 1 ? "" : "s"}`
+        : "Requested sign-out from other devices (none were active)",
+    metadata: { count },
+    req,
   });
 
   sendSuccess(res, {
@@ -158,6 +216,14 @@ export const revokeSession = asyncHandler(async (req, res) => {
     throw ApiError.notFound("Session not found");
   }
 
+  await logActivity({
+    userId,
+    category: ACTIVITY_CATEGORIES.SESSION,
+    action: ACTIVITY_ACTIONS.SESSION_REVOKED,
+    description: "Revoked a device session",
+    req,
+  });
+
   sendSuccess(res, { message: "Session revoked successfully" });
 });
 
@@ -177,6 +243,14 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   const { token } = req.body;
   const user = await authService.verifyEmail(token);
 
+  await logActivity({
+    userId: user.id || user._id,
+    category: ACTIVITY_CATEGORIES.AUTH,
+    action: ACTIVITY_ACTIONS.EMAIL_VERIFIED,
+    description: "Verified email address",
+    req,
+  });
+
   sendSuccess(res, {
     message: "Email verified successfully. You can now sign in.",
     data: { email: user.email, emailVerified: user.emailVerified },
@@ -187,6 +261,9 @@ export const verifyEmail = asyncHandler(async (req, res) => {
  * POST /api/auth/resend-verification
  * Re-sends the verification email for an unverified account. Always
  * returns a generic success response — see auth.service.js for rationale.
+ * Not logged: the endpoint must not reveal whether an account exists
+ * (see the anti-enumeration note there), and logging conditionally on
+ * `sent` would leak exactly that.
  */
 export const resendVerification = asyncHandler(async (req, res) => {
   const { email } = req.body;
@@ -202,7 +279,8 @@ export const resendVerification = asyncHandler(async (req, res) => {
  * POST /api/auth/forgot-password
  * Issues a password-reset email for the given address. Always returns a
  * generic success response regardless of whether the account exists —
- * see auth.service.js for the anti-enumeration rationale.
+ * see auth.service.js for the anti-enumeration rationale. Not logged for
+ * the same reason as resendVerification above.
  */
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
@@ -222,7 +300,15 @@ export const forgotPassword = asyncHandler(async (req, res) => {
  */
 export const resetPassword = asyncHandler(async (req, res) => {
   const { token, password } = req.body;
-  await authService.resetPassword(token, password);
+  const user = await authService.resetPassword(token, password);
+
+  await logActivity({
+    userId: user.id || user._id,
+    category: ACTIVITY_CATEGORIES.AUTH,
+    action: ACTIVITY_ACTIONS.PASSWORD_RESET_COMPLETED,
+    description: "Reset account password",
+    req,
+  });
 
   sendSuccess(res, {
     message:

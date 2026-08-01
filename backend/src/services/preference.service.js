@@ -1,4 +1,9 @@
 import UserPreference from "../models/UserPreference.js";
+import { logActivity } from "../utils/activityLogger.js";
+import {
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_ACTIONS,
+} from "../config/activityConstants.js";
 
 const resolveUserId = (user) => user.id || user._id.toString();
 
@@ -16,10 +21,19 @@ export const getPreferences = async (user) => {
 // ── Update: general preferences ─────────────────────────────────────────────
 
 export const updatePreferences = async (user, data) => {
-  const prefs = await UserPreference.getOrCreateForUser(resolveUserId(user));
+  const userId = resolveUserId(user);
+  const prefs = await UserPreference.getOrCreateForUser(userId);
 
   Object.assign(prefs, data);
   await prefs.save();
+
+  await logActivity({
+    userId,
+    category: ACTIVITY_CATEGORIES.PREFERENCES,
+    action: ACTIVITY_ACTIONS.PREFERENCES_UPDATED,
+    description: "Updated preferences",
+    metadata: { changedFields: Object.keys(data) },
+  });
 
   return prefs;
 };
@@ -33,7 +47,8 @@ export const updatePreferences = async (user, data) => {
  * resets the others to their schema defaults.
  */
 export const updateDashboardPreferences = async (user, data) => {
-  const prefs = await UserPreference.getOrCreateForUser(resolveUserId(user));
+  const userId = resolveUserId(user);
+  const prefs = await UserPreference.getOrCreateForUser(userId);
 
   if (data.widgets) {
     const currentWidgets = prefs.dashboard.widgets.toObject();
@@ -62,6 +77,14 @@ export const updateDashboardPreferences = async (user, data) => {
   prefs.markModified("dashboard");
   await prefs.save();
 
+  await logActivity({
+    userId,
+    category: ACTIVITY_CATEGORIES.PREFERENCES,
+    action: ACTIVITY_ACTIONS.DASHBOARD_PREFERENCES_UPDATED,
+    description: "Updated dashboard customization",
+    metadata: { changedFields: Object.keys(data) },
+  });
+
   return prefs;
 };
 
@@ -76,5 +99,14 @@ export const updateDashboardPreferences = async (user, data) => {
 export const resetPreferences = async (user) => {
   const userId = resolveUserId(user);
   await UserPreference.deleteOne({ user: userId });
-  return UserPreference.getOrCreateForUser(userId);
+  const prefs = await UserPreference.getOrCreateForUser(userId);
+
+  await logActivity({
+    userId,
+    category: ACTIVITY_CATEGORIES.PREFERENCES,
+    action: ACTIVITY_ACTIONS.PREFERENCES_RESET,
+    description: "Reset preferences to defaults",
+  });
+
+  return prefs;
 };

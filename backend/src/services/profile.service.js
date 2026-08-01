@@ -4,6 +4,11 @@ import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
 import { AVATAR_DIR_ABSOLUTE, AVATAR_URL_PREFIX } from "../middlewares/uploadAvatar.js";
+import { logActivity } from "../utils/activityLogger.js";
+import {
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_ACTIONS,
+} from "../config/activityConstants.js";
 
 // ── Profile completion ──────────────────────────────────────────────────────
 
@@ -99,6 +104,16 @@ export const updateProfile = async (userId, data) => {
 
   logger.info(`Profile updated for user ${user._id}`);
 
+  await logActivity({
+    userId: user._id,
+    category: ACTIVITY_CATEGORIES.PROFILE,
+    action: ACTIVITY_ACTIONS.PROFILE_UPDATED,
+    description: "Updated profile information",
+    entityType: "User",
+    entityId: user._id,
+    metadata: { changedFields: Object.keys(data) },
+  });
+
   return {
     ...user.toJSON(),
     profileCompletion: computeProfileCompletion(user),
@@ -124,6 +139,15 @@ export const uploadAvatar = async (userId, file) => {
 
   logger.info(`Avatar updated for user ${user._id}`);
 
+  await logActivity({
+    userId: user._id,
+    category: ACTIVITY_CATEGORIES.PROFILE,
+    action: ACTIVITY_ACTIONS.AVATAR_UPLOADED,
+    description: "Updated profile photo",
+    entityType: "User",
+    entityId: user._id,
+  });
+
   return {
     ...user.toJSON(),
     profileCompletion: computeProfileCompletion(user),
@@ -147,6 +171,15 @@ export const deleteAvatar = async (userId) => {
   await deleteLocalAvatarFile(previousAvatarUrl);
 
   logger.info(`Avatar removed for user ${user._id}`);
+
+  await logActivity({
+    userId: user._id,
+    category: ACTIVITY_CATEGORIES.PROFILE,
+    action: ACTIVITY_ACTIONS.AVATAR_REMOVED,
+    description: "Removed profile photo",
+    entityType: "User",
+    entityId: user._id,
+  });
 
   return {
     ...user.toJSON(),
