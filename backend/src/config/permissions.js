@@ -37,9 +37,7 @@ export const ROLE_PERMISSIONS = Object.freeze({
     "plan:read",
     "plan:change",
     "usage:read",
-    "notification:read",
-    "notification:update",
-    "notification:delete",
+    "activity:read",
   ]),
 
   [ROLES.ADMIN]: Object.freeze([
@@ -52,9 +50,7 @@ export const ROLE_PERMISSIONS = Object.freeze({
     "plan:read",
     "plan:change",
     "usage:read",
-    "notification:read",
-    "notification:update",
-    "notification:delete",
+    "activity:read",
     "user:read",
     "user:manage-role",
   ]),
