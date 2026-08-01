@@ -3,6 +3,11 @@ import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
 import { getPlanDefinition, getPublicPlanCatalog } from "../config/plans.js";
 import { getChangeType } from "../utils/planUtils.js";
+import { logActivity } from "../utils/activityLogger.js";
+import {
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_ACTIONS,
+} from "../config/activityConstants.js";
 
 // ── Catalog ──────────────────────────────────────────────────────────────────
 
@@ -61,6 +66,7 @@ export const changeUserPlan = async (userId, targetPlan, actingUser = null) => {
     );
   }
 
+  const previousPlan = user.plan;
   const changeType = getChangeType(user.plan, targetPlan);
 
   const actingUserId = actingUser
@@ -76,6 +82,24 @@ export const changeUserPlan = async (userId, targetPlan, actingUser = null) => {
       isSelfService ? "" : ` (changed by ${actingUserId})`
     }`,
   );
+
+  // Logged onto the TARGET user's own activity timeline regardless of who
+  // initiated it — it's their subscription that changed. An additional,
+  // separate ADMIN-category entry is logged on the acting admin's own
+  // timeline by services/admin.service.js#updateUserPlan when this was
+  // admin-directed, so both parties see the change from their own side.
+  await logActivity({
+    userId: user._id,
+    category: ACTIVITY_CATEGORIES.PLAN,
+    action:
+      changeType === "upgrade"
+        ? ACTIVITY_ACTIONS.PLAN_UPGRADED
+        : ACTIVITY_ACTIONS.PLAN_DOWNGRADED,
+    description: isSelfService
+      ? `${changeType === "upgrade" ? "Upgraded" : "Downgraded"} plan from ${previousPlan} to ${targetPlan}`
+      : `Plan ${changeType === "upgrade" ? "upgraded" : "downgraded"} from ${previousPlan} to ${targetPlan} by an administrator`,
+    metadata: { from: previousPlan, to: targetPlan, changeType, isSelfService },
+  });
 
   return { user, changeType };
 };

@@ -11,6 +11,11 @@ import {
 } from "../config/constants.js";
 import { msBefore } from "../utils/dateUtils.js";
 import { getOwnedMonitorIds } from "./monitor.service.js";
+import { logActivity } from "../utils/activityLogger.js";
+import {
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_ACTIONS,
+} from "../config/activityConstants.js";
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
@@ -32,8 +37,8 @@ const ALLOWED_TRANSITIONS = {
 /**
  * Narrows a monitor-id filter to the caller's owned monitors, optionally
  * intersected with a single requested monitor ID. A monitorId that isn't
- * one of the caller's own resolves to an impossible match ($in: [])
- * rather than leaking whether it exists for someone else.
+ * one of the caller's own resolves to an impossible match ($in: []) rather
+ * than leaking whether it exists for someone else.
  */
 const resolveMonitorFilter = (ownedIds, monitorId) => {
   if (!monitorId) return { $in: ownedIds };
@@ -116,20 +121,37 @@ export const updateIncidentStatus = async (
   const incident = await Incident.findOne({
     _id: id,
     monitor: { $in: ownedIds },
-  });
+  }).populate("monitor", MONITOR_POPULATE_FIELDS);
   if (!incident) {
     throw ApiError.notFound(`Incident not found with id: ${id}`);
   }
 
-  const allowed = ALLOWED_TRANSITIONS[incident.status] || [];
+  const previousStatus = incident.status;
+
+  const allowed = ALLOWED_TRANSITIONS[previousStatus] || [];
   if (!allowed.includes(status)) {
     throw ApiError.badRequest(
-      `Invalid status transition from "${incident.status}" to "${status}"`,
+      `Invalid status transition from "${previousStatus}" to "${status}"`,
     );
   }
 
+  const ownerId = user.id || user._id.toString();
+  const monitorName = incident.monitor?.name || "a monitor";
+
+  const logStatusChange = () =>
+    logActivity({
+      userId: ownerId,
+      category: ACTIVITY_CATEGORIES.INCIDENT,
+      action: ACTIVITY_ACTIONS.INCIDENT_STATUS_UPDATED,
+      description: `Marked incident on "${monitorName}" as ${status}`,
+      entityType: "Incident",
+      entityId: incident._id,
+      metadata: { from: previousStatus, to: status },
+    });
+
   if (status === INCIDENT_STATUS.RESOLVED) {
     const resolved = await Incident.resolve(id, { rootCause, resolutionNotes });
+    await logStatusChange();
     return Incident.findById(resolved._id)
       .populate("monitor", MONITOR_POPULATE_FIELDS)
       .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
@@ -139,6 +161,7 @@ export const updateIncidentStatus = async (
   incident.status = status;
   if (rootCause != null) incident.rootCause = rootCause;
   await incident.save();
+  await logStatusChange();
 
   return Incident.findById(incident._id)
     .populate("monitor", MONITOR_POPULATE_FIELDS)

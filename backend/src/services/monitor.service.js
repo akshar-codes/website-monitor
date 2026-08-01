@@ -4,6 +4,11 @@ import {
   isIntervalAllowedForPlan,
   getMinCheckInterval,
 } from "../utils/planUtils.js";
+import { logActivity } from "../utils/activityLogger.js";
+import {
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_ACTIONS,
+} from "../config/activityConstants.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,7 +64,19 @@ export const createMonitor = async (data, user) => {
     throw ApiError.conflict(`You already have a monitor for "${data.url}"`);
   }
 
-  return Monitor.create({ ...data, owner: ownerId });
+  const monitor = await Monitor.create({ ...data, owner: ownerId });
+
+  await logActivity({
+    userId: ownerId,
+    category: ACTIVITY_CATEGORIES.MONITOR,
+    action: ACTIVITY_ACTIONS.MONITOR_CREATED,
+    description: `Created monitor "${monitor.name}"`,
+    entityType: "Monitor",
+    entityId: monitor._id,
+    metadata: { url: monitor.url, interval: monitor.interval },
+  });
+
+  return monitor;
 };
 
 export const getMonitors = async (
@@ -117,6 +134,10 @@ export const updateMonitor = async (id, data, user) => {
     }
   }
 
+  const previous = await Monitor.findOne({ _id: id, owner: ownerId })
+    .select("active")
+    .lean();
+
   // Reactivating a monitor schedules an immediate re-check.
   if (data.active === true) {
     data.nextCheckAt = new Date();
@@ -132,6 +153,28 @@ export const updateMonitor = async (id, data, user) => {
     throw ApiError.notFound(`Monitor not found with id: ${id}`);
   }
 
+  // Distinguish a pause/resume toggle from a general field edit so the
+  // activity timeline reads naturally ("Paused monitor X" vs. "Updated
+  // monitor X") rather than always saying "updated".
+  const activeChanged =
+    previous && data.active !== undefined && previous.active !== data.active;
+
+  await logActivity({
+    userId: ownerId,
+    category: ACTIVITY_CATEGORIES.MONITOR,
+    action: activeChanged
+      ? monitor.active
+        ? ACTIVITY_ACTIONS.MONITOR_RESUMED
+        : ACTIVITY_ACTIONS.MONITOR_PAUSED
+      : ACTIVITY_ACTIONS.MONITOR_UPDATED,
+    description: activeChanged
+      ? `${monitor.active ? "Resumed" : "Paused"} monitor "${monitor.name}"`
+      : `Updated monitor "${monitor.name}"`,
+    entityType: "Monitor",
+    entityId: monitor._id,
+    metadata: { changedFields: Object.keys(data) },
+  });
+
   return monitor;
 };
 
@@ -142,5 +185,16 @@ export const deleteMonitor = async (id, user) => {
   if (!monitor) {
     throw ApiError.notFound(`Monitor not found with id: ${id}`);
   }
+
+  await logActivity({
+    userId: ownerId,
+    category: ACTIVITY_CATEGORIES.MONITOR,
+    action: ACTIVITY_ACTIONS.MONITOR_DELETED,
+    description: `Deleted monitor "${monitor.name}"`,
+    entityType: "Monitor",
+    entityId: monitor._id,
+    metadata: { url: monitor.url },
+  });
+
   return monitor;
 };
