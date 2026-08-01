@@ -5,7 +5,8 @@ import {
   Monitor,
   BarChart3,
   CreditCard,
-  Activity,
+  Activity as ActivityIcon,
+  History,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -39,6 +40,11 @@ const BASE_NAV_ITEMS = [
     label: "Insights",
     path: "/insights",
     icon: BarChart3,
+  },
+  {
+    label: "Activity",
+    path: ROUTES.ACTIVITY,
+    icon: History,
   },
   {
     label: "Billing",
@@ -158,7 +164,7 @@ export default function Sidebar() {
         )}
       >
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-          <Activity size={16} className="text-emerald-400" />
+          <ActivityIcon size={16} className="text-emerald-400" />
         </div>
         {!collapsed && (
           <div>
