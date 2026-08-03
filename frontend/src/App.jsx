@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "./context/AuthContext";
 import { PermissionsProvider } from "./context/PermissionsContext";
 import { PreferencesProvider } from "./context/PreferencesContext";
+import { NotificationsProvider } from "./context/NotificationsContext";
 import ProtectedRoute from "./components/routing/ProtectedRoute";
 import GuestRoute from "./components/routing/GuestRoute";
 import RoleProtectedRoute from "./components/routing/RoleProtectedRoute";
@@ -49,15 +50,16 @@ export default function App() {
       <AuthProvider>
         <PermissionsProvider>
           <PreferencesProvider>
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                style: {
-                  background: "#18181b",
-                  border: "1px solid #27272a",
-                  color: "#fafafa",
-                  fontSize: "13px",
-                  borderRadius: "12px",
+            <NotificationsProvider>
+              <Toaster
+                position="bottom-right"
+                toastOptions={{
+                  style: {
+                    background: "#18181b",
+                    border: "1px solid #27272a",
+                    color: "#fafafa",
+                    fontSize: "13px",
+                    borderRadius: "12px",
                 },
                 classNames: {
                   success: "!text-emerald-400",
@@ -189,6 +191,7 @@ export default function App() {
               {/* Catch-all */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </NotificationsProvider>
           </PreferencesProvider>
         </PermissionsProvider>
       </AuthProvider>
