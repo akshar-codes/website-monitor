@@ -8,6 +8,14 @@ export function useOverview(pollingInterval = 30000) {
   return usePolling(() => dashboardApi.getOverview(), [], pollingInterval);
 }
 
+export function useDashboardSummary(pollingInterval = 30000) {
+  return usePolling(
+    () => dashboardApi.getDashboardSummary(),
+    [],
+    pollingInterval,
+  );
+}
+
 export function useMonitorList(params = {}) {
   const paramsKey = JSON.stringify(params);
   return useQuery(() => monitorsApi.getMonitors(params), [paramsKey]);
@@ -42,13 +50,6 @@ export function useActiveIncidents(params = {}) {
   return useQuery(() => dashboardApi.getActiveIncidents(params), [paramsKey]);
 }
 
-/**
- * `onError` is optional and currently only wired up for createMonitor —
- * it lets the caller react to a specific failure (e.g. the plan's
- * monitor limit being hit, surfaced as a 403 UPGRADE_REQUIRED) with a
- * dedicated UI instead of relying solely on the generic toast the axios
- * interceptor already shows for every failed request.
- */
 export function useMonitorMutations(onSuccess, onError) {
   const [submitting, setSubmitting] = useState(false);
 
@@ -60,8 +61,6 @@ export function useMonitorMutations(onSuccess, onError) {
         toast.success("Monitor created successfully");
         onSuccess?.("create");
       } catch (err) {
-        // Error toast handled by axios interceptor; onError lets the
-        // caller additionally branch on specific failure reasons.
         onError?.(err);
       } finally {
         setSubmitting(false);

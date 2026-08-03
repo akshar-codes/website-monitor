@@ -9,6 +9,14 @@ export async function getOverview() {
 }
 
 /**
+ * GET /api/dashboard/summary
+ */
+export async function getDashboardSummary() {
+  const { data } = await apiClient.get("/dashboard/summary");
+  return data;
+}
+
+/**
  * GET /api/dashboard/incidents
  */
 export async function getActiveIncidents(params = {}) {
