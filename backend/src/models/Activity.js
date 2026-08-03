@@ -6,8 +6,6 @@ import {
 
 const activitySchema = new mongoose.Schema(
   {
-    // Owner-scoped like Monitor/Incident — every query in
-    // services/activity.service.js filters on this first.
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -33,9 +31,6 @@ const activitySchema = new mongoose.Schema(
       },
     },
 
-    // Human-readable, pre-rendered at write time (e.g. `Created monitor
-    // "Prod API"`) — the timeline renders this directly rather than
-    // reconstructing sentences client-side from category/action/metadata.
     description: {
       type: String,
       required: [true, "Activity description is required"],
@@ -43,9 +38,6 @@ const activitySchema = new mongoose.Schema(
       maxlength: [500, "Description cannot exceed 500 characters"],
     },
 
-    // Optional reference to the resource this activity concerns (e.g.
-    // "Monitor" / monitorId) — generic rather than a per-type field so
-    // new entity types never require a schema change.
     entityType: {
       type: String,
       trim: true,
@@ -57,11 +49,6 @@ const activitySchema = new mongoose.Schema(
       default: null,
     },
 
-    // Small structured payload for context the description doesn't carry
-    // verbatim (e.g. { from: "free", to: "pro" }). Never used to store
-    // secrets or PII beyond what's already on the user/entity in
-    // question — every write site is internal/trusted (see
-    // utils/activityLogger.js), never populated from raw client input.
     metadata: {
       type: mongoose.Schema.Types.Mixed,
       default: null,
@@ -112,6 +99,38 @@ activitySchema.index({ user: 1, action: 1, createdAt: -1 });
 // not yet exposed via a route, kept ready the same way
 // middlewares/ownership.js is kept ready ahead of its first caller.
 activitySchema.index({ user: 1, entityType: 1, entityId: 1 });
+
+// ─────────────────────────────────────────────
+// Statics
+// ─────────────────────────────────────────────
+
+activitySchema.statics.getCategorySummary = async function (ownerId, since) {
+  const [result] = await this.aggregate([
+    {
+      $match: {
+        user: new mongoose.Types.ObjectId(ownerId),
+        createdAt: { $gte: since },
+      },
+    },
+    {
+      $facet: {
+        byCategory: [
+          { $group: { _id: "$category", count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ],
+        total: [{ $count: "count" }],
+      },
+    },
+  ]);
+
+  return {
+    byCategory: (result?.byCategory || []).map((c) => ({
+      category: c._id,
+      count: c.count,
+    })),
+    total: result?.total?.[0]?.count || 0,
+  };
+};
 
 const Activity = mongoose.model("Activity", activitySchema);
 

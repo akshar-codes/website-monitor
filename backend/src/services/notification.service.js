@@ -53,20 +53,6 @@ const dispatchPushChannel = async (notification) => {
 
 // ── Create ───────────────────────────────────────────────────────────────────
 
-/**
- * Creates and persists a notification for a single user. This is the one
- * reusable entry point every domain service should call to notify a user
- * of something happening (an incident opening, a plan change, a usage
- * limit being hit, ...) — see workers/incidentManager.js for the
- * reference integration. Callers never construct a Notification document
- * directly, so category derivation and channel dispatch always happen
- * consistently regardless of the trigger.
- *
- * Never throws — a failure to create/dispatch a notification must not
- * fail the business operation that triggered it (an incident still opens
- * even if notifying the owner about it fails); the error is logged and
- * `null` is returned instead.
- */
 export const createNotification = async ({
   ownerId,
   type,
@@ -161,18 +147,13 @@ export const getNotifications = async (
 
 /**
  * Total unread + per-category breakdown — powers the bell badge and the
- * per-category counts in the page's filter bar in two indexed queries
- * regardless of how many notifications the user has.
+ * per-category counts in the page's filter bar. Backed by
+ * Notification.getUnreadSummary, a single $facet aggregation, rather than
+ * two separate queries (a count + a group-by).
  */
 export const getUnreadSummary = async (user) => {
   const ownerId = resolveOwnerId(user);
-
-  const [total, byCategory] = await Promise.all([
-    Notification.countUnreadForUser(ownerId),
-    Notification.unreadCountsByCategory(ownerId),
-  ]);
-
-  return { total, byCategory };
+  return Notification.getUnreadSummary(ownerId);
 };
 
 // ── Update ───────────────────────────────────────────────────────────────────

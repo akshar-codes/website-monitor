@@ -34,11 +34,6 @@ const notificationSchema = new mongoose.Schema(
       },
     },
 
-    // Denormalized from `type` via NOTIFICATION_TYPE_CATEGORY (see the
-    // pre-validate hook below and services/notification.service.js, which
-    // sets it explicitly at creation) — stored redundantly so
-    // category-filtered list/count queries hit a plain indexed equality
-    // match instead of re-deriving it from `type` on every read.
     category: {
       type: String,
       required: [true, "Notification category is required"],
@@ -71,10 +66,6 @@ const notificationSchema = new mongoose.Schema(
       maxlength: [1000, "Message cannot exceed 1000 characters"],
     },
 
-    // Optional frontend route the notification navigates to when clicked
-    // (e.g. "/insights"). Deliberately restricted to a relative in-app
-    // path — never an absolute/external URL — so a notification can never
-    // be used to redirect a user off-site.
     link: {
       type: String,
       trim: true,
@@ -88,11 +79,6 @@ const notificationSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Generic reference to the resource this notification is about (a
-    // Monitor, an Incident, ...). Deliberately not a Mongoose `ref` to a
-    // single model, since notifications span many source types — kept as
-    // a plain (type, id) pair for future dedup/grouping rather than
-    // populated directly.
     relatedResource: {
       resourceType: { type: String, default: null },
       resourceId: { type: mongoose.Schema.Types.ObjectId, default: null },
@@ -108,30 +94,17 @@ const notificationSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Per-channel delivery state. Only `inApp` is actually dispatched
-    // today (see services/notification.service.js#dispatchChannels) —
-    // `email` and `push` exist on every document now so wiring up those
-    // channels later only requires implementing their dispatch function
-    // and flipping `sent`, never a schema migration or API change.
     channels: {
       inApp: { type: channelStateSchema, default: () => ({}) },
       email: { type: channelStateSchema, default: () => ({}) },
       push: { type: channelStateSchema, default: () => ({}) },
     },
 
-    // Free-form structured payload for the specific notification type
-    // (e.g. { monitorId, previousStatus, responseTime }) — kept out of
-    // `message` so the frontend can eventually render richer UI for
-    // specific types without parsing prose.
     metadata: {
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
 
-    // Optional TTL. Most notification types don't set this — but
-    // low-priority/system types can opt in (see createNotification's
-    // `expiresAt` param) so the collection doesn't grow unbounded with
-    // stale, already-read noise.
     expiresAt: {
       type: Date,
       default: null,
@@ -204,25 +177,36 @@ notificationSchema.statics.countUnreadForUser = function (ownerId) {
 };
 
 /**
- * Unread count broken down by category — powers per-category badges on
- * the notifications page's filter bar via a single aggregation instead of
- * one countDocuments() per category.
+ * Total unread count + per-category breakdown in a SINGLE aggregation call
+ * (via $facet) rather than two separate queries — powers the bell badge and
+ * the per-category counts in the notifications page's filter bar.
  */
-notificationSchema.statics.unreadCountsByCategory = async function (ownerId) {
-  const results = await this.aggregate([
+notificationSchema.statics.getUnreadSummary = async function (ownerId) {
+  const [result] = await this.aggregate([
     {
       $match: {
         owner: new mongoose.Types.ObjectId(ownerId),
         read: false,
       },
     },
-    { $group: { _id: "$category", count: { $sum: 1 } } },
+    {
+      $facet: {
+        total: [{ $count: "count" }],
+        byCategory: [{ $group: { _id: "$category", count: { $sum: 1 } } }],
+      },
+    },
   ]);
 
-  return results.reduce((acc, { _id, count }) => {
-    acc[_id] = count;
-    return acc;
-  }, {});
+  const total = result?.total?.[0]?.count || 0;
+  const byCategory = (result?.byCategory || []).reduce(
+    (acc, { _id, count }) => {
+      acc[_id] = count;
+      return acc;
+    },
+    {},
+  );
+
+  return { total, byCategory };
 };
 
 const Notification = mongoose.model("Notification", notificationSchema);
