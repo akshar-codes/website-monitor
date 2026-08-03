@@ -6,6 +6,7 @@ import DailyStat from "../models/DailyStat.js";
 import ApiError from "../utils/ApiError.js";
 import {
   WINDOW_MS,
+  WINDOW_KEYS,
   HEALTH_STATUS,
   INCIDENT_STATUS,
   MONITOR_POPULATE_FIELDS,
@@ -18,6 +19,7 @@ import {
   isStale,
 } from "../utils/dateUtils.js";
 import { getOwnedMonitorIds } from "./monitor.service.js";
+import { getPlanDefinition } from "../config/plans.js";
 
 const resolveOwnerObjectId = (user) =>
   new mongoose.Types.ObjectId(user.id || user._id);
@@ -32,9 +34,7 @@ const resolveOwnerObjectId = (user) =>
 const resolveMonitorFilter = (ownedIds, monitorId) => {
   if (!monitorId) return { $in: ownedIds };
   const requested = new mongoose.Types.ObjectId(monitorId);
-  return ownedIds.some((id) => id.equals(requested))
-    ? requested
-    : { $in: [] };
+  return ownedIds.some((id) => id.equals(requested)) ? requested : { $in: [] };
 };
 
 // ── Overview ─────────────────────────────────────────────────────────────────
@@ -475,4 +475,199 @@ export const getMonitorChartData = async (monitorId, { window }, user) => {
     window,
     dataPoints,
   };
+};
+
+// ── Dashboard summary (aggregated) ───────────────────────────────────────────
+
+/**
+ * Current status + latest response time for up to `limit` owned monitors,
+ * computed in a single aggregation (a $lookup for each monitor's most
+ * recent health check) rather than N individual getMonitorStats calls.
+ */
+export const getMonitorStatusList = async (user, limit = 12) => {
+  const ownerId = resolveOwnerObjectId(user);
+
+  const monitors = await Monitor.aggregate([
+    { $match: { owner: ownerId, active: true } },
+    { $sort: { createdAt: -1 } },
+    { $limit: limit },
+    {
+      $lookup: {
+        from: "healthchecks",
+        let: { monitorId: "$_id" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$monitor", "$$monitorId"] } } },
+          { $sort: { checkedAt: -1 } },
+          { $limit: 1 },
+          { $project: { status: 1, responseTime: 1, checkedAt: 1 } },
+        ],
+        as: "latestCheck",
+      },
+    },
+    {
+      $addFields: {
+        latestCheck: { $arrayElemAt: ["$latestCheck", 0] },
+      },
+    },
+    {
+      $project: {
+        name: 1,
+        url: 1,
+        interval: 1,
+        status: "$latestCheck.status",
+        responseTime: "$latestCheck.responseTime",
+        checkedAt: "$latestCheck.checkedAt",
+      },
+    },
+  ]);
+
+  return monitors.map((m) => {
+    let status = m.status || HEALTH_STATUS.UNKNOWN;
+    if (m.checkedAt && isStale(m.checkedAt, m.interval)) {
+      status = HEALTH_STATUS.UNKNOWN;
+    }
+    return {
+      id: m._id,
+      name: m.name,
+      url: m.url,
+      status,
+      responseTime: m.responseTime ?? null,
+    };
+  });
+};
+
+/** Number of calendar days a named window (see config/constants.js#WINDOW_MS) spans. */
+const windowDays = (window) => WINDOW_MS[window] / (24 * 60 * 60 * 1000);
+
+/**
+ * True system-wide chart data — response time and uptime aggregated across
+ * EVERY monitor the caller owns, for each requested window, in one pass per
+ * window. A window that exceeds the caller's plan data-retention limit
+ * resolves to an empty array rather than throwing, mirroring how
+ * middlewares/featureAccess.js#requireWindowWithinRetention blocks the
+ * equivalent single-monitor endpoint — the dashboard simply shows "no data"
+ * for a window the plan doesn't retain, instead of a 403 hidden inside a
+ * Promise.allSettled fan-out.
+ */
+export const getSystemChartData = async (user, windows = WINDOW_KEYS) => {
+  const ownedIds = await getOwnedMonitorIds(user);
+
+  const definition = getPlanDefinition(user.plan);
+  const retentionDays = definition?.limits.dataRetentionDays ?? 0;
+
+  if (!ownedIds.length) {
+    return Object.fromEntries(windows.map((w) => [w, []]));
+  }
+
+  const results = await Promise.all(
+    windows.map(async (window) => {
+      if (windowDays(window) > retentionDays) {
+        return [window, []];
+      }
+
+      const windowMs = WINDOW_MS[window];
+      const since = msBefore(windowMs);
+
+      if (window === "24h") {
+        const buckets = await HealthCheck.aggregate([
+          {
+            $match: {
+              monitor: { $in: ownedIds },
+              checkedAt: { $gte: since },
+            },
+          },
+          {
+            $group: {
+              _id: {
+                $dateToString: {
+                  format: "%Y-%m-%dT%H:00:00.000Z",
+                  date: "$checkedAt",
+                },
+              },
+              avgResponseTime: { $avg: "$responseTime" },
+              totalChecks: { $sum: 1 },
+              successfulChecks: {
+                $sum: {
+                  $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0],
+                },
+              },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ]);
+
+        return [
+          window,
+          buckets.map((b) => ({
+            timestamp: b._id,
+            avgResponseTime: parseFloat((b.avgResponseTime || 0).toFixed(2)),
+            uptimePercentage:
+              b.totalChecks > 0
+                ? parseFloat(
+                    ((b.successfulChecks / b.totalChecks) * 100).toFixed(2),
+                  )
+                : 0,
+          })),
+        ];
+      }
+
+      const startDate = startOfDayUTC(since);
+      const endDate = endOfDayUTC(new Date());
+
+      const dailyBuckets = await DailyStat.aggregate([
+        {
+          $match: {
+            monitor: { $in: ownedIds },
+            date: { $gte: startDate, $lte: endDate },
+          },
+        },
+        {
+          $group: {
+            _id: "$date",
+            totalChecks: { $sum: "$totalChecks" },
+            successfulChecks: { $sum: "$successfulChecks" },
+            weightedRt: {
+              $sum: { $multiply: ["$avgResponseTime", "$totalChecks"] },
+            },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]);
+
+      return [
+        window,
+        dailyBuckets.map((b) => ({
+          timestamp: b._id,
+          avgResponseTime:
+            b.totalChecks > 0
+              ? parseFloat((b.weightedRt / b.totalChecks).toFixed(2))
+              : 0,
+          uptimePercentage:
+            b.totalChecks > 0
+              ? parseFloat(
+                  ((b.successfulChecks / b.totalChecks) * 100).toFixed(2),
+                )
+              : 0,
+        })),
+      ];
+    }),
+  );
+
+  return Object.fromEntries(results);
+};
+
+/**
+ * Single aggregated payload for the dashboard page: overview KPIs, the
+ * monitor status grid, and the full-window system chart — all three run in
+ * parallel and are returned together so the frontend needs exactly one
+ * request instead of assembling them from many.
+ */
+export const getDashboardSummary = async (user) => {
+  const [overview, monitorStatusList, chartData] = await Promise.all([
+    getOverview(user),
+    getMonitorStatusList(user, 12),
+    getSystemChartData(user, WINDOW_KEYS),
+  ]);
+
+  return { overview, monitorStatusList, chartData };
 };

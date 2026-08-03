@@ -16,6 +16,15 @@ export const getOverview = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /api/dashboard/summary
+ */
+export const getDashboardSummary = asyncHandler(async (req, res) => {
+  const data = await dashboardService.getDashboardSummary(req.user);
+
+  sendSuccess(res, { data });
+});
+
+/**
  * GET /api/dashboard/incidents
  * Paginated active incidents, scoped to the caller.
  */

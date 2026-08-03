@@ -2,20 +2,20 @@
  * Dashboard routes
  *
  * GET /api/dashboard/overview                  — main dashboard (aggregated)
+ * GET /api/dashboard/summary                    — full dashboard page payload
+ *                                                  (overview + monitor status
+ *                                                  grid + system-wide chart,
+ *                                                  all in one request)
  * GET /api/dashboard/incidents                 — active incidents (paginated)
  * GET /api/dashboard/health-checks             — recent checks (filterable)
  * GET /api/dashboard/monitors/:id/stats        — per-monitor detail stats
  * GET /api/dashboard/monitors/:id/chart-data   — per-monitor chart data
- *
- * Authentication is enforced once at the mount point (routes/index.js).
- * Every route below additionally requires the relevant permission (see
- * config/permissions.js), and the two window-based endpoints enforce the
- * caller's plan data-retention limit via requireWindowWithinRetention.
  */
 
 import { Router } from "express";
 import {
   getOverview,
+  getDashboardSummary,
   getActiveIncidents,
   getRecentHealthChecks,
   getMonitorStats,
@@ -33,6 +33,8 @@ import {
 const router = Router();
 
 router.get("/overview", requirePermission("monitor:read"), getOverview);
+
+router.get("/summary", requirePermission("monitor:read"), getDashboardSummary);
 
 router.get(
   "/incidents",
