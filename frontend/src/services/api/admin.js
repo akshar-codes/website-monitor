@@ -52,3 +52,36 @@ export async function deleteUser(userId) {
   const { data } = await apiClient.delete(`/admin/users/${userId}`);
   return data;
 }
+
+/**
+ * GET /api/admin/plan-upgrade-requests
+ * Supports pagination plus an optional { status } filter
+ * ("pending" | "approved" | "rejected").
+ */
+export async function getPlanUpgradeRequests(params = {}) {
+  const { data } = await apiClient.get("/admin/plan-upgrade-requests", {
+    params,
+  });
+  return data;
+}
+
+/**
+ * PATCH /api/admin/plan-upgrade-requests/:id/approve
+ */
+export async function approvePlanUpgradeRequest(requestId) {
+  const { data } = await apiClient.patch(
+    `/admin/plan-upgrade-requests/${requestId}/approve`,
+  );
+  return data;
+}
+
+/**
+ * PATCH /api/admin/plan-upgrade-requests/:id/reject
+ */
+export async function rejectPlanUpgradeRequest(requestId, reason) {
+  const { data } = await apiClient.patch(
+    `/admin/plan-upgrade-requests/${requestId}/reject`,
+    reason ? { reason } : {},
+  );
+  return data;
+}

@@ -21,7 +21,7 @@ export function useUpdateUserRole(onSuccess) {
         );
         onSuccess?.();
       } catch {
-        // Error toast handled by axios interceptor
+        // Error toast handled by the axios interceptor
       } finally {
         setSubmitting(false);
       }
@@ -45,7 +45,7 @@ export function useUpdateUserPlan(onSuccess) {
         );
         onSuccess?.();
       } catch {
-        // Error toast handled by axios interceptor
+        // Error toast handled by the axios interceptor
       } finally {
         setSubmitting(false);
       }
@@ -67,7 +67,7 @@ export function useSuspendUser(onSuccess) {
         toast.success(`${name ? `"${name}"` : "User"} has been suspended`);
         onSuccess?.();
       } catch {
-        // Error toast handled by axios interceptor
+        // Error toast handled by the axios interceptor
       } finally {
         setSubmitting(false);
       }
@@ -89,7 +89,7 @@ export function useReactivateUser(onSuccess) {
         toast.success(`${name ? `"${name}"` : "User"} has been reactivated`);
         onSuccess?.();
       } catch {
-        // Error toast handled by axios interceptor
+        // Error toast handled by the axios interceptor
       } finally {
         setSubmitting(false);
       }
@@ -111,7 +111,7 @@ export function useDeleteUser(onSuccess) {
         toast.success(`${name ? `"${name}"` : "User"} has been deleted`);
         onSuccess?.();
       } catch {
-        // Error toast handled by axios interceptor
+        // Error toast handled by the axios interceptor
       } finally {
         setSubmitting(false);
       }
@@ -120,4 +120,60 @@ export function useDeleteUser(onSuccess) {
   );
 
   return { removeUser, submitting };
+}
+
+// ── Plan upgrade requests ────────────────────────────────────────────────────
+
+export function usePlanUpgradeRequestList(params = {}) {
+  const paramsKey = JSON.stringify(params);
+  return useQuery(() => adminApi.getPlanUpgradeRequests(params), [paramsKey]);
+}
+
+export function useApprovePlanUpgradeRequest(onSuccess) {
+  const [submittingId, setSubmittingId] = useState(null);
+
+  const approve = useCallback(
+    async (requestId) => {
+      setSubmittingId(requestId);
+      try {
+        const { message } = await adminApi.approvePlanUpgradeRequest(
+          requestId,
+        );
+        toast.success(message || "Upgrade request approved");
+        onSuccess?.();
+      } catch {
+        // Error toast handled by the axios interceptor
+      } finally {
+        setSubmittingId(null);
+      }
+    },
+    [onSuccess],
+  );
+
+  return { approve, submittingId };
+}
+
+export function useRejectPlanUpgradeRequest(onSuccess) {
+  const [submittingId, setSubmittingId] = useState(null);
+
+  const reject = useCallback(
+    async (requestId, reason) => {
+      setSubmittingId(requestId);
+      try {
+        const { message } = await adminApi.rejectPlanUpgradeRequest(
+          requestId,
+          reason,
+        );
+        toast.success(message || "Upgrade request rejected");
+        onSuccess?.();
+      } catch {
+        // Error toast handled by the axios interceptor
+      } finally {
+        setSubmittingId(null);
+      }
+    },
+    [onSuccess],
+  );
+
+  return { reject, submittingId };
 }
