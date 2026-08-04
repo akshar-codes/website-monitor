@@ -12,6 +12,7 @@ import {
   LogOut,
   ShieldOff,
   ShieldCheck,
+  ClipboardCheck,
   User,
   SlidersHorizontal,
 } from "lucide-react";
@@ -24,6 +25,8 @@ import ConfirmDialog from "../ui/ConfirmDialog";
 import PlanBadge from "../ui/PlanBadge";
 import UpgradePrompt from "../../features/plans/UpgradePrompt";
 
+const MONITORS_PATH = "/monitors";
+
 const BASE_NAV_ITEMS = [
   {
     label: "Dashboard",
@@ -33,7 +36,7 @@ const BASE_NAV_ITEMS = [
   },
   {
     label: "Monitors",
-    path: "/monitors",
+    path: MONITORS_PATH,
     icon: Monitor,
   },
   {
@@ -64,6 +67,13 @@ const ADMIN_NAV_ITEM = {
   path: ROUTES.ADMIN_USERS,
   icon: ShieldCheck,
   permission: "user:read",
+};
+
+const ADMIN_PLAN_REQUESTS_NAV_ITEM = {
+  label: "Plan Requests",
+  path: ROUTES.ADMIN_PLAN_REQUESTS,
+  icon: ClipboardCheck,
+  permission: "plan-upgrade-request:manage",
 };
 
 function NavItem({ item, collapsed }) {
@@ -118,17 +128,24 @@ export default function Sidebar() {
   const { can } = usePermissions();
   const navigate = useNavigate();
 
-  // Admin-only entries are appended, never inserted in the middle, so the
-  // core navigation order stays identical for every user regardless of
-  // role/permissions. Filtered by permission rather than the `isAdmin`
-  // flag directly — see ADMIN_NAV_ITEM's comment above.
-  const navItems = useMemo(
-    () =>
-      can(ADMIN_NAV_ITEM.permission)
-        ? [...BASE_NAV_ITEMS, ADMIN_NAV_ITEM]
-        : BASE_NAV_ITEMS,
-    [can],
-  );
+  // Admin accounts are management-only (see App.jsx's BlockRoleRoute
+  // wrapping /monitors, and backend/src/config/permissions.js, which
+  // doesn't grant "monitor:create" to the admin role) — the Monitors tab
+  // is hidden for them entirely rather than left visible and blocked.
+  // Admin-only entries (Users, Plan Requests) are appended, never
+  // inserted in the middle, so the core navigation order stays identical
+  // for every user regardless of role/permissions.
+  const navItems = useMemo(() => {
+    const base = isAdmin
+      ? BASE_NAV_ITEMS.filter((item) => item.path !== MONITORS_PATH)
+      : BASE_NAV_ITEMS;
+
+    const adminItems = [ADMIN_NAV_ITEM, ADMIN_PLAN_REQUESTS_NAV_ITEM].filter(
+      (item) => can(item.permission),
+    );
+
+    return [...base, ...adminItems];
+  }, [can, isAdmin]);
 
   const handleLogout = async () => {
     try {
@@ -281,9 +298,12 @@ export default function Sidebar() {
           </button>
         )}
 
-        {/* Upgrade nudge — only shown to Free-plan users, hidden on the
-            collapsed rail alongside the other secondary actions. */}
-        {!collapsed && plan === PLANS.FREE && (
+        {/* Upgrade nudge — only shown to Free-plan, non-admin users (admin
+            accounts don't hold their own subscription-relevant usage in
+            the way end users do, and are never nudged toward billing
+            actions), hidden on the collapsed rail alongside the other
+            secondary actions. */}
+        {!collapsed && !isAdmin && plan === PLANS.FREE && (
           <UpgradePrompt
             plan={plan}
             variant="compact"
