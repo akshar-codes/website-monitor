@@ -4,6 +4,8 @@ import { getTransporter } from "../config/mail.js";
 import { buildVerificationEmail } from "../utils/email/templates/verificationEmail.js";
 import { buildPasswordResetEmail } from "../utils/email/templates/passwordResetEmail.js";
 import { buildPasswordChangedEmail } from "../utils/email/templates/passwordChangedEmail.js";
+import { buildPlanUpgradeApprovedEmail } from "../utils/email/templates/planUpgradeApprovedEmail.js";
+import { buildPlanUpgradeRejectedEmail } from "../utils/email/templates/planUpgradeRejectedEmail.js";
 
 const sendMail = async ({ to, subject, html, text }) => {
   const transporter = getTransporter();
@@ -70,4 +72,49 @@ export const sendPasswordChangedEmail = async (user) => {
   await sendMail({ to: user.email, subject, html, text });
 
   logger.info(`Password-changed notification sent to ${user.email}`);
+};
+
+/**
+ * Sends the "your upgrade request was approved" notification once an
+ * admin approves a PlanUpgradeRequest (see
+ * services/planUpgradeRequest.service.js#approveRequest). Best-effort —
+ * the plan change has already been applied by the time this is called, so
+ * a delivery failure here must never fail the approval itself.
+ */
+export const sendPlanUpgradeRequestApprovedEmail = async (user, plan) => {
+  const billingUrl = `${env.CLIENT_URL}/billing`;
+
+  const { subject, html, text } = buildPlanUpgradeApprovedEmail({
+    name: user.name,
+    plan,
+    billingUrl,
+  });
+
+  await sendMail({ to: user.email, subject, html, text });
+
+  logger.info(`Plan-upgrade-approved email sent to ${user.email}`);
+};
+
+/**
+ * Sends the "your upgrade request was declined" notification once an
+ * admin rejects a PlanUpgradeRequest, optionally including the admin's
+ * reason. Best-effort — see sendPlanUpgradeRequestApprovedEmail above.
+ */
+export const sendPlanUpgradeRequestRejectedEmail = async (
+  user,
+  plan,
+  reason,
+) => {
+  const billingUrl = `${env.CLIENT_URL}/billing`;
+
+  const { subject, html, text } = buildPlanUpgradeRejectedEmail({
+    name: user.name,
+    plan,
+    reason,
+    billingUrl,
+  });
+
+  await sendMail({ to: user.email, subject, html, text });
+
+  logger.info(`Plan-upgrade-rejected email sent to ${user.email}`);
 };
