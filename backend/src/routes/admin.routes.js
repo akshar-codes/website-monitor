@@ -12,6 +12,10 @@
  * POST   /api/admin/users/:id/suspend    — suspend a user account
  * POST   /api/admin/users/:id/reactivate — reactivate a suspended account
  * DELETE /api/admin/users/:id            — permanently delete a user account
+ *
+ * GET   /api/admin/plan-upgrade-requests             — list plan upgrade requests (filter: status)
+ * PATCH /api/admin/plan-upgrade-requests/:id/approve — approve a pending request (applies the plan change)
+ * PATCH /api/admin/plan-upgrade-requests/:id/reject  — reject a pending request (optional reason)
  */
 
 import { Router } from "express";
@@ -22,6 +26,9 @@ import {
   suspendUser,
   reactivateUser,
   deleteUser,
+  listPlanUpgradeRequests,
+  approvePlanUpgradeRequest,
+  rejectPlanUpgradeRequest,
 } from "../controllers/admin.controller.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
 import {
@@ -29,6 +36,10 @@ import {
   updateUserRoleSchema,
   updateUserPlanSchema,
 } from "../validators/admin.validator.js";
+import {
+  listPlanUpgradeRequestsSchema,
+  rejectPlanUpgradeRequestSchema,
+} from "../validators/planUpgradeRequest.validator.js";
 
 const router = Router();
 
@@ -53,5 +64,26 @@ router.post("/users/:id/suspend", validateObjectId("id"), suspendUser);
 router.post("/users/:id/reactivate", validateObjectId("id"), reactivateUser);
 
 router.delete("/users/:id", validateObjectId("id"), deleteUser);
+
+// ── Plan upgrade requests ──
+
+router.get(
+  "/plan-upgrade-requests",
+  validate(listPlanUpgradeRequestsSchema, "query"),
+  listPlanUpgradeRequests,
+);
+
+router.patch(
+  "/plan-upgrade-requests/:id/approve",
+  validateObjectId("id"),
+  approvePlanUpgradeRequest,
+);
+
+router.patch(
+  "/plan-upgrade-requests/:id/reject",
+  validateObjectId("id"),
+  validate(rejectPlanUpgradeRequestSchema, "body"),
+  rejectPlanUpgradeRequest,
+);
 
 export default router;

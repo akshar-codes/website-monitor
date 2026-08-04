@@ -25,6 +25,14 @@ import { ROLES } from "./constants.js";
  * Adding a new permission is a one-line addition to the relevant role's
  * array. Adding a new role starts in config/constants.js (ROLES), then a
  * corresponding entry here — nothing else needs to change.
+ *
+ * NOTE — admin accounts cannot create monitors: "monitor:create" is
+ * intentionally present on ROLES.USER only. Admin accounts are
+ * management-only (see routes/monitor.routes.js, which enforces this via
+ * requirePermission("monitor:create"), and services/monitor.service.js,
+ * which additionally guards against it directly as defense-in-depth).
+ * Admins retain monitor:read/update/delete for support/moderation
+ * purposes; only creation is restricted.
  */
 export const ROLE_PERMISSIONS = Object.freeze({
   [ROLES.USER]: Object.freeze([
@@ -36,13 +44,17 @@ export const ROLE_PERMISSIONS = Object.freeze({
     "incident:update",
     "plan:read",
     "plan:change",
+    "plan-upgrade-request:create",
+    "plan-upgrade-request:read",
     "usage:read",
     "activity:read",
+    "notification:read",
+    "notification:update",
+    "notification:delete",
   ]),
 
   [ROLES.ADMIN]: Object.freeze([
     "monitor:read",
-    "monitor:create",
     "monitor:update",
     "monitor:delete",
     "incident:read",
@@ -53,6 +65,10 @@ export const ROLE_PERMISSIONS = Object.freeze({
     "activity:read",
     "user:read",
     "user:manage-role",
+    "plan-upgrade-request:manage",
+    "notification:read",
+    "notification:update",
+    "notification:delete",
   ]),
 });
 

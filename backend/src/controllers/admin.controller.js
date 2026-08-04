@@ -1,8 +1,9 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import * as adminService from "../services/admin.service.js";
+import * as planUpgradeRequestService from "../services/planUpgradeRequest.service.js";
 import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
 
-// ── Controllers ──────────────────────────────────────────────────────────────
+// ── Controllers: users ───────────────────────────────────────────────────────
 
 /**
  * GET /api/admin/users
@@ -88,5 +89,59 @@ export const deleteUser = asyncHandler(async (req, res) => {
   sendSuccess(res, {
     message: "User deleted successfully",
     data: result,
+  });
+});
+
+// ── Controllers: plan upgrade requests ──────────────────────────────────────
+
+/**
+ * GET /api/admin/plan-upgrade-requests
+ * Paginated, optionally filtered by status (defaults to every status when
+ * omitted — the frontend defaults its own filter to "pending").
+ */
+export const listPlanUpgradeRequests = asyncHandler(async (req, res) => {
+  const query = req.validatedQuery;
+  const result = await planUpgradeRequestService.listRequestsForAdmin(query);
+
+  sendPaginated(res, {
+    data: result.requests,
+    page: result.page,
+    limit: query.limit,
+    total: result.total,
+  });
+});
+
+/**
+ * PATCH /api/admin/plan-upgrade-requests/:id/approve
+ * Applies the requested plan change immediately and notifies the user by
+ * email and in-app notification.
+ */
+export const approvePlanUpgradeRequest = asyncHandler(async (req, res) => {
+  const { request } = await planUpgradeRequestService.approveRequest(
+    req.params.id,
+    req.user,
+  );
+
+  sendSuccess(res, {
+    message: "Upgrade request approved and the user's plan has been updated",
+    data: request,
+  });
+});
+
+/**
+ * PATCH /api/admin/plan-upgrade-requests/:id/reject
+ * Optional { reason } in the request body is shared with the user in
+ * their notification and email.
+ */
+export const rejectPlanUpgradeRequest = asyncHandler(async (req, res) => {
+  const request = await planUpgradeRequestService.rejectRequest(
+    req.params.id,
+    req.user,
+    { reason: req.body.reason },
+  );
+
+  sendSuccess(res, {
+    message: "Upgrade request rejected",
+    data: request,
   });
 });

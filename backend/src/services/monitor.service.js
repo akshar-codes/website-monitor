@@ -1,5 +1,6 @@
 import Monitor from "../models/Monitor.js";
 import ApiError from "../utils/ApiError.js";
+import { ROLES } from "../config/constants.js";
 import {
   isIntervalAllowedForPlan,
   getMinCheckInterval,
@@ -55,6 +56,21 @@ export const countOwnedMonitors = async (user) => {
 // ── Service methods ───────────────────────────────────────────────────────────
 
 export const createMonitor = async (data, user) => {
+  // Admin accounts are management-only — they never own monitors. This is
+  // primary/architecturally enforced by config/permissions.js (the ADMIN
+  // role simply doesn't grant "monitor:create", so
+  // requirePermission("monitor:create") in routes/monitor.routes.js
+  // already 403s before this function ever runs). This is a second,
+  // explicit layer purely for defense-in-depth and a clearer error
+  // message, mirroring how middlewares/authenticate.js double-checks
+  // suspended accounts even though session destruction already covers it.
+  if (user.role === ROLES.ADMIN) {
+    throw ApiError.forbidden(
+      "Admin accounts cannot create monitors. Monitors are owned by individual user accounts.",
+      "ROLE_FORBIDDEN",
+    );
+  }
+
   const ownerId = resolveOwnerId(user);
 
   assertIntervalAllowedForPlan(user.plan, data.interval);
