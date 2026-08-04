@@ -59,6 +59,9 @@ export const ACTIVITY_ACTIONS = Object.freeze({
   // ── Plan (self-service) ──
   PLAN_UPGRADED: "plan_upgraded",
   PLAN_DOWNGRADED: "plan_downgraded",
+  PLAN_UPGRADE_REQUESTED: "plan_upgrade_requested",
+  PLAN_UPGRADE_REQUEST_APPROVED: "plan_upgrade_request_approved",
+  PLAN_UPGRADE_REQUEST_REJECTED: "plan_upgrade_request_rejected",
 
   // ── Preferences ──
   PREFERENCES_UPDATED: "preferences_updated",
@@ -71,6 +74,8 @@ export const ACTIVITY_ACTIONS = Object.freeze({
   ADMIN_USER_SUSPENDED: "admin_user_suspended",
   ADMIN_USER_REACTIVATED: "admin_user_reactivated",
   ADMIN_USER_DELETED: "admin_user_deleted",
+  ADMIN_PLAN_UPGRADE_REQUEST_APPROVED: "admin_plan_upgrade_request_approved",
+  ADMIN_PLAN_UPGRADE_REQUEST_REJECTED: "admin_plan_upgrade_request_rejected",
 });
 
 export const ACTIVITY_ACTION_VALUES = Object.freeze(

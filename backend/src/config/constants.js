@@ -137,6 +137,26 @@ export const PLAN_STATUS = Object.freeze({
 
 export const PLAN_STATUS_VALUES = Object.freeze(Object.values(PLAN_STATUS));
 
+// ── Plan Upgrade Requests ────────────────────────────────────────────────────
+
+/**
+ * Lifecycle status of a manual plan-upgrade request (see
+ * models/PlanUpgradeRequest.js). There is no payment gateway wired up yet
+ * (see User.billing in models/User.js), so a self-service upgrade cannot
+ * be applied automatically the way a downgrade can (POST /api/plans/change
+ * remains instant for downgrades) — an upgrade must be reviewed and
+ * manually approved by an admin before the user's plan actually changes.
+ */
+export const PLAN_UPGRADE_REQUEST_STATUS = Object.freeze({
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+});
+
+export const PLAN_UPGRADE_REQUEST_STATUS_VALUES = Object.freeze(
+  Object.values(PLAN_UPGRADE_REQUEST_STATUS),
+);
+
 // ── Shared Mongoose populate projections ──────────────────────────────────────
 
 /** Fields selected when populating a `monitor` reference. */
