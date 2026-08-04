@@ -14,5 +14,7 @@ export const ROUTES = Object.freeze({
   ACTIVITY: "/activity",
   PROFILE: "/profile",
   PREFERENCES: "/preferences",
+  NOTIFICATIONS: "/notifications",
   ADMIN_USERS: "/admin/users",
+  ADMIN_PLAN_REQUESTS: "/admin/plan-requests",
 });

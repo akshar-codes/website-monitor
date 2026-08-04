@@ -8,6 +8,7 @@ import { NotificationsProvider } from "./context/NotificationsContext";
 import ProtectedRoute from "./components/routing/ProtectedRoute";
 import GuestRoute from "./components/routing/GuestRoute";
 import RoleProtectedRoute from "./components/routing/RoleProtectedRoute";
+import BlockRoleRoute from "./components/routing/BlockRoleRoute";
 import AccessErrorListener from "./components/access/AccessErrorListener";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
@@ -18,6 +19,7 @@ import Activity from "./pages/Activity";
 import Profile from "./pages/Profile";
 import Preferences from "./pages/Preferences";
 import AdminUsers from "./pages/AdminUsers";
+import AdminPlanRequests from "./pages/AdminPlanRequests";
 import Unauthorized from "./pages/Unauthorized";
 import UpgradeRequired from "./pages/UpgradeRequired";
 import Login from "./pages/Login";
@@ -104,14 +106,27 @@ export default function App() {
                       </Suspense>
                     }
                   />
+
+                  {/* Admin accounts are management-only — they never own
+                      monitors (backend/src/config/permissions.js doesn't
+                      grant them "monitor:create", and
+                      services/monitor.service.js additionally guards
+                      against it) — so /monitors is blocked for them at the
+                      route level rather than merely hidden from the
+                      sidebar (see components/layout/Sidebar.jsx). */}
                   <Route
-                    path="/monitors"
-                    element={
-                      <Suspense fallback={<PageFallback />}>
-                        <Monitors />
-                      </Suspense>
-                    }
-                  />
+                    element={<BlockRoleRoute blockedRoles={[ROLES.ADMIN]} />}
+                  >
+                    <Route
+                      path="/monitors"
+                      element={
+                        <Suspense fallback={<PageFallback />}>
+                          <Monitors />
+                        </Suspense>
+                      }
+                    />
+                  </Route>
+
                   <Route
                     path="/insights"
                     element={
@@ -170,6 +185,14 @@ export default function App() {
                       element={
                         <Suspense fallback={<PageFallback />}>
                           <AdminUsers />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/admin/plan-requests"
+                      element={
+                        <Suspense fallback={<PageFallback />}>
+                          <AdminPlanRequests />
                         </Suspense>
                       }
                     />
