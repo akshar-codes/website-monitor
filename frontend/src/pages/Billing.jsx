@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { CreditCard, RefreshCw } from "lucide-react";
 import PageContainer from "../components/layout/PageContainer";
 import PageHeader from "../components/layout/PageHeader";
 import CurrentPlanSummary from "../features/plans/CurrentPlanSummary";
 import UpgradePrompt from "../features/plans/UpgradePrompt";
 import PlanChangeModal from "../features/plans/PlanChangeModal";
+import PendingUpgradeBanner from "../features/plans/PendingUpgradeBanner";
 import UsageDashboard from "../components/usage/UsageDashboard";
 import Button from "../components/ui/Button";
 import {
@@ -12,14 +13,28 @@ import {
   usePlanCatalog,
   usePlanChange,
 } from "../hooks/usePlans";
+import {
+  useMyPlanUpgradeRequest,
+  useRequestPlanUpgrade,
+} from "../hooks/usePlanUpgradeRequests";
 import { useUsage } from "../hooks/useUsage";
 import { useAuth } from "../hooks/useAuth";
 import { getPlanChangeType } from "../utils/planCompare";
 
+/**
+ * There is no payment gateway wired up yet, so plan changes split into two
+ * flows here:
+ *   - Downgrades apply immediately via POST /api/plans/change (no revenue
+ *     concern — see usePlans.js#usePlanChange).
+ *   - Upgrades submit a PlanUpgradeRequest for admin review instead of
+ *     changing the plan directly (see hooks/usePlanUpgradeRequests.js).
+ *     Only one pending request is allowed at a time; while one exists,
+ *     every plan-change action is disabled and a banner explains why.
+ */
 export default function Billing() {
   const { refetchUser } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
-  const [changingPlan, setChangingPlan] = useState(null);
+  const [actionPlanId, setActionPlanId] = useState(null);
 
   const {
     data: currentPlanData,
@@ -29,33 +44,71 @@ export default function Billing() {
   const { data: catalogData, loading: catalogLoading } = usePlanCatalog();
   const { data: usageData, loading: usageLoading, refetch: refetchUsage } =
     useUsage();
+  const {
+    data: upgradeRequestData,
+    loading: upgradeRequestLoading,
+    refetch: refetchUpgradeRequest,
+  } = useMyPlanUpgradeRequest();
 
   const currentPlan = currentPlanData?.data;
   const plans = catalogData?.data || [];
   const usage = usageData?.data;
+  const pendingRequest = upgradeRequestData?.data?.pending || null;
 
-  const handlePlanChangeSuccess = async () => {
-    setChangingPlan(null);
+  const handleDowngradeSuccess = async () => {
+    setActionPlanId(null);
     setModalOpen(false);
     await Promise.all([refetchCurrentPlan(), refetchUser(), refetchUsage()]);
   };
 
-  const { changePlan } = usePlanChange(handlePlanChangeSuccess);
-
-  const handleSelectPlan = async (planId) => {
-    setChangingPlan(planId);
-    const result = await changePlan(planId);
-    if (!result) setChangingPlan(null);
+  const handleUpgradeRequestSuccess = async () => {
+    setActionPlanId(null);
+    setModalOpen(false);
+    await refetchUpgradeRequest();
   };
 
+  const { changePlan } = usePlanChange(handleDowngradeSuccess);
+  const { requestUpgrade } = useRequestPlanUpgrade(
+    handleUpgradeRequestSuccess,
+  );
+
+  const handleSelectPlan = useCallback(
+    async (planId) => {
+      const targetPlan = plans.find((p) => p.id === planId);
+      const changeType = getPlanChangeType(
+        currentPlan?.plan,
+        targetPlan,
+        plans,
+      );
+
+      setActionPlanId(planId);
+
+      const result =
+        changeType === "upgrade"
+          ? await requestUpgrade(planId)
+          : await changePlan(planId);
+
+      if (!result) {
+        setActionPlanId(null);
+      }
+    },
+    [plans, currentPlan, requestUpgrade, changePlan],
+  );
+
   const handleModalClose = () => {
-    if (!changingPlan) setModalOpen(false);
+    if (!actionPlanId) setModalOpen(false);
   };
 
   const handleRefresh = () => {
     refetchCurrentPlan();
     refetchUsage();
+    refetchUpgradeRequest();
   };
+
+  const pendingPlanName =
+    pendingRequest &&
+    (plans.find((p) => p.id === pendingRequest.requestedPlan)?.name ||
+      pendingRequest.requestedPlan);
 
   return (
     <PageContainer>
@@ -74,6 +127,12 @@ export default function Billing() {
         }
         className="mb-6"
       />
+
+      {!upgradeRequestLoading && pendingRequest && (
+        <div className="mb-6">
+          <PendingUpgradeBanner planName={pendingPlanName} />
+        </div>
+      )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CurrentPlanSummary
@@ -98,7 +157,8 @@ export default function Billing() {
           <p className="text-sm font-semibold text-white">Available plans</p>
         </div>
         <p className="mb-5 text-xs text-text-muted">
-          Compare plans and switch at any time.
+          Downgrades apply immediately. Upgrades require admin approval since
+          no payment gateway is connected yet.
         </p>
         <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
           Compare & change plan
@@ -111,7 +171,8 @@ export default function Billing() {
         plans={plans}
         currentPlanId={currentPlan?.plan}
         loading={catalogLoading}
-        changingPlan={changingPlan}
+        changingPlan={actionPlanId}
+        pendingRequest={pendingRequest}
         onSelectPlan={handleSelectPlan}
         getChangeType={(targetId) => {
           const targetPlan = plans.find((p) => p.id === targetId);

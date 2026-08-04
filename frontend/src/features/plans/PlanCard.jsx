@@ -4,6 +4,14 @@ import Button from "../../components/ui/Button";
 
 /**
  * `plan` is a plan-catalog entry: { id, name, tagline, rank, price, limits, features }
+ *
+ * NOTE on the button label: since there is no payment gateway wired up,
+ * upgrades go through a manual admin-review flow (see
+ * pages/Billing.jsx#handleSelectPlan and
+ * services/planUpgradeRequest.service.js) rather than applying instantly.
+ * Downgrades remain instant and self-service. `onSelect` doesn't need to
+ * know which — the parent decides whether the click submits a request or
+ * calls the plan-change endpoint directly.
  */
 export default function PlanCard({
   plan,
@@ -71,7 +79,7 @@ export default function PlanCard({
           ? "Current plan"
           : changeType === "downgrade"
             ? `Downgrade to ${plan.name}`
-            : `Upgrade to ${plan.name}`}
+            : `Request upgrade to ${plan.name}`}
       </Button>
     </div>
   );
