@@ -120,6 +120,7 @@ export const approvePlanUpgradeRequest = asyncHandler(async (req, res) => {
   const { request } = await planUpgradeRequestService.approveRequest(
     req.params.id,
     req.user,
+    { grantedPlan: req.body.grantedPlan }
   );
 
   sendSuccess(res, {

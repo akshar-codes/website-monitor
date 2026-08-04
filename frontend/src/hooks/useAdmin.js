@@ -133,11 +133,12 @@ export function useApprovePlanUpgradeRequest(onSuccess) {
   const [submittingId, setSubmittingId] = useState(null);
 
   const approve = useCallback(
-    async (requestId) => {
+    async (requestId, grantedPlan) => {
       setSubmittingId(requestId);
       try {
         const { message } = await adminApi.approvePlanUpgradeRequest(
           requestId,
+          grantedPlan,
         );
         toast.success(message || "Upgrade request approved");
         onSuccess?.();

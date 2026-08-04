@@ -21,6 +21,16 @@ export const listPlanUpgradeRequestsSchema = z.object({
   status: z.enum(PLAN_UPGRADE_REQUEST_STATUS_VALUES).optional(),
 });
 
+// ── Admin: approve ────────────────────────────────────────────────────────────
+
+export const approvePlanUpgradeRequestSchema = z.object({
+  grantedPlan: z
+    .enum(PLAN_VALUES, {
+      invalid_type_error: `Granted plan must be one of: ${PLAN_VALUES.join(", ")}`,
+    })
+    .optional(),
+});
+
 // ── Admin: reject ─────────────────────────────────────────────────────────────
 
 export const rejectPlanUpgradeRequestSchema = z.object({

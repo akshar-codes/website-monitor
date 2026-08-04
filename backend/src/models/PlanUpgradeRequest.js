@@ -45,6 +45,15 @@ const planUpgradeRequestSchema = new mongoose.Schema(
       },
     },
 
+    grantedPlan: {
+      type: String,
+      enum: {
+        values: PLAN_VALUES,
+        message: `Granted plan must be one of: ${PLAN_VALUES.join(", ")}`,
+      },
+      default: null,
+    },
+
     status: {
       type: String,
       required: [true, "Status is required"],

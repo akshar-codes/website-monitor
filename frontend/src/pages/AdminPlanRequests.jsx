@@ -9,6 +9,7 @@ import EmptyState from "../components/ui/EmptyState";
 import { SkeletonRow } from "../components/ui/Skeleton";
 import PlanRequestRow from "../features/admin/PlanRequestRow";
 import RejectPlanRequestDialog from "../features/admin/RejectPlanRequestDialog";
+import ApprovePlanRequestDialog from "../features/admin/ApprovePlanRequestDialog";
 import {
   usePlanUpgradeRequestList,
   useApprovePlanUpgradeRequest,
@@ -69,9 +70,9 @@ export default function AdminPlanRequests() {
     setPage(1);
   };
 
-  const handleConfirmApprove = () => {
+  const handleConfirmApprove = (grantedPlan) => {
     if (!pendingApprove) return;
-    approve(getRequestId(pendingApprove));
+    approve(getRequestId(pendingApprove), grantedPlan);
   };
 
   const handleConfirmReject = (reason) => {
@@ -173,18 +174,11 @@ export default function AdminPlanRequests() {
         />
       )}
 
-      <ConfirmDialog
+      <ApprovePlanRequestDialog
         open={!!pendingApprove}
         onClose={() => setPendingApprove(null)}
         onConfirm={handleConfirmApprove}
-        title="Approve this upgrade request?"
-        description={
-          pendingApprove
-            ? `"${pendingApprove.user?.name}" will be moved to the ${pendingApprove.requestedPlan} plan immediately, and they'll be notified by email and in-app notification.`
-            : undefined
-        }
-        confirmLabel="Approve request"
-        confirmVariant="primary"
+        targetRequest={pendingApprove}
         loading={approvingId === getRequestId(pendingApprove)}
       />
 

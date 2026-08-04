@@ -39,6 +39,7 @@ import {
 import {
   listPlanUpgradeRequestsSchema,
   rejectPlanUpgradeRequestSchema,
+  approvePlanUpgradeRequestSchema,
 } from "../validators/planUpgradeRequest.validator.js";
 
 const router = Router();
@@ -76,6 +77,7 @@ router.get(
 router.patch(
   "/plan-upgrade-requests/:id/approve",
   validateObjectId("id"),
+  validate(approvePlanUpgradeRequestSchema, "body"),
   approvePlanUpgradeRequest,
 );
 

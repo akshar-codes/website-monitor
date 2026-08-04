@@ -66,8 +66,14 @@ export default function PlanRequestRow({
         <PlanBadge plan={request.currentPlan} size="sm" />
       </div>
 
-      <div>
+      <div className="flex flex-col items-start gap-1.5">
         <PlanBadge plan={request.requestedPlan} size="sm" />
+        {request.grantedPlan && request.grantedPlan !== request.requestedPlan && (
+          <div className="flex items-center gap-1 text-[10px] text-text-muted">
+            <span className="text-[10px]">↳ Granted</span>
+            <PlanBadge plan={request.grantedPlan} size="sm" />
+          </div>
+        )}
       </div>
 
       <div>

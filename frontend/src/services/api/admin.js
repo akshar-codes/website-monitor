@@ -68,9 +68,10 @@ export async function getPlanUpgradeRequests(params = {}) {
 /**
  * PATCH /api/admin/plan-upgrade-requests/:id/approve
  */
-export async function approvePlanUpgradeRequest(requestId) {
+export async function approvePlanUpgradeRequest(requestId, grantedPlan) {
   const { data } = await apiClient.patch(
     `/admin/plan-upgrade-requests/${requestId}/approve`,
+    grantedPlan ? { grantedPlan } : {},
   );
   return data;
 }
