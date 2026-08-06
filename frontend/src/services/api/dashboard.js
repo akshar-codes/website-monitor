@@ -51,3 +51,13 @@ export async function getMonitorChartData(id, params = {}) {
   });
   return data;
 }
+
+/**
+ * GET /api/dashboard/monitors/:id/details
+ */
+export async function getMonitorDetails(id, params = {}) {
+  const { data } = await apiClient.get(`/dashboard/monitors/${id}/details`, {
+    params,
+  });
+  return data;
+}

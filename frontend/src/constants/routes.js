@@ -9,6 +9,7 @@ export const ROUTES = Object.freeze({
   UPGRADE_REQUIRED: "/upgrade-required",
   DASHBOARD: "/",
   MONITORS: "/monitors",
+  MONITOR_DETAILS: "/monitors/:id",
   INSIGHTS: "/insights",
   BILLING: "/billing",
   ACTIVITY: "/activity",
@@ -18,3 +19,5 @@ export const ROUTES = Object.freeze({
   ADMIN_USERS: "/admin/users",
   ADMIN_PLAN_REQUESTS: "/admin/plan-requests",
 });
+
+export const monitorDetailsPath = (monitorId) => `/monitors/${monitorId}`;

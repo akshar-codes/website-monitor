@@ -37,6 +37,21 @@ export function useMonitorChartData(id, window = "24h") {
   );
 }
 
+/**
+ * Combined Monitor Details page data — one polled request covering config,
+ * current status, stats, chart data, recent checks, and any active
+ * incident (see backend GET /api/dashboard/monitors/:id/details). Polls on
+ * the same cadence as the main dashboard so the status shown stays fresh
+ * while the page is open.
+ */
+export function useMonitorDetails(id, window = "24h", pollingInterval = 30000) {
+  return usePolling(
+    () => dashboardApi.getMonitorDetails(id, { window }),
+    [id, window],
+    pollingInterval,
+  );
+}
+
 export function useRecentHealthChecks(params = {}) {
   const paramsKey = JSON.stringify(params);
   return useQuery(
