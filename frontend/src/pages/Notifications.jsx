@@ -12,11 +12,15 @@ import {
   useNotificationMutations,
   useNotificationsCenter,
 } from "../hooks/useNotifications";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 export default function Notifications() {
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState("all");
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [clearReadOpen, setClearReadOpen] = useState(false);
 
   const { unreadByCategory, refetch: refetchCenter } = useNotificationsCenter();
 
@@ -32,6 +36,8 @@ export default function Notifications() {
   const pagination = data?.pagination;
 
   const handleMutationSuccess = () => {
+    setDeleteTarget(null);
+    setClearReadOpen(false);
     refetch();
     refetchCenter();
   };
@@ -78,7 +84,7 @@ export default function Notifications() {
               variant="ghost"
               size="sm"
               icon={Trash2}
-              onClick={clearRead}
+              onClick={() => setClearReadOpen(true)}
               disabled={bulkSubmitting || !hasRead}
               className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
             >
@@ -134,7 +140,7 @@ export default function Notifications() {
               key={n.id}
               notification={n}
               onMarkRead={markAsRead}
-              onDelete={deleteNotification}
+              onDelete={() => setDeleteTarget(n)}
               submitting={submittingId === n.id}
             />
           ))
@@ -149,6 +155,28 @@ export default function Notifications() {
           className="mt-4"
         />
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteNotification(deleteTarget.id)}
+        title="Delete Notification"
+        description="Are you sure you want to delete this notification?"
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={submittingId === deleteTarget?.id}
+      />
+
+      <ConfirmDialog
+        open={clearReadOpen}
+        onClose={() => setClearReadOpen(false)}
+        onConfirm={clearRead}
+        title="Clear Read Notifications"
+        description="Are you sure you want to clear all read notifications?"
+        confirmLabel="Clear"
+        confirmVariant="danger"
+        loading={bulkSubmitting}
+      />
     </PageContainer>
   );
 }

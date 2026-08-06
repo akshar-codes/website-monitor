@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Trash2, Loader2, User } from "lucide-react";
 import Button from "../ui/Button";
+import ConfirmDialog from "../ui/ConfirmDialog";
 import { cn } from "../../utils/cn";
 
 const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
@@ -32,6 +33,7 @@ export default function AvatarUpload({
   const inputRef = useRef(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [error, setError] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Revoke the object URL whenever it's replaced/unmounted so we don't
   // leak blob references.
@@ -136,7 +138,7 @@ export default function AvatarUpload({
               variant="ghost"
               size="sm"
               icon={Trash2}
-              onClick={onDelete}
+              onClick={() => setDeleteOpen(true)}
               disabled={uploading}
               className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
             >
@@ -149,6 +151,19 @@ export default function AvatarUpload({
           {error || "JPEG, PNG, or WebP. Max 2MB."}
         </p>
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => {
+          setDeleteOpen(false);
+          onDelete();
+        }}
+        title="Remove Profile Photo"
+        description="Are you sure you want to remove your profile photo?"
+        confirmLabel="Remove"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

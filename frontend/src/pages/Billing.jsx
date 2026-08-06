@@ -8,6 +8,7 @@ import PlanChangeModal from "../features/plans/PlanChangeModal";
 import PendingUpgradeBanner from "../features/plans/PendingUpgradeBanner";
 import UsageDashboard from "../components/usage/UsageDashboard";
 import Button from "../components/ui/Button";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 import {
   useCurrentPlan,
   usePlanCatalog,
@@ -35,6 +36,7 @@ export default function Billing() {
   const { refetchUser } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [actionPlanId, setActionPlanId] = useState(null);
+  const [pendingDowngrade, setPendingDowngrade] = useState(null);
 
   const {
     data: currentPlanData,
@@ -81,6 +83,11 @@ export default function Billing() {
         plans,
       );
 
+      if (changeType === "downgrade") {
+        setPendingDowngrade(planId);
+        return;
+      }
+
       setActionPlanId(planId);
 
       const result =
@@ -96,7 +103,17 @@ export default function Billing() {
   );
 
   const handleModalClose = () => {
-    if (!actionPlanId) setModalOpen(false);
+    if (!actionPlanId && !pendingDowngrade) setModalOpen(false);
+  };
+
+  const handleConfirmDowngrade = async () => {
+    if (!pendingDowngrade) return;
+    setActionPlanId(pendingDowngrade);
+    const result = await changePlan(pendingDowngrade);
+    if (!result) {
+      setActionPlanId(null);
+    }
+    setPendingDowngrade(null);
   };
 
   const handleRefresh = () => {
@@ -178,6 +195,16 @@ export default function Billing() {
           const targetPlan = plans.find((p) => p.id === targetId);
           return getPlanChangeType(currentPlan?.plan, targetPlan, plans);
         }}
+      />
+
+      <ConfirmDialog
+        open={!!pendingDowngrade}
+        onClose={() => setPendingDowngrade(null)}
+        onConfirm={handleConfirmDowngrade}
+        title="Downgrade Plan?"
+        description="Are you sure you want to downgrade your plan? If you downgrade, you will have to request the admin again to upgrade to Pro."
+        confirmLabel="Downgrade"
+        confirmVariant="danger"
       />
     </PageContainer>
   );
