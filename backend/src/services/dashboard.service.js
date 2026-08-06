@@ -265,7 +265,7 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
 
   const monitor = await Monitor.findOne({ _id: id, owner: ownerId })
     .select(
-      "name url active interval lastCheckedAt nextCheckAt consecutiveFailures",
+      "name url active interval lastCheckedAt nextCheckAt consecutiveFailures createdAt updatedAt",
     )
     .lean();
   if (!monitor) {
@@ -359,6 +359,9 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
       name: monitor.name,
       url: monitor.url,
       active: monitor.active,
+      interval: monitor.interval,
+      createdAt: monitor.createdAt,
+      updatedAt: monitor.updatedAt,
     },
     currentStatus,
     lastCheckedAt: monitor.lastCheckedAt,
@@ -477,6 +480,23 @@ export const getMonitorChartData = async (monitorId, { window }, user) => {
   };
 };
 
+// ── Per-monitor details (aggregated) ─────────────────────────────────────────
+
+export const getMonitorDetails = async (monitorId, { window }, user) => {
+  const [stats, chartData] = await Promise.all([
+    getMonitorStats(monitorId, { window }, user),
+    getMonitorChartData(monitorId, { window }, user),
+  ]);
+
+  return {
+    ...stats,
+    chart: {
+      window: chartData.window,
+      dataPoints: chartData.dataPoints,
+    },
+  };
+};
+
 // ── Dashboard summary (aggregated) ───────────────────────────────────────────
 
 /**
@@ -539,16 +559,6 @@ export const getMonitorStatusList = async (user, limit = 12) => {
 /** Number of calendar days a named window (see config/constants.js#WINDOW_MS) spans. */
 const windowDays = (window) => WINDOW_MS[window] / (24 * 60 * 60 * 1000);
 
-/**
- * True system-wide chart data — response time and uptime aggregated across
- * EVERY monitor the caller owns, for each requested window, in one pass per
- * window. A window that exceeds the caller's plan data-retention limit
- * resolves to an empty array rather than throwing, mirroring how
- * middlewares/featureAccess.js#requireWindowWithinRetention blocks the
- * equivalent single-monitor endpoint — the dashboard simply shows "no data"
- * for a window the plan doesn't retain, instead of a 403 hidden inside a
- * Promise.allSettled fan-out.
- */
 export const getSystemChartData = async (user, windows = WINDOW_KEYS) => {
   const ownedIds = await getOwnedMonitorIds(user);
 

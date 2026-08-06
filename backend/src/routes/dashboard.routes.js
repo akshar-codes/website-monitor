@@ -10,6 +10,9 @@
  * GET /api/dashboard/health-checks             — recent checks (filterable)
  * GET /api/dashboard/monitors/:id/stats        — per-monitor detail stats
  * GET /api/dashboard/monitors/:id/chart-data   — per-monitor chart data
+ * GET /api/dashboard/monitors/:id/details      — combined Monitor Details
+ *                                                  page payload (stats +
+ *                                                  chart data in one request)
  */
 
 import { Router } from "express";
@@ -20,6 +23,7 @@ import {
   getRecentHealthChecks,
   getMonitorStats,
   getMonitorChartData,
+  getMonitorDetails,
 } from "../controllers/dashboard.controller.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
 import { requirePermission } from "../middlewares/permission.js";
@@ -66,6 +70,15 @@ router.get(
   validate(monitorStatsQuerySchema, "query"),
   requireWindowWithinRetention,
   getMonitorChartData,
+);
+
+router.get(
+  "/monitors/:id/details",
+  requirePermission("monitor:read"),
+  validateObjectId("id"),
+  validate(monitorStatsQuerySchema, "query"),
+  requireWindowWithinRetention,
+  getMonitorDetails,
 );
 
 export default router;

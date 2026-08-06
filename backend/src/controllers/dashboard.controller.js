@@ -82,3 +82,16 @@ export const getMonitorChartData = asyncHandler(async (req, res) => {
 
   sendSuccess(res, { data });
 });
+
+/**
+ * GET /api/dashboard/monitors/:id/details
+ */
+export const getMonitorDetails = asyncHandler(async (req, res) => {
+  const data = await dashboardService.getMonitorDetails(
+    req.params.id,
+    req.validatedQuery,
+    req.user,
+  );
+
+  sendSuccess(res, { data });
+});
