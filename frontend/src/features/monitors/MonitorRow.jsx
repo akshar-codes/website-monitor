@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   MoreHorizontal,
   Edit2,
@@ -10,6 +11,7 @@ import {
 import StatusBadge from "../../components/ui/StatusBadge";
 import Can from "../../components/access/Can";
 import { usePermissions } from "../../hooks/usePermissions";
+import { monitorDetailsPath } from "../../constants/routes";
 import {
   formatResponseTime,
   formatUptime,
@@ -98,15 +100,19 @@ export default function MonitorRow({
 
   const uptime = stats?.uptime?.percentage;
   const avgRt = stats?.responseTime?.average;
+  const detailsPath = monitorDetailsPath(monitor.id || monitor._id);
 
   return (
     <div className="grid grid-cols-[1fr_100px_100px_90px_90px_100px_40px] items-center gap-3 border-b border-[#1a1a1d] px-5 py-4 transition-colors hover:bg-[#131315] last:border-0">
       {/* Name + URL */}
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-white">
+          <Link
+            to={detailsPath}
+            className="truncate text-sm font-medium text-white transition-colors hover:text-emerald-400"
+          >
             {monitor.name}
-          </p>
+          </Link>
           {!monitor.active && (
             <span className="shrink-0 rounded-full bg-bg-subtle px-1.5 py-0.5 text-[10px] font-medium text-[#71717a]">
               Paused
