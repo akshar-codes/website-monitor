@@ -13,6 +13,10 @@
  * GET /api/dashboard/monitors/:id/details      — combined Monitor Details
  *                                                  page payload (stats +
  *                                                  chart data in one request)
+ * GET /api/dashboard/monitors/:id/analytics    — monitor analytics /
+ *                                                  performance insights,
+ *                                                  window preset OR custom
+ *                                                  startDate/endDate range
  */
 
 import { Router } from "express";
@@ -24,14 +28,19 @@ import {
   getMonitorStats,
   getMonitorChartData,
   getMonitorDetails,
+  getMonitorAnalytics,
 } from "../controllers/dashboard.controller.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
 import { requirePermission } from "../middlewares/permission.js";
-import { requireWindowWithinRetention } from "../middlewares/featureAccess.js";
+import {
+  requireWindowWithinRetention,
+  requireAnalyticsRangeWithinRetention,
+} from "../middlewares/featureAccess.js";
 import {
   incidentsQuerySchema,
   healthChecksQuerySchema,
   monitorStatsQuerySchema,
+  analyticsQuerySchema,
 } from "../validators/dashboard.validator.js";
 
 const router = Router();
@@ -79,6 +88,19 @@ router.get(
   validate(monitorStatsQuerySchema, "query"),
   requireWindowWithinRetention,
   getMonitorDetails,
+);
+
+// Before-vs-after position relative to /details doesn't matter (Express
+// matches literal "analytics" vs. the earlier routes' literal segments,
+// none of which collide with a :id param here) — kept last simply to
+// group it after the other per-monitor detail endpoints.
+router.get(
+  "/monitors/:id/analytics",
+  requirePermission("monitor:read"),
+  validateObjectId("id"),
+  validate(analyticsQuerySchema, "query"),
+  requireAnalyticsRangeWithinRetention,
+  getMonitorAnalytics,
 );
 
 export default router;

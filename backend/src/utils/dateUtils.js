@@ -39,3 +39,14 @@ export const isStale = (checkedAt, intervalSeconds, staleMultiplier = 2) => {
   const staleThresholdMs = intervalSeconds * staleMultiplier * 1000;
   return ageMs > staleThresholdMs;
 };
+
+/**
+ * Inclusive day-span between two dates, counted in whole UTC calendar
+ * days (e.g. the same day = 1, a full week apart = 8). Used by the
+ * monitor analytics endpoint to:
+ */
+export const daysBetween = (start, end) => {
+  const startMs = startOfDayUTC(start).getTime();
+  const endMs = endOfDayUTC(end).getTime();
+  return Math.max(1, Math.ceil((endMs - startMs) / (24 * 60 * 60 * 1000)));
+};

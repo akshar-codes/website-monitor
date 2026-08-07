@@ -17,6 +17,7 @@ import {
   endOfDayUTC,
   msBefore,
   isStale,
+  daysBetween,
 } from "../utils/dateUtils.js";
 import { getOwnedMonitorIds } from "./monitor.service.js";
 import { getPlanDefinition } from "../config/plans.js";
@@ -380,6 +381,57 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
   };
 };
 
+// ── Shared: hourly health-check bucket aggregation ────────────────────────────
+//
+// Extracted so the raw per-hour aggregation pipeline is defined exactly
+// once and reused by both getMonitorChartData's 24h branch and the
+// analytics endpoint's hourly chart — the two call sites only differ in
+// how they map the raw bucket fields into their own response shape, not
+// in how the buckets are computed. `until` is optional (open-ended,
+// matching the original 24h chart's "since now" semantics); the
+// analytics endpoint always supplies it to bound an explicit custom
+// range.
+const aggregateHourlyHealthCheckBuckets = (monitorId, since, until = null) =>
+  HealthCheck.aggregate([
+    {
+      $match: {
+        monitor: monitorId,
+        checkedAt: until ? { $gte: since, $lte: until } : { $gte: since },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          $dateToString: {
+            format: "%Y-%m-%dT%H:00:00.000Z",
+            date: "$checkedAt",
+          },
+        },
+        avgResponseTime: { $avg: "$responseTime" },
+        minResponseTime: { $min: "$responseTime" },
+        maxResponseTime: { $max: "$responseTime" },
+        totalChecks: { $sum: 1 },
+        successfulChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
+        },
+        failedChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DOWN] }, 1, 0] },
+        },
+        degradedChecks: {
+          $sum: {
+            $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0],
+          },
+        },
+        unknownChecks: {
+          $sum: {
+            $cond: [{ $eq: ["$status", HEALTH_STATUS.UNKNOWN] }, 1, 0],
+          },
+        },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
 // ── Per-monitor chart data ────────────────────────────────────────────────────
 
 export const getMonitorChartData = async (monitorId, { window }, user) => {
@@ -399,40 +451,7 @@ export const getMonitorChartData = async (monitorId, { window }, user) => {
   let dataPoints;
 
   if (window === "24h") {
-    const buckets = await HealthCheck.aggregate([
-      { $match: { monitor: id, checkedAt: { $gte: since } } },
-      {
-        $group: {
-          _id: {
-            $dateToString: {
-              format: "%Y-%m-%dT%H:00:00.000Z",
-              date: "$checkedAt",
-            },
-          },
-          avgResponseTime: { $avg: "$responseTime" },
-          minResponseTime: { $min: "$responseTime" },
-          maxResponseTime: { $max: "$responseTime" },
-          totalChecks: { $sum: 1 },
-          successfulChecks: {
-            $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
-          },
-          failedChecks: {
-            $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DOWN] }, 1, 0] },
-          },
-          degradedChecks: {
-            $sum: {
-              $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0],
-            },
-          },
-          unknownChecks: {
-            $sum: {
-              $cond: [{ $eq: ["$status", HEALTH_STATUS.UNKNOWN] }, 1, 0],
-            },
-          },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
+    const buckets = await aggregateHourlyHealthCheckBuckets(id, since);
 
     dataPoints = buckets.map((b) => ({
       timestamp: b._id,
@@ -494,6 +513,253 @@ export const getMonitorDetails = async (monitorId, { window }, user) => {
       window: chartData.window,
       dataPoints: chartData.dataPoints,
     },
+  };
+};
+
+// ── Per-monitor analytics / performance insights (custom date range) ─────────
+
+/**
+ * Resolves the effective [startDate, endDate] window for the analytics
+ * endpoint. A custom range always wins when supplied; otherwise falls
+ * back to the requested (or default 30d) preset, mirroring
+ * middlewares/featureAccess.js#requireAnalyticsRangeWithinRetention's
+ * own default so the enforced limit and the actually-queried range can
+ * never drift apart.
+ */
+const resolveAnalyticsRange = ({ window, startDate, endDate }) => {
+  if (startDate && endDate) {
+    return {
+      startDate: startOfDayUTC(startDate),
+      endDate: endOfDayUTC(endDate),
+    };
+  }
+
+  const ms = WINDOW_MS[window || "30d"];
+  return { startDate: msBefore(ms), endDate: new Date() };
+};
+
+/**
+ * Overview KPIs for the analytics endpoint — uptime, response-time
+ * distribution (avg/min/max/p95), and an approximate downtime/degraded
+ * duration. Computed in a SINGLE aggregation ($group with a $facet-free
+ * shape, since every metric shares the same $match) rather than several
+ * round trips.
+ *
+ * p95ResponseTime uses MongoDB's native `$percentile` accumulator
+ * (server-side, streaming — no per-document data has to be pulled into
+ * application memory), which is the "analytics optimization" requirement
+ * for a chart that can span a caller's entire retention window.
+ *
+ * downtimeSeconds/degradedSeconds are approximated as
+ * `failedOrDegradedChecks * monitor.interval` — the same convention
+ * workers/aggregationManager.js already uses for DailyStat, so this
+ * endpoint's numbers stay consistent with the rest of the app rather than
+ * introducing a second, differently-computed notion of "downtime".
+ */
+const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
+  const [result] = await HealthCheck.aggregate([
+    {
+      $match: {
+        monitor: monitorId,
+        checkedAt: { $gte: startDate, $lte: endDate },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalChecks: { $sum: 1 },
+        successfulChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
+        },
+        failedChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DOWN] }, 1, 0] },
+        },
+        degradedChecks: {
+          $sum: {
+            $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0],
+          },
+        },
+        avgResponseTime: { $avg: "$responseTime" },
+        minResponseTime: { $min: "$responseTime" },
+        maxResponseTime: { $max: "$responseTime" },
+        p95ResponseTime: {
+          $percentile: {
+            input: "$responseTime",
+            p: [0.95],
+            method: "approximate",
+          },
+        },
+      },
+    },
+  ]);
+
+  if (!result || result.totalChecks === 0) {
+    return {
+      totalChecks: 0,
+      successfulChecks: 0,
+      failedChecks: 0,
+      degradedChecks: 0,
+      uptimePercentage: 0,
+      avgResponseTime: 0,
+      minResponseTime: 0,
+      maxResponseTime: 0,
+      p95ResponseTime: 0,
+      downtimeSeconds: 0,
+      degradedSeconds: 0,
+    };
+  }
+
+  return {
+    totalChecks: result.totalChecks,
+    successfulChecks: result.successfulChecks,
+    failedChecks: result.failedChecks,
+    degradedChecks: result.degradedChecks,
+    uptimePercentage: parseFloat(
+      ((result.successfulChecks / result.totalChecks) * 100).toFixed(2),
+    ),
+    avgResponseTime: parseFloat((result.avgResponseTime || 0).toFixed(2)),
+    minResponseTime: result.minResponseTime || 0,
+    maxResponseTime: result.maxResponseTime || 0,
+    p95ResponseTime: Math.round(result.p95ResponseTime?.[0] || 0),
+    downtimeSeconds: result.failedChecks * monitor.interval,
+    degradedSeconds: result.degradedChecks * monitor.interval,
+  };
+};
+
+/**
+ * Component-level availability (frontend/backend/database) over the
+ * requested range — surfaces the per-component health data
+ * models/HealthCheck.js already records on every check but that no
+ * existing endpoint aggregates into a summary percentage.
+ */
+const computeAvailabilityBreakdown = async (monitorId, startDate, endDate) => {
+  const [result] = await HealthCheck.aggregate([
+    {
+      $match: {
+        monitor: monitorId,
+        checkedAt: { $gte: startDate, $lte: endDate },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        frontendUp: {
+          $sum: {
+            $cond: [{ $eq: ["$frontendStatus", HEALTH_STATUS.UP] }, 1, 0],
+          },
+        },
+        backendUp: {
+          $sum: {
+            $cond: [{ $eq: ["$backendStatus", HEALTH_STATUS.UP] }, 1, 0],
+          },
+        },
+        databaseUp: {
+          $sum: {
+            $cond: [{ $eq: ["$databaseStatus", HEALTH_STATUS.UP] }, 1, 0],
+          },
+        },
+      },
+    },
+  ]);
+
+  if (!result || result.total === 0) {
+    return { frontend: 0, backend: 0, database: 0 };
+  }
+
+  const pct = (n) => parseFloat(((n / result.total) * 100).toFixed(2));
+
+  return {
+    frontend: pct(result.frontendUp),
+    backend: pct(result.backendUp),
+    database: pct(result.databaseUp),
+  };
+};
+
+/** Hourly chart series for short (<=2 day) analytics ranges — reuses the
+ * shared bucket aggregation, sourced from raw HealthCheck documents. */
+const computeHourlyChart = async (monitorId, startDate, endDate) => {
+  const buckets = await aggregateHourlyHealthCheckBuckets(
+    monitorId,
+    startDate,
+    endDate,
+  );
+
+  return buckets.map((b) => ({
+    timestamp: b._id,
+    avgResponseTime: parseFloat((b.avgResponseTime || 0).toFixed(2)),
+    uptimePercentage:
+      b.totalChecks > 0
+        ? parseFloat(((b.successfulChecks / b.totalChecks) * 100).toFixed(2))
+        : 0,
+    totalChecks: b.totalChecks,
+  }));
+};
+
+/** Daily chart series for longer analytics ranges — reuses the
+ * already-maintained DailyStat rollups instead of re-aggregating raw
+ * HealthCheck history, keeping wide ranges (up to a plan's full
+ * retention window) cheap to query. */
+const computeDailyChart = async (monitorId, startDate, endDate) => {
+  const stats = await DailyStat.getDateRangeStats(
+    monitorId,
+    startOfDayUTC(startDate),
+    endOfDayUTC(endDate),
+  ).lean();
+
+  return stats.map((d) => ({
+    timestamp: d.date,
+    avgResponseTime: d.avgResponseTime,
+    uptimePercentage: d.uptimePercentage,
+    totalChecks: d.totalChecks,
+    downtimeSeconds: d.downtimeSeconds,
+  }));
+};
+
+/**
+ * Monitor analytics / performance insights — the aggregated payload
+ * behind the frontend's Analytics tab
+ */
+export const getMonitorAnalytics = async (monitorId, query, user) => {
+  const ownerId = user.id || user._id.toString();
+  const id = new mongoose.Types.ObjectId(monitorId);
+
+  const monitor = await Monitor.findOne({ _id: id, owner: ownerId })
+    .select("name url interval active createdAt")
+    .lean();
+  if (!monitor) {
+    throw ApiError.notFound(`Monitor not found with id: ${monitorId}`);
+  }
+
+  const { startDate, endDate } = resolveAnalyticsRange(query);
+  const spanDays = daysBetween(startDate, endDate);
+  const granularity = spanDays <= 2 ? "hourly" : "daily";
+
+  const [overview, availability, chart] = await Promise.all([
+    computeOverviewStats(id, monitor, startDate, endDate),
+    computeAvailabilityBreakdown(id, startDate, endDate),
+    granularity === "hourly"
+      ? computeHourlyChart(id, startDate, endDate)
+      : computeDailyChart(id, startDate, endDate),
+  ]);
+
+  return {
+    monitor: {
+      id: monitor._id,
+      name: monitor.name,
+      url: monitor.url,
+      interval: monitor.interval,
+      active: monitor.active,
+    },
+    range: {
+      startDate,
+      endDate,
+      days: spanDays,
+      granularity,
+    },
+    overview,
+    availability,
+    chart,
   };
 };
 
