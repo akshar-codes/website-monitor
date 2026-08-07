@@ -61,3 +61,16 @@ export async function getMonitorDetails(id, params = {}) {
   });
   return data;
 }
+
+/**
+ * GET /api/dashboard/monitors/:id/analytics
+ * `params` is either `{ window: "24h" | "7d" | "30d" }` or
+ * `{ startDate: "YYYY-MM-DD", endDate: "YYYY-MM-DD" }` — never both (see
+ * backend/src/validators/dashboard.validator.js#analyticsQuerySchema).
+ */
+export async function getMonitorAnalytics(id, params = {}) {
+  const { data } = await apiClient.get(`/dashboard/monitors/${id}/analytics`, {
+    params,
+  });
+  return data;
+}

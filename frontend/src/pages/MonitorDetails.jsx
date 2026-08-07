@@ -4,6 +4,7 @@ import PageContainer from "../components/layout/PageContainer";
 import Button from "../components/ui/Button";
 import ErrorState from "../components/ui/ErrorState";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
+import SectionLabel from "../components/ui/SectionLabel";
 import ChartCard from "../components/cards/ChartCard";
 import ResponseTimeChart from "../components/charts/ResponseTimeChart";
 import UptimeChart from "../components/charts/UptimeChart";
@@ -16,6 +17,7 @@ import MonitorDetailHeader from "../features/monitorDetails/MonitorDetailHeader"
 import MonitorStatusOverview from "../features/monitorDetails/MonitorStatusOverview";
 import MonitorInfoCard from "../features/monitorDetails/MonitorInfoCard";
 import MonitorRecentChecks from "../features/monitorDetails/MonitorRecentChecks";
+import MonitorAnalytics from "../features/monitorDetails/MonitorAnalytics";
 import { useMonitorDetails, useMonitorMutations } from "../hooks/useMonitors";
 import { useUsage } from "../hooks/useUsage";
 import { ROUTES } from "../constants/routes";
@@ -170,10 +172,25 @@ export default function MonitorDetails() {
       </div>
 
       {/* Recent checks */}
-      <MonitorRecentChecks
-        checks={details?.recentChecks || []}
-        loading={isInitialLoad}
-      />
+      <div className="mb-6">
+        <MonitorRecentChecks
+          checks={details?.recentChecks || []}
+          loading={isInitialLoad}
+        />
+      </div>
+
+      {/* Analytics & performance insights — custom date-range reporting,
+          independent of the live-status view above (see
+          features/monitorDetails/MonitorAnalytics.jsx). */}
+      <div>
+        <SectionLabel className="mb-3">
+          Analytics &amp; Performance Insights
+        </SectionLabel>
+        <MonitorAnalytics
+          monitorId={id}
+          retentionDays={usage?.retention?.days}
+        />
+      </div>
 
       {/* Edit modal */}
       <MonitorFormModal

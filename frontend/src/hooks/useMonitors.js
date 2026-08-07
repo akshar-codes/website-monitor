@@ -52,6 +52,27 @@ export function useMonitorDetails(id, window = "24h", pollingInterval = 30000) {
   );
 }
 
+/**
+ * Monitor analytics / performance insights for an arbitrary window preset
+ * or custom date range — backs
+ * features/monitorDetails/MonitorAnalytics.jsx. Deliberately NOT polled:
+ * unlike the live dashboard/detail views, an analytics query is a
+ * point-in-time report the user explicitly requested for a specific
+ * range, so it should only re-fetch when that range changes, not on a
+ * timer.
+ *
+ * `params` is either `{ window }` or `{ startDate, endDate }` — see
+ * services/api/dashboard.js#getMonitorAnalytics.
+ */
+export function useMonitorAnalytics(id, params = {}) {
+  const paramsKey = JSON.stringify(params);
+  return useQuery(
+    () => dashboardApi.getMonitorAnalytics(id, params),
+    [id, paramsKey],
+    { immediate: !!id },
+  );
+}
+
 export function useRecentHealthChecks(params = {}) {
   const paramsKey = JSON.stringify(params);
   return useQuery(
