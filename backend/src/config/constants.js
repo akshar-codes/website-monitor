@@ -49,11 +49,9 @@ export const INCIDENT_STATUS = Object.freeze({
   RESOLVED: "resolved",
 });
 
-/**
- * Query-param sentinel meaning "any non-resolved status" — not a real
- * status value, used only for filtering the incident list endpoint.
- */
 export const INCIDENT_STATUS_FILTER_ACTIVE = "active";
+
+export const INCIDENT_STATUS_FILTER_ALL = "all";
 
 /** Incident severity levels. */
 export const INCIDENT_SEVERITY = Object.freeze({
@@ -64,15 +62,6 @@ export const INCIDENT_SEVERITY = Object.freeze({
 
 // ── Authentication / OAuth ───────────────────────────────────────────────────
 
-/**
- * Supported OAuth providers. Adding a new provider (Facebook, Microsoft,
- * Discord, ...) starts here — add the key, then a matching strategy file
- * under config/oauth/ and an entry in config/oauth/providers.config.js.
- *
- * This is the single source of truth for OAuth provider identifiers.
- * Referenced by models/User.js (oauthAccounts enum), config/oauth/*.strategy.js,
- * config/oauth/providers.config.js, and controllers/oauth.controller.js.
- */
 export const OAUTH_PROVIDERS = Object.freeze({
   GOOGLE: "google",
   GITHUB: "github",
@@ -84,17 +73,6 @@ export const OAUTH_PROVIDER_VALUES = Object.freeze(
 
 // ── Authorization (roles) ────────────────────────────────────────────────────
 
-/**
- * Application-level roles — govern what a user is PERMITTED to do
- * (authorization). Deliberately kept separate from any future
- * subscription/billing "plan" concept, which would govern what a user is
- * ENTITLED to (limits, feature gates). A role change must never silently
- * affect billing, and a plan change must never grant elevated permissions —
- * so these two concerns must never be merged into a single field.
- *
- * Single source of truth — referenced by models/User.js (schema enum +
- * default), middlewares/authorize.js callers, and validators/admin.validator.js.
- */
 export const ROLES = Object.freeze({
   USER: "user",
   ADMIN: "admin",
@@ -104,22 +82,6 @@ export const ROLE_VALUES = Object.freeze(Object.values(ROLES));
 
 // ── Subscription Plans ───────────────────────────────────────────────────────
 
-/**
- * Subscription plan identifiers. Deliberately independent of ROLES above —
- * a plan governs entitlements (monitor limits, check-interval floor, data
- * retention), a role governs permissions. The two must never be merged.
- *
- * This is the single source of truth for plan identifiers. Full plan
- * metadata (pricing, limits, marketing feature copy) lives in
- * config/plans.js, mirroring how OAUTH_PROVIDERS (identifiers, here) is
- * split from config/oauth/providers.config.js (definitions).
- *
- * To add a new plan tier:
- *   1. Add its key here
- *   2. Add its definition to config/plans.js (assign the next `rank`)
- *   3. Nothing else needs to change — validation, upgrade/downgrade
- *      comparison, and the frontend catalog all read from that map.
- */
 export const PLANS = Object.freeze({
   FREE: "free",
   PRO: "pro",
@@ -139,14 +101,6 @@ export const PLAN_STATUS_VALUES = Object.freeze(Object.values(PLAN_STATUS));
 
 // ── Plan Upgrade Requests ────────────────────────────────────────────────────
 
-/**
- * Lifecycle status of a manual plan-upgrade request (see
- * models/PlanUpgradeRequest.js). There is no payment gateway wired up yet
- * (see User.billing in models/User.js), so a self-service upgrade cannot
- * be applied automatically the way a downgrade can (POST /api/plans/change
- * remains instant for downgrades) — an upgrade must be reviewed and
- * manually approved by an admin before the user's plan actually changes.
- */
 export const PLAN_UPGRADE_REQUEST_STATUS = Object.freeze({
   PENDING: "pending",
   APPROVED: "approved",

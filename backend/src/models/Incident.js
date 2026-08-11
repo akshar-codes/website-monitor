@@ -4,6 +4,22 @@ import { INCIDENT_STATUS, INCIDENT_SEVERITY } from "../config/constants.js";
 const STATUS_VALUES = Object.values(INCIDENT_STATUS);
 const SEVERITY_VALUES = Object.values(INCIDENT_SEVERITY);
 
+const statusHistoryEntrySchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: STATUS_VALUES,
+      required: true,
+    },
+    changedAt: {
+      type: Date,
+      default: Date.now,
+      required: true,
+    },
+  },
+  { _id: false },
+);
+
 const incidentSchema = new mongoose.Schema(
   {
     monitor: {
@@ -84,6 +100,13 @@ const incidentSchema = new mongoose.Schema(
       maxlength: [5000, "Resolution notes cannot exceed 5000 characters"],
       default: null,
     },
+
+    // ── Timeline ──
+
+    statusHistory: {
+      type: [statusHistoryEntrySchema],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -128,6 +151,21 @@ incidentSchema.index({ monitor: 1, duration: 1 });
 incidentSchema.pre("save", async function () {
   if (this.endedAt && this.startedAt) {
     this.duration = Math.round((this.endedAt - this.startedAt) / 1000);
+  }
+
+  if (this.isNew || this.isModified("status")) {
+    if (!Array.isArray(this.statusHistory)) {
+      this.statusHistory = [];
+    }
+
+    const timestamp =
+      this.status === INCIDENT_STATUS.RESOLVED && this.endedAt
+        ? this.endedAt
+        : this.isNew
+          ? this.startedAt || new Date()
+          : new Date();
+
+    this.statusHistory.push({ status: this.status, changedAt: timestamp });
   }
 });
 

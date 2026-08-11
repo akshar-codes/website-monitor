@@ -1,15 +1,19 @@
 import mongoose from "mongoose";
 import Incident from "../models/Incident.js";
+import Monitor from "../models/Monitor.js";
 import ApiError from "../utils/ApiError.js";
 import {
   WINDOW_MS,
   INCIDENT_STATUS,
+  INCIDENT_STATUS_FILTER_ACTIVE,
+  INCIDENT_STATUS_FILTER_ALL,
   INCIDENT_SEVERITY,
   MONITOR_POPULATE_FIELDS,
   TRIGGER_CHECK_POPULATE_FIELDS,
   TRIGGER_CHECK_DETAIL_POPULATE_FIELDS,
 } from "../config/constants.js";
 import { msBefore } from "../utils/dateUtils.js";
+import { escapeRegExp } from "../utils/regex.js";
 import { getOwnedMonitorIds } from "./monitor.service.js";
 import { logActivity } from "../utils/activityLogger.js";
 import {
@@ -34,47 +38,80 @@ const ALLOWED_TRANSITIONS = {
   [INCIDENT_STATUS.RESOLVED]: [], // terminal
 };
 
-/**
- * Narrows a monitor-id filter to the caller's owned monitors, optionally
- * intersected with a single requested monitor ID. A monitorId that isn't
- * one of the caller's own resolves to an impossible match ($in: []) rather
- * than leaking whether it exists for someone else.
- */
 const resolveMonitorFilter = (ownedIds, monitorId) => {
   if (!monitorId) return { $in: ownedIds };
   const requested = new mongoose.Types.ObjectId(monitorId);
-  return ownedIds.some((id) => id.equals(requested))
-    ? requested
-    : { $in: [] };
+  return ownedIds.some((id) => id.equals(requested)) ? requested : { $in: [] };
 };
 
 // ── List incidents ────────────────────────────────────────────────────────────
 
 export const getIncidents = async (
-  { page, limit, severity, status, monitorId },
+  {
+    page,
+    limit,
+    severity,
+    status,
+    monitorId,
+    search,
+    window,
+    startDate,
+    endDate,
+    order,
+  },
   user,
 ) => {
   const ownedIds = await getOwnedMonitorIds(user);
+  const monitorFilter = resolveMonitorFilter(ownedIds, monitorId);
 
-  const filter = { monitor: resolveMonitorFilter(ownedIds, monitorId) };
+  const filter = {};
 
-  if (status === "active") {
+  if (status === INCIDENT_STATUS_FILTER_ACTIVE) {
     filter.status = { $ne: INCIDENT_STATUS.RESOLVED };
-  } else if (status) {
+  } else if (status && status !== INCIDENT_STATUS_FILTER_ALL) {
     filter.status = status;
   }
+  // status === INCIDENT_STATUS_FILTER_ALL → no status constraint at all.
 
   if (severity) {
     filter.severity = severity;
   }
 
+  if (startDate && endDate) {
+    filter.startedAt = { $gte: startDate, $lte: endDate };
+  } else if (window) {
+    filter.startedAt = { $gte: msBefore(WINDOW_MS[window]) };
+  }
+
+  if (search) {
+    const pattern = new RegExp(escapeRegExp(search), "i");
+    const matchingMonitorIds = await Monitor.find({
+      _id: monitorFilter,
+      $or: [{ name: pattern }, { url: pattern }],
+    }).distinct("_id");
+
+    filter.$and = [
+      { monitor: monitorFilter },
+      {
+        $or: [
+          { monitor: { $in: matchingMonitorIds } },
+          { rootCause: pattern },
+          { resolutionNotes: pattern },
+        ],
+      },
+    ];
+  } else {
+    filter.monitor = monitorFilter;
+  }
+
+  const sortDirection = order === "asc" ? 1 : -1;
   const skip = (page - 1) * limit;
 
   const [incidents, total] = await Promise.all([
     Incident.find(filter)
       .populate("monitor", MONITOR_POPULATE_FIELDS)
       .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
-      .sort({ startedAt: -1 })
+      .sort({ startedAt: sortDirection })
       .skip(skip)
       .limit(limit)
       .lean(),
@@ -180,54 +217,125 @@ export const getDowntimeStats = async ({ monitorId, window }, user) => {
     monitor: resolveMonitorFilter(ownedIds, monitorId),
   };
 
-  const [aggResult] = await Incident.aggregate([
-    { $match: matchFilter },
-    {
-      $group: {
-        _id: null,
-        totalIncidents: { $sum: 1 },
-        resolvedCount: {
-          $sum: {
-            $cond: [{ $eq: ["$status", INCIDENT_STATUS.RESOLVED] }, 1, 0],
+  const [aggResults, topAffectedMonitors] = await Promise.all([
+    Incident.aggregate([
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: null,
+          totalIncidents: { $sum: 1 },
+          resolvedCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", INCIDENT_STATUS.RESOLVED] }, 1, 0],
+            },
           },
-        },
-        ongoingCount: {
-          $sum: {
-            $cond: [{ $ne: ["$status", INCIDENT_STATUS.RESOLVED] }, 1, 0],
+          ongoingCount: {
+            $sum: {
+              $cond: [{ $ne: ["$status", INCIDENT_STATUS.RESOLVED] }, 1, 0],
+            },
           },
-        },
-        resolvedDowntime: {
-          $sum: { $ifNull: ["$duration", 0] },
-        },
-        avgDuration: {
-          $avg: {
-            $cond: [{ $ne: ["$duration", null] }, "$duration", null],
+          // Per-status breakdown of the "still open" bucket above — used
+          // by the Incident History page's downtime summary.
+          ongoingOnlyCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", INCIDENT_STATUS.ONGOING] }, 1, 0],
+            },
           },
-        },
-        maxDuration: { $max: "$duration" },
-        criticalCount: {
-          $sum: {
-            $cond: [{ $eq: ["$severity", INCIDENT_SEVERITY.CRITICAL] }, 1, 0],
+          investigatingCount: {
+            $sum: {
+              $cond: [
+                { $eq: ["$status", INCIDENT_STATUS.INVESTIGATING] },
+                1,
+                0,
+              ],
+            },
           },
-        },
-        majorCount: {
-          $sum: {
-            $cond: [{ $eq: ["$severity", INCIDENT_SEVERITY.MAJOR] }, 1, 0],
+          identifiedCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", INCIDENT_STATUS.IDENTIFIED] }, 1, 0],
+            },
           },
-        },
-        minorCount: {
-          $sum: {
-            $cond: [{ $eq: ["$severity", INCIDENT_SEVERITY.MINOR] }, 1, 0],
+          resolvedDowntime: {
+            $sum: { $ifNull: ["$duration", 0] },
+          },
+          avgDuration: {
+            $avg: {
+              $cond: [{ $ne: ["$duration", null] }, "$duration", null],
+            },
+          },
+          maxDuration: { $max: "$duration" },
+          criticalCount: {
+            $sum: {
+              $cond: [{ $eq: ["$severity", INCIDENT_SEVERITY.CRITICAL] }, 1, 0],
+            },
+          },
+          majorCount: {
+            $sum: {
+              $cond: [{ $eq: ["$severity", INCIDENT_SEVERITY.MAJOR] }, 1, 0],
+            },
+          },
+          minorCount: {
+            $sum: {
+              $cond: [{ $eq: ["$severity", INCIDENT_SEVERITY.MINOR] }, 1, 0],
+            },
           },
         },
       },
-    },
+    ]),
+
+    // Top 5 monitors by incident count in the window — a single
+    // aggregation (match → group → sort → limit → lookup) rather than N
+    // per-monitor queries, so this scales with the window's incident
+    // volume rather than the caller's total monitor count.
+    Incident.aggregate([
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: "$monitor",
+          incidentCount: { $sum: 1 },
+          totalDowntime: { $sum: { $ifNull: ["$duration", 0] } },
+          criticalCount: {
+            $sum: {
+              $cond: [{ $eq: ["$severity", INCIDENT_SEVERITY.CRITICAL] }, 1, 0],
+            },
+          },
+        },
+      },
+      { $sort: { incidentCount: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "monitors",
+          localField: "_id",
+          foreignField: "_id",
+          as: "monitorInfo",
+          pipeline: [{ $project: { name: 1, url: 1 } }],
+        },
+      },
+      { $unwind: { path: "$monitorInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          monitorId: "$_id",
+          name: "$monitorInfo.name",
+          url: "$monitorInfo.url",
+          incidentCount: 1,
+          totalDowntime: 1,
+          criticalCount: 1,
+        },
+      },
+    ]),
   ]);
+
+  const aggResult = aggResults[0];
 
   const stats = aggResult || {
     totalIncidents: 0,
     resolvedCount: 0,
     ongoingCount: 0,
+    ongoingOnlyCount: 0,
+    investigatingCount: 0,
+    identifiedCount: 0,
     resolvedDowntime: 0,
     avgDuration: null,
     maxDuration: null,
@@ -265,6 +373,12 @@ export const getDowntimeStats = async ({ monitorId, window }, user) => {
       major: stats.majorCount,
       minor: stats.minorCount,
     },
+    byStatus: {
+      ongoing: stats.ongoingOnlyCount,
+      investigating: stats.investigatingCount,
+      identified: stats.identifiedCount,
+    },
+    topAffectedMonitors,
     window,
   };
 };
