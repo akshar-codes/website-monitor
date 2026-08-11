@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Monitor,
   BarChart3,
+  AlertTriangle,
   CreditCard,
   Activity as ActivityIcon,
   History,
@@ -45,6 +46,11 @@ const BASE_NAV_ITEMS = [
     icon: BarChart3,
   },
   {
+    label: "Incidents",
+    path: ROUTES.INCIDENTS,
+    icon: AlertTriangle,
+  },
+  {
     label: "Activity",
     path: ROUTES.ACTIVITY,
     icon: History,
@@ -56,12 +62,6 @@ const BASE_NAV_ITEMS = [
   },
 ];
 
-// `permission` is checked against the current user's permission list (see
-// hooks/usePermissions -> context/PermissionsContext.jsx, sourced from
-// backend/src/config/permissions.js) rather than a raw role comparison —
-// navigation is now driven by permissions, not roles directly, so a
-// future permission change (e.g. a new "moderator" role that also gets
-// user:read) doesn't require touching this component.
 const ADMIN_NAV_ITEM = {
   label: "Users",
   path: ROUTES.ADMIN_USERS,
@@ -128,13 +128,6 @@ export default function Sidebar() {
   const { can } = usePermissions();
   const navigate = useNavigate();
 
-  // Admin accounts are management-only (see App.jsx's BlockRoleRoute
-  // wrapping /monitors, and backend/src/config/permissions.js, which
-  // doesn't grant "monitor:create" to the admin role) — the Monitors tab
-  // is hidden for them entirely rather than left visible and blocked.
-  // Admin-only entries (Users, Plan Requests) are appended, never
-  // inserted in the middle, so the core navigation order stays identical
-  // for every user regardless of role/permissions.
   const navItems = useMemo(() => {
     const base = isAdmin
       ? BASE_NAV_ITEMS.filter((item) => item.path !== MONITORS_PATH)

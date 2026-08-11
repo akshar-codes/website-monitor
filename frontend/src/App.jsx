@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import Monitors from "./pages/Monitors";
 import MonitorDetails from "./pages/MonitorDetails";
 import Insights from "./pages/Insights";
+import IncidentHistory from "./pages/IncidentHistory";
 import Billing from "./pages/Billing";
 import Activity from "./pages/Activity";
 import Profile from "./pages/Profile";
@@ -134,6 +135,14 @@ export default function App() {
                       element={
                         <Suspense fallback={<PageFallback />}>
                           <Insights />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/incidents"
+                      element={
+                        <Suspense fallback={<PageFallback />}>
+                          <IncidentHistory />
                         </Suspense>
                       }
                     />
