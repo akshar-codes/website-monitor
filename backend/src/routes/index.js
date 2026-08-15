@@ -14,6 +14,7 @@ import usageRoutes from "./usage.routes.js";
 import monitorRoutes from "./monitor.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
 import incidentRoutes from "./incident.routes.js";
+import sslRoutes from "./ssl.routes.js";
 import activityRoutes from "./activity.routes.js";
 import notificationRoutes from "./notification.routes.js";
 import adminRoutes from "./admin.routes.js";
@@ -40,6 +41,7 @@ router.use("/usage", isAuthenticated, usageRoutes);
 router.use("/monitors", isAuthenticated, monitorRoutes);
 router.use("/dashboard", isAuthenticated, dashboardRoutes);
 router.use("/incidents", isAuthenticated, incidentRoutes);
+router.use("/ssl", isAuthenticated, sslRoutes);
 router.use("/activity", isAuthenticated, activityRoutes);
 router.use("/notifications", isAuthenticated, notificationRoutes);
 router.use(
