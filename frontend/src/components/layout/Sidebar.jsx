@@ -13,6 +13,7 @@ import {
   LogOut,
   ShieldOff,
   ShieldCheck,
+  Lock,
   ClipboardCheck,
   User,
   SlidersHorizontal,
@@ -27,6 +28,7 @@ import PlanBadge from "../ui/PlanBadge";
 import UpgradePrompt from "../../features/plans/UpgradePrompt";
 
 const MONITORS_PATH = "/monitors";
+const SSL_PATH = ROUTES.SSL_MONITORING;
 
 const BASE_NAV_ITEMS = [
   {
@@ -39,6 +41,11 @@ const BASE_NAV_ITEMS = [
     label: "Monitors",
     path: MONITORS_PATH,
     icon: Monitor,
+  },
+  {
+    label: "SSL Monitoring",
+    path: SSL_PATH,
+    icon: Lock,
   },
   {
     label: "Insights",
@@ -129,8 +136,14 @@ export default function Sidebar() {
   const navigate = useNavigate();
 
   const navItems = useMemo(() => {
+    // Admin accounts are management-only and never own monitors (see
+    // backend/src/config/permissions.js) — Monitors and SSL Monitoring
+    // are both meaningless for them, so both are hidden alongside each
+    // other rather than only the Monitors link.
     const base = isAdmin
-      ? BASE_NAV_ITEMS.filter((item) => item.path !== MONITORS_PATH)
+      ? BASE_NAV_ITEMS.filter(
+          (item) => item.path !== MONITORS_PATH && item.path !== SSL_PATH,
+        )
       : BASE_NAV_ITEMS;
 
     const adminItems = [ADMIN_NAV_ITEM, ADMIN_PLAN_REQUESTS_NAV_ITEM].filter(
