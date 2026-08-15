@@ -14,6 +14,7 @@ import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Monitors from "./pages/Monitors";
 import MonitorDetails from "./pages/MonitorDetails";
+import SslMonitoring from "./pages/SslMonitoring";
 import Insights from "./pages/Insights";
 import IncidentHistory from "./pages/IncidentHistory";
 import Billing from "./pages/Billing";
@@ -125,6 +126,14 @@ export default function App() {
                         element={
                           <Suspense fallback={<PageFallback />}>
                             <MonitorDetails />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/ssl"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <SslMonitoring />
                           </Suspense>
                         }
                       />

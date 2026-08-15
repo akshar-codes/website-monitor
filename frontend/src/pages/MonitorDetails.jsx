@@ -17,6 +17,7 @@ import MonitorDetailHeader from "../features/monitorDetails/MonitorDetailHeader"
 import MonitorStatusOverview from "../features/monitorDetails/MonitorStatusOverview";
 import MonitorInfoCard from "../features/monitorDetails/MonitorInfoCard";
 import MonitorRecentChecks from "../features/monitorDetails/MonitorRecentChecks";
+import MonitorSslPanel from "../features/monitorDetails/MonitorSslPanel";
 import MonitorAnalytics from "../features/monitorDetails/MonitorAnalytics";
 import { useMonitorDetails, useMonitorMutations } from "../hooks/useMonitors";
 import { useUsage } from "../hooks/useUsage";
@@ -177,6 +178,17 @@ export default function MonitorDetails() {
           checks={details?.recentChecks || []}
           loading={isInitialLoad}
         />
+      </div>
+
+      {/* SSL & domain monitoring — certificate validity, expiry countdown,
+          and domain registration status for this endpoint (see
+          features/monitorDetails/MonitorSslPanel.jsx). Independent of the
+          live-status view above; renders its own loading/eligibility
+          states, so it's safe to mount before the rest of the page has
+          finished its initial load. */}
+      <div className="mb-6">
+        <SectionLabel className="mb-3">SSL &amp; Domain</SectionLabel>
+        <MonitorSslPanel monitorId={id} />
       </div>
 
       {/* Analytics & performance insights — custom date-range reporting,
