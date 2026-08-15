@@ -37,12 +37,33 @@ const envSchema = z.object({
   REDIS_HOST: z.string().default("127.0.0.1"),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
 
-  // ── Monitoring worker ──
+  // ── Monitoring worker (HTTP health checks) ──
   POLL_TICK_MS: z.coerce.number().int().positive().default(10_000),
   POLL_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   MONITOR_RETRY_COUNT: z.coerce.number().int().min(0).default(2),
   MONITOR_RETRY_DELAY: z.coerce.number().int().min(0).default(1_000),
   CONSECUTIVE_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(3),
+
+  // ── SSL / domain monitoring worker ──
+  // Deliberately on its own, much slower cadence than the HTTP
+  // health-check worker above — see workers/sslScheduler.js for the
+  // rationale.
+
+  /** How often the SSL scheduler wakes up to look for due monitors. */
+  SSL_CHECK_TICK_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
+
+  /** How often each individual monitor's certificate/domain is rechecked. */
+  SSL_CHECK_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(24 * 60 * 60 * 1000),
+
+  /** Timeout for the raw TLS handshake used to read a certificate. */
+  SSL_CHECK_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+
+  /** Timeout for the RDAP domain-registration lookup. */
+  DOMAIN_LOOKUP_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
 
   // ── Production hardening ──
 

@@ -4,13 +4,18 @@ import connectDB from "./config/db.js";
 import logger from "./utils/logger.js";
 import { registerProcessHandlers } from "./utils/processHandlers.js";
 import { start, stop } from "./workers/scheduler.js";
+import {
+  start as startSslScheduler,
+  stop as stopSslScheduler,
+} from "./workers/sslScheduler.js";
 import { verifyMailTransport } from "./config/mail.js";
 
 let server = null;
 let shuttingDown = false;
 
 /**
- * Graceful shutdown — stops the polling scheduler, closes the HTTP
+ * Graceful shutdown — stops both the health-check and SSL polling
+ * schedulers, closes the HTTP server, then exits.
  */
 const shutdown = (signal, exitCode = 0) => {
   if (shuttingDown) return;
@@ -18,8 +23,9 @@ const shutdown = (signal, exitCode = 0) => {
 
   logger.info(`${signal} received — shutting down gracefully`);
 
-  // Stop the scheduler first (no new polls)
+  // Stop the schedulers first (no new polls/checks)
   stop();
+  stopSslScheduler();
 
   if (!server) {
     process.exit(exitCode);
@@ -51,8 +57,9 @@ const startServer = async () => {
   // 2. Verify outbound email connectivity (non-fatal — see config/mail.js)
   await verifyMailTransport();
 
-  // 3. Start the monitoring scheduler
+  // 3. Start the monitoring schedulers
   start();
+  startSslScheduler();
 
   // 4. Start listening
   server = app.listen(env.PORT, () => {
