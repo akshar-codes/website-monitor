@@ -55,7 +55,7 @@ const monitorSchema = new mongoose.Schema(
       default: true,
     },
 
-    // ── Worker fields ──
+    // ── Worker fields (health checks) ──
 
     lastCheckedAt: {
       type: Date,
@@ -71,6 +71,33 @@ const monitorSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: [0, "Consecutive failures cannot be negative"],
+    },
+
+    // ── Worker fields (SSL / domain monitoring) ──
+    // Additive, optional fields — mirrors lastCheckedAt/nextCheckAt above
+    // but on the SSL scheduler's own, much slower cadence (see
+    // workers/sslScheduler.js and config/env.js#SSL_CHECK_INTERVAL_MS).
+    // Existing monitor documents created before this feature shipped
+    // hydrate these via their schema defaults automatically — no
+    // migration is needed (same rationale as models/User.js's optional
+    // profile fields).
+
+    // Only meaningful for HTTPS monitors; toggled from the SSL panel in
+    // the monitor detail page. Defaults to true so every eligible
+    // monitor is covered unless a user opts out.
+    sslMonitoringEnabled: {
+      type: Boolean,
+      default: true,
+    },
+
+    lastSslCheckedAt: {
+      type: Date,
+      default: null,
+    },
+
+    nextSslCheckAt: {
+      type: Date,
+      default: Date.now, // first SSL check fires on the scheduler's next tick
     },
   },
   {
@@ -103,6 +130,11 @@ monitorSchema.index({ owner: 1, url: 1 }, { unique: true });
 monitorSchema.index({ active: 1 });
 monitorSchema.index({ active: 1, interval: 1 });
 monitorSchema.index({ active: 1, nextCheckAt: 1 });
+
+// SSL scheduler's due-query hot path — mirrors the health-check indexes
+// above, scoped additionally to sslMonitoringEnabled so disabled
+// monitors are excluded at the index level rather than filtered in JS.
+monitorSchema.index({ active: 1, sslMonitoringEnabled: 1, nextSslCheckAt: 1 });
 
 // Per-user monitor listing / usage-limit counting (Monitors page, the
 // usage dashboard, and requireWithinLimit's countFn all hit this shape).
@@ -140,6 +172,23 @@ monitorSchema.statics.findDue = function () {
   return this.find({
     active: true,
     nextCheckAt: { $lte: new Date() },
+  });
+};
+
+/**
+ * Return active, SSL-monitoring-enabled, HTTPS monitors whose
+ * nextSslCheckAt <= now (due for an SSL/domain recheck). Global/unscoped
+ * — used only by workers/sslScheduler.js, mirroring findDue's rationale
+ * above. The `url` regex restricts the due-set to HTTPS monitors at the
+ * query level so an HTTP-only monitor is never pulled into the SSL check
+ * pipeline in the first place.
+ */
+monitorSchema.statics.findDueSsl = function () {
+  return this.find({
+    active: true,
+    sslMonitoringEnabled: true,
+    url: { $regex: /^https:\/\//i },
+    nextSslCheckAt: { $lte: new Date() },
   });
 };
 
