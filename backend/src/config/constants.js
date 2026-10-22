@@ -27,6 +27,8 @@ export const HEALTH_STATUS = Object.freeze({
 /** Reasons a health check can fail. */
 export const FAILURE_REASONS = Object.freeze({
   TIMEOUT: "timeout",
+  UNSAFE_DESTINATION: "unsafe_destination",
+  RESPONSE_TOO_LARGE: "response_too_large",
   DNS_ERROR: "dns_error",
   CONNECTION_REFUSED: "connection_refused",
   INVALID_JSON: "invalid_json",

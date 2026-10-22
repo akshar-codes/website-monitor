@@ -40,6 +40,7 @@ const envSchema = z.object({
   // ── Monitoring worker (HTTP health checks) ──
   POLL_TICK_MS: z.coerce.number().int().positive().default(10_000),
   POLL_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  HEALTH_CHECK_MAX_RESPONSE_BYTES: z.coerce.number().int().positive().max(10_485_760).default(1_048_576),
   /** Maximum number of monitor pipelines a process may execute at once. */
   MONITOR_JOB_CONCURRENCY: z.coerce.number().int().positive().max(100).default(10),
   /** Lease duration also bounds recovery time after a worker process crashes. */
