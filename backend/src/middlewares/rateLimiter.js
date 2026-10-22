@@ -61,4 +61,14 @@ export const passwordResetLimiter = createAuthRateLimiter();
 /** Rate limiter for authenticated password changes. */
 export const passwordChangeLimiter = createAuthRateLimiter();
 
+/** Per-key budget for the public, read-only API. */
+export const apiKeyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.apiKey?._id?.toString() || "unauthenticated",
+  handler: rateLimitHandler,
+});
+
 export default globalLimiter;
