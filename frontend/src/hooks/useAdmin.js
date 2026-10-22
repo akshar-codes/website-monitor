@@ -44,6 +44,13 @@ export function useAdminIncidents(params = {}) {
   const paramsKey = JSON.stringify(params);
   return useQuery(() => adminApi.getAdminIncidents(params), [paramsKey]);
 }
+export function useAdminAuditEvents(params = {}) {
+  const paramsKey = JSON.stringify(params);
+  return useQuery(() => adminApi.getAdminAuditEvents(params), [paramsKey]);
+}
+export function useAdminAuditEvent(id) {
+  return useQuery(() => adminApi.getAdminAuditEvent(id), [id]);
+}
 export function useAdminIncident(id) {
   return useQuery(() => adminApi.getAdminIncident(id), [id]);
 }

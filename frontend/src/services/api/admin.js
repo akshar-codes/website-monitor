@@ -33,6 +33,15 @@ export async function resolveAdminIncident(id, payload) {
   return data?.data;
 }
 
+export async function getAdminAuditEvents(params = {}) {
+  const { data } = await apiClient.get("/admin/audit-logs", { params });
+  return data;
+}
+export async function getAdminAuditEvent(id) {
+  const { data } = await apiClient.get(`/admin/audit-logs/${id}`);
+  return data?.data;
+}
+
 /**
  * GET /api/admin/users
  * Supports pagination plus optional { search, role, plan, status } filters.
