@@ -1,5 +1,10 @@
 import apiClient from "./client";
 
+export async function getAdminDashboard(params = {}) {
+  const { data } = await apiClient.get("/admin/dashboard", { params });
+  return data?.data;
+}
+
 /**
  * GET /api/admin/users
  * Supports pagination plus optional { search, role, plan, status } filters.

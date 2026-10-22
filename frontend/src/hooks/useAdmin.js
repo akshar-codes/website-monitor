@@ -3,6 +3,17 @@ import { useQuery } from "./useQuery";
 import * as adminApi from "../services/api/admin";
 import { toast } from "sonner";
 
+const adminDashboardCache = new Map();
+export function useAdminDashboard(params = {}) {
+  const paramsKey = JSON.stringify(params);
+  const query = useQuery(() => adminApi.getAdminDashboard(params), [paramsKey]);
+  if (query.data) adminDashboardCache.set(paramsKey, query.data);
+  return {
+    ...query,
+    data: query.data || adminDashboardCache.get(paramsKey) || null,
+  };
+}
+
 export function useUserList(params = {}) {
   const paramsKey = JSON.stringify(params);
   return useQuery(() => adminApi.getUsers(params), [paramsKey]);

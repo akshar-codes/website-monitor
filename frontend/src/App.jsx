@@ -27,6 +27,7 @@ import SecuritySettings from "./pages/SecuritySettings";
 import NotificationSettings from "./pages/NotificationSettings";
 import ApiKeysSettings from "./pages/ApiKeysSettings";
 import AdminUsers from "./pages/AdminUsers";
+import AdminDashboard from "./pages/AdminDashboard";
 import AdminPlanRequests from "./pages/AdminPlanRequests";
 import Unauthorized from "./pages/Unauthorized";
 import UpgradeRequired from "./pages/UpgradeRequired";
@@ -223,6 +224,14 @@ export default function App() {
                         <RoleProtectedRoute allowedRoles={[ROLES.ADMIN]} />
                       }
                     >
+                      <Route
+                        path="/admin"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <AdminDashboard />
+                          </Suspense>
+                        }
+                      />
                       <Route
                         path="/admin/users"
                         element={

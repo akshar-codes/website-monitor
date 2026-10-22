@@ -76,6 +76,12 @@ const ADMIN_NAV_ITEM = {
   permission: "user:read",
 };
 
+const ADMIN_DASHBOARD_NAV_ITEM = {
+  label: "Admin Overview",
+  path: "/admin",
+  icon: LayoutDashboard,
+};
+
 const ADMIN_PLAN_REQUESTS_NAV_ITEM = {
   label: "Plan Requests",
   path: ROUTES.ADMIN_PLAN_REQUESTS,
@@ -146,9 +152,11 @@ export default function Sidebar() {
         )
       : BASE_NAV_ITEMS;
 
-    const adminItems = [ADMIN_NAV_ITEM, ADMIN_PLAN_REQUESTS_NAV_ITEM].filter(
-      (item) => can(item.permission),
-    );
+    const adminItems = [
+      ADMIN_DASHBOARD_NAV_ITEM,
+      ADMIN_NAV_ITEM,
+      ADMIN_PLAN_REQUESTS_NAV_ITEM,
+    ].filter((item) => !item.permission || can(item.permission));
 
     return [...base, ...adminItems];
   }, [can, isAdmin]);
