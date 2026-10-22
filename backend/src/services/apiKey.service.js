@@ -3,6 +3,7 @@ import ApiKey from "../models/ApiKey.js";
 import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import { PLANS, ROLES } from "../config/constants.js";
+import { expireSubscriptionIfDue } from "./subscriptionLifecycle.service.js";
 
 const KEY_LIMITS = { [PLANS.PRO]: 5, [PLANS.UNLIMITED]: 20 };
 const hashSecret = (secret) =>
@@ -97,9 +98,10 @@ export const authenticateApiKeySecret = async (secret) => {
   const stored = Buffer.from(key.keyHash, "hex");
   if (candidate.length !== stored.length || !timingSafeEqual(candidate, stored))
     return null;
-  const user = await User.findOne({ _id: key.owner, active: true }).select(
-    "role plan active",
+  let user = await User.findOne({ _id: key.owner, active: true }).select(
+    "role plan active planStatus planRenewsAt planCanceledAt",
   );
+  if (user) user = await expireSubscriptionIfDue(user);
   if (!user || user.role === ROLES.ADMIN || !KEY_LIMITS[user.plan]) return null;
   return { key, user };
 };

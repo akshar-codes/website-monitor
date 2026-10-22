@@ -206,6 +206,11 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    planExpiredAt: {
+      type: Date,
+      default: null,
+    },
+
     // Append-only audit trail of plan transitions. Hidden from default
     // queries — not needed on every user fetch, only when explicitly
     // inspecting history (see services/plan.service.js).
@@ -504,7 +509,9 @@ userSchema.methods.changePlan = function (newPlan, changedByUserId = null) {
   this.plan = newPlan;
   this.planStatus = PLAN_STATUS.ACTIVE;
   this.planStartedAt = new Date();
+  this.planRenewsAt = null;
   this.planCanceledAt = null;
+  this.planExpiredAt = null;
 
   if (!Array.isArray(this.planHistory)) {
     this.planHistory = [];

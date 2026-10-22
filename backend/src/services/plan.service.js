@@ -29,6 +29,8 @@ export const getCurrentPlanForUser = (user) => {
     startedAt: user.planStartedAt,
     renewsAt: user.planRenewsAt,
     canceledAt: user.planCanceledAt,
+    expiredAt: user.planExpiredAt,
+    accountStatus: user.active === false ? "suspended" : "active",
     definition,
   };
 };
@@ -73,6 +75,13 @@ export const changeUserPlan = async (userId, targetPlan, actingUser = null) => {
     ? actingUser.id || actingUser._id?.toString()
     : null;
   const isSelfService = !actingUserId || actingUserId === userId.toString();
+
+  if (isSelfService && changeType === "upgrade") {
+    throw ApiError.forbidden(
+      "Paid plan upgrades require an approved upgrade request.",
+      "PLAN_UPGRADE_APPROVAL_REQUIRED",
+    );
+  }
 
   user.changePlan(targetPlan, isSelfService ? null : actingUserId);
   await user.save({ validateBeforeSave: false });

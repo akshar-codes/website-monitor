@@ -95,6 +95,7 @@ export const PLAN_STATUS = Object.freeze({
   ACTIVE: "active",
   CANCELED: "canceled",
   EXPIRED: "expired",
+  SUSPENDED: "suspended",
 });
 
 export const PLAN_STATUS_VALUES = Object.freeze(Object.values(PLAN_STATUS));
