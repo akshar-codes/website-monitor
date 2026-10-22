@@ -3,12 +3,25 @@ import path from "path";
 import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
-import { AVATAR_DIR_ABSOLUTE, AVATAR_URL_PREFIX } from "../middlewares/uploadAvatar.js";
+import {
+  AVATAR_DIR_ABSOLUTE,
+  AVATAR_URL_PREFIX,
+} from "../middlewares/uploadAvatar.js";
 import { logActivity } from "../utils/activityLogger.js";
 import {
   ACTIVITY_CATEGORIES,
   ACTIVITY_ACTIONS,
 } from "../config/activityConstants.js";
+import Monitor from "../models/Monitor.js";
+import HealthCheck from "../models/HealthCheck.js";
+import DailyStat from "../models/DailyStat.js";
+import Incident from "../models/Incident.js";
+import SslInfo from "../models/SslInfo.js";
+import Activity from "../models/Activity.js";
+import Notification from "../models/Notification.js";
+import UserPreference from "../models/UserPreference.js";
+import PlanUpgradeRequest from "../models/PlanUpgradeRequest.js";
+import { destroyAllUserSessions } from "./session.service.js";
 
 // ── Profile completion ──────────────────────────────────────────────────────
 
@@ -89,6 +102,36 @@ export const getProfile = async (user) => {
     ...fresh.toJSON(),
     profileCompletion: computeProfileCompletion(fresh),
   };
+};
+
+export const deleteAccount = async (userId, confirmationEmail) => {
+  const account = await User.findById(userId);
+  if (!account) throw ApiError.notFound("User not found");
+  if (account.email.toLowerCase() !== confirmationEmail.toLowerCase()) {
+    throw ApiError.badRequest("The email address does not match this account");
+  }
+
+  const monitorDocs = await Monitor.find({ owner: account._id })
+    .select("_id")
+    .lean();
+  const monitorIds = monitorDocs.map(({ _id }) => _id);
+
+  await Promise.all([
+    HealthCheck.deleteMany({ monitor: { $in: monitorIds } }),
+    DailyStat.deleteMany({ monitor: { $in: monitorIds } }),
+    Incident.deleteMany({ monitor: { $in: monitorIds } }),
+    SslInfo.deleteMany({ monitor: { $in: monitorIds } }),
+    Monitor.deleteMany({ owner: account._id }),
+    Activity.deleteMany({ user: account._id }),
+    Notification.deleteMany({ owner: account._id }),
+    UserPreference.deleteMany({ user: account._id }),
+    PlanUpgradeRequest.deleteMany({ user: account._id }),
+  ]);
+
+  await account.deleteOne();
+  await destroyAllUserSessions(account._id.toString());
+  await deleteLocalAvatarFile(account.avatarUrl);
+  logger.info(`Account ${account._id} permanently deleted by its owner`);
 };
 
 // ── Update profile ───────────────────────────────────────────────────────────

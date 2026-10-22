@@ -7,6 +7,7 @@ import { Router } from "express";
 import healthRoutes from "./health.routes.js";
 import authRoutes from "./auth.routes.js";
 import profileRoutes from "./profile.routes.js";
+import accountRoutes from "./account.routes.js";
 import preferenceRoutes from "./preference.routes.js";
 import planRoutes from "./plan.routes.js";
 import planUpgradeRequestRoutes from "./planUpgradeRequest.routes.js";
@@ -33,6 +34,7 @@ const router = Router();
 router.use("/health", healthRoutes);
 router.use("/auth", authRoutes);
 router.use("/profile", profileRoutes);
+router.use("/account", accountRoutes);
 router.use("/plans", planRoutes);
 
 // ── Requires an authenticated session ──
@@ -44,11 +46,7 @@ router.use("/incidents", isAuthenticated, incidentRoutes);
 router.use("/ssl", isAuthenticated, sslRoutes);
 router.use("/activity", isAuthenticated, activityRoutes);
 router.use("/notifications", isAuthenticated, notificationRoutes);
-router.use(
-  "/plan-upgrade-requests",
-  isAuthenticated,
-  planUpgradeRequestRoutes,
-);
+router.use("/plan-upgrade-requests", isAuthenticated, planUpgradeRequestRoutes);
 
 // ── Requires an authenticated session AND the admin role ──
 router.use("/admin", isAuthenticated, authorize(ROLES.ADMIN), adminRoutes);
