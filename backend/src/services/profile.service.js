@@ -20,6 +20,7 @@ import SslInfo from "../models/SslInfo.js";
 import Activity from "../models/Activity.js";
 import Notification from "../models/Notification.js";
 import UserPreference from "../models/UserPreference.js";
+import ApiKey from "../models/ApiKey.js";
 import PlanUpgradeRequest from "../models/PlanUpgradeRequest.js";
 import { destroyAllUserSessions } from "./session.service.js";
 
@@ -125,6 +126,7 @@ export const deleteAccount = async (userId, confirmationEmail) => {
     Activity.deleteMany({ user: account._id }),
     Notification.deleteMany({ owner: account._id }),
     UserPreference.deleteMany({ user: account._id }),
+    ApiKey.deleteMany({ owner: account._id }),
     PlanUpgradeRequest.deleteMany({ user: account._id }),
   ]);
 

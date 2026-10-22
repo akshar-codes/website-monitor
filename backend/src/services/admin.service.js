@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import ApiKey from "../models/ApiKey.js";
 import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import Incident from "../models/Incident.js";
@@ -290,6 +291,7 @@ export const deleteUser = async (targetUserId, actingUser) => {
   }
 
   await destroyAllUserSessions(targetUserId);
+  await ApiKey.deleteMany({ owner: targetUserId });
   await User.findByIdAndDelete(targetUserId);
 
   logger.info(
