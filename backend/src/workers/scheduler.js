@@ -8,7 +8,10 @@ import { classify } from "./classifier.js";
 import { handleIncident } from "./incidentManager.js";
 import { updateDailyStat } from "./aggregationManager.js";
 import { logActivity } from "../utils/activityLogger.js";
-import { ACTIVITY_CATEGORIES, ACTIVITY_ACTIONS } from "../config/activityConstants.js";
+import {
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_ACTIONS,
+} from "../config/activityConstants.js";
 
 let intervalId = null;
 let stopped = true;
@@ -30,20 +33,24 @@ const processMonitor = async (monitor, initiatedBy = null) => {
       : `scheduled:${id}:${monitor.nextCheckAt ? new Date(monitor.nextCheckAt).toISOString() : "immediate"}`;
     const healthCheck = await HealthCheck.findOneAndUpdate(
       { executionKey },
-      { $setOnInsert: {
-        executionKey,
-        monitor: monitor._id,
-        status: classification.status,
-        frontendStatus: classification.frontendStatus,
-        backendStatus: classification.backendStatus,
-        databaseStatus: classification.databaseStatus,
-        responseTime: pollResult.responseTime,
-        httpStatus: pollResult.httpStatus,
-        failureReason: classification.failureReason,
-        rawResponse: null,
-        diagnostics: pollResult.diagnostics,
-        checkedAt,
-      } },
+      {
+        $setOnInsert: {
+          executionKey,
+          monitor: monitor._id,
+          status: classification.status,
+          frontendStatus: classification.frontendStatus,
+          backendStatus: classification.backendStatus,
+          databaseStatus: classification.databaseStatus,
+          responseTime: pollResult.responseTime,
+          intervalSeconds: monitor.interval,
+          scheduled: true,
+          httpStatus: pollResult.httpStatus,
+          failureReason: classification.failureReason,
+          rawResponse: null,
+          diagnostics: pollResult.diagnostics,
+          checkedAt,
+        },
+      },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
     await handleIncident(monitor, healthCheck);
@@ -62,7 +69,10 @@ const processMonitor = async (monitor, initiatedBy = null) => {
         description: `Triggered a manual health check for monitor "${monitor.name}"`,
         entityType: "Monitor",
         entityId: monitor._id,
-        metadata: { targetOwner: String(monitor.owner), status: classification.status },
+        metadata: {
+          targetOwner: String(monitor.owner),
+          status: classification.status,
+        },
       });
     }
     logger.info("Monitor check completed", {
@@ -93,21 +103,30 @@ const claimNextDueMonitor = async () => {
       active: true,
       nextCheckAt: { $lte: now },
       $and: [
-        { $or: [
-          { checkLeaseUntil: null },
-          { checkLeaseUntil: { $exists: false } },
-          { checkLeaseUntil: { $lte: now } },
-        ] },
-        { $or: [
-          { checkRetryAt: null },
-          { checkRetryAt: { $exists: false } },
-          { checkRetryAt: { $lte: now } },
-        ] },
+        {
+          $or: [
+            { checkLeaseUntil: null },
+            { checkLeaseUntil: { $exists: false } },
+            { checkLeaseUntil: { $lte: now } },
+          ],
+        },
+        {
+          $or: [
+            { checkRetryAt: null },
+            { checkRetryAt: { $exists: false } },
+            { checkRetryAt: { $lte: now } },
+          ],
+        },
       ],
     },
-    { $set: { checkLeaseToken: token, checkLeaseUntil: new Date(now.getTime() + env.MONITOR_JOB_LEASE_MS) } },
+    {
+      $set: {
+        checkLeaseToken: token,
+        checkLeaseUntil: new Date(now.getTime() + env.MONITOR_JOB_LEASE_MS),
+      },
+    },
     { sort: { nextCheckAt: 1 }, new: true, select: "+checkLeaseToken" },
-  ).then((monitor) => monitor ? { monitor, token } : null);
+  ).then((monitor) => (monitor ? { monitor, token } : null));
 };
 
 const runClaimedMonitor = async ({ monitor, token }) => {
@@ -117,25 +136,43 @@ const runClaimedMonitor = async ({ monitor, token }) => {
   let heartbeat;
   let work;
   try {
-    heartbeat = setInterval(() => {
-      Monitor.updateOne(query, { $set: { checkLeaseUntil: new Date(Date.now() + env.MONITOR_JOB_LEASE_MS) } })
-        .catch((error) => logger.error("Monitor lease renewal failed", { monitorId: id, error: error.message }));
-    }, Math.max(1_000, Math.floor(env.MONITOR_JOB_LEASE_MS / 3)));
+    heartbeat = setInterval(
+      () => {
+        Monitor.updateOne(query, {
+          $set: {
+            checkLeaseUntil: new Date(Date.now() + env.MONITOR_JOB_LEASE_MS),
+          },
+        }).catch((error) =>
+          logger.error("Monitor lease renewal failed", {
+            monitorId: id,
+            error: error.message,
+          }),
+        );
+      },
+      Math.max(1_000, Math.floor(env.MONITOR_JOB_LEASE_MS / 3)),
+    );
     heartbeat.unref?.();
     // Bound total work time as well as each network attempt. The promise is
     // still observed if the database stalls, keeping the job lease until its
     // underlying operations settle instead of permitting overlapping work.
     work = processMonitor(monitor);
     const deadline = new Promise((_, reject) => {
-      timeout = setTimeout(() => reject(new Error("Monitor job exceeded its timeout")), env.MONITOR_JOB_LEASE_MS - 5_000);
+      timeout = setTimeout(
+        () => reject(new Error("Monitor job exceeded its timeout")),
+        env.MONITOR_JOB_LEASE_MS - 5_000,
+      );
       timeout.unref?.();
     });
     await Promise.race([work, deadline]);
-    const latest = await Monitor.findById(monitor._id).select("active interval").lean();
+    const latest = await Monitor.findById(monitor._id)
+      .select("active interval")
+      .lean();
     await Monitor.updateOne(query, {
       $set: {
         lastCheckedAt: new Date(),
-        ...(latest?.active ? { nextCheckAt: new Date(Date.now() + latest.interval * 1000) } : {}),
+        ...(latest?.active
+          ? { nextCheckAt: new Date(Date.now() + latest.interval * 1000) }
+          : {}),
       },
       $unset: { checkLeaseToken: 1, checkLeaseUntil: 1, checkRetryAt: 1 },
     });
@@ -145,9 +182,15 @@ const runClaimedMonitor = async ({ monitor, token }) => {
       // writes. Keep ownership until it settles, then apply the retry policy.
       await work.catch(() => {});
     }
-    logger.error("Monitor job failed", { monitorId: id, monitorName: monitor.name, error: error.message });
+    logger.error("Monitor job failed", {
+      monitorId: id,
+      monitorName: monitor.name,
+      error: error.message,
+    });
     await Monitor.updateOne(query, {
-      $set: { checkRetryAt: new Date(Date.now() + env.MONITOR_JOB_RETRY_DELAY_MS) },
+      $set: {
+        checkRetryAt: new Date(Date.now() + env.MONITOR_JOB_RETRY_DELAY_MS),
+      },
       $unset: { checkLeaseToken: 1, checkLeaseUntil: 1 },
     });
   } finally {
@@ -159,16 +202,31 @@ const runClaimedMonitor = async ({ monitor, token }) => {
 const tick = async () => {
   if (stopped || tickPromise) return tickPromise;
   tickPromise = (async () => {
-    const available = Math.max(0, env.MONITOR_JOB_CONCURRENCY - activeTasks.size);
-    const claims = await Promise.all(Array.from({ length: available }, () => claimNextDueMonitor()));
+    const available = Math.max(
+      0,
+      env.MONITOR_JOB_CONCURRENCY - activeTasks.size,
+    );
+    const claims = await Promise.all(
+      Array.from({ length: available }, () => claimNextDueMonitor()),
+    );
     for (const claim of claims.filter(Boolean)) {
-      const task = runClaimedMonitor(claim).catch((error) => {
-        logger.error("Monitor job cleanup failed", { monitorId: String(claim.monitor._id), error: error.message });
-      }).finally(() => activeTasks.delete(task));
+      const task = runClaimedMonitor(claim)
+        .catch((error) => {
+          logger.error("Monitor job cleanup failed", {
+            monitorId: String(claim.monitor._id),
+            error: error.message,
+          });
+        })
+        .finally(() => activeTasks.delete(task));
       activeTasks.add(task);
     }
-  })().catch((error) => logger.error("Scheduler dispatch failed", { error: error.message }))
-    .finally(() => { tickPromise = null; });
+  })()
+    .catch((error) =>
+      logger.error("Scheduler dispatch failed", { error: error.message }),
+    )
+    .finally(() => {
+      tickPromise = null;
+    });
   return tickPromise;
 };
 

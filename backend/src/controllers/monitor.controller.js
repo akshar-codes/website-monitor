@@ -6,6 +6,7 @@ import { classify } from "../workers/classifier.js";
 import HealthCheck from "../models/HealthCheck.js";
 import Monitor from "../models/Monitor.js";
 import { randomUUID } from "node:crypto";
+import { updateDailyStat } from "../workers/aggregationManager.js";
 
 // ── Controllers ──────────────────────────────────────────────────────────────
 
@@ -69,12 +70,15 @@ export const manualHealthCheck = asyncHandler(async (req, res) => {
     backendStatus: classification.backendStatus,
     databaseStatus: classification.databaseStatus,
     responseTime: result.responseTime,
+    intervalSeconds: monitor.interval,
+    scheduled: false,
     httpStatus: result.httpStatus,
     failureReason: classification.failureReason,
     rawResponse: null,
     diagnostics: result.diagnostics,
     checkedAt: new Date(),
   });
+  await updateDailyStat(monitor, check);
   await Monitor.findByIdAndUpdate(monitor._id, {
     lastCheckedAt: check.checkedAt,
   });

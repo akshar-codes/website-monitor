@@ -52,6 +52,7 @@ export const getOverview = async (user) => {
     activeIncidentCount,
     latestIncidents,
     recentChecks,
+    coverageMonitors,
   ] = await Promise.all([
     // 1 ─ Monitor counts, scoped to the caller
     Monitor.aggregate([
@@ -111,6 +112,9 @@ export const getOverview = async (user) => {
         $group: {
           _id: null,
           totalChecks: { $sum: 1 },
+          scheduledChecks: {
+            $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
+          },
           successfulChecks: {
             $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
           },
@@ -142,6 +146,10 @@ export const getOverview = async (user) => {
       .sort({ checkedAt: -1 })
       .limit(10)
       .lean(),
+
+    Monitor.find({ owner: ownerId, active: true })
+      .select("interval createdAt")
+      .lean(),
   ]);
 
   // ── Format response ──
@@ -170,6 +178,7 @@ export const getOverview = async (user) => {
 
   const stats = systemStats[0] || {
     totalChecks: 0,
+    scheduledChecks: 0,
     successfulChecks: 0,
     avgResponseTime: 0,
   };
@@ -179,7 +188,21 @@ export const getOverview = async (user) => {
       ? parseFloat(
           ((stats.successfulChecks / stats.totalChecks) * 100).toFixed(2),
         )
-      : 0;
+      : null;
+  const now = new Date();
+  const expectedChecks = coverageMonitors.reduce((sum, monitor) => {
+    const startedAt = Math.max(
+      since.getTime(),
+      new Date(monitor.createdAt || since).getTime(),
+    );
+    const seconds = Math.max(0, (now.getTime() - startedAt) / 1000);
+    return (
+      sum +
+      (seconds > 0
+        ? Math.max(1, Math.ceil(seconds / (monitor.interval || 300)))
+        : 0)
+    );
+  }, 0);
 
   return {
     monitors: {
@@ -192,6 +215,16 @@ export const getOverview = async (user) => {
       percentage: uptimePercentage,
       window: "24h",
       totalChecks: stats.totalChecks,
+      expectedChecks,
+      coveragePercentage: expectedChecks
+        ? Number(
+            Math.min(
+              100,
+              (stats.scheduledChecks / expectedChecks) * 100,
+            ).toFixed(2),
+          )
+        : 0,
+      basis: "observed_checks",
     },
     responseTime: {
       average: parseFloat((stats.avgResponseTime || 0).toFixed(2)),
@@ -274,64 +307,90 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
   }
 
   const windowMs = WINDOW_MS[window];
-  const since = msBefore(windowMs);
-  const useDaily = window !== "24h";
-
-  let uptimePercentage, responseTimeStats;
-
-  if (useDaily) {
-    const startDate = startOfDayUTC(since);
-    const endDate = endOfDayUTC(new Date());
-
-    const [uptime, dailyStats] = await Promise.all([
-      DailyStat.calculateUptime(id, startDate, endDate),
-      DailyStat.getDateRangeStats(id, startDate, endDate).lean(),
-    ]);
-
-    uptimePercentage = uptime;
-
-    if (dailyStats.length > 0) {
-      const totalChecks = dailyStats.reduce((sum, d) => sum + d.totalChecks, 0);
-      const weightedRt = dailyStats.reduce(
-        (sum, d) => sum + d.avgResponseTime * d.totalChecks,
-        0,
-      );
-
-      responseTimeStats = {
-        average:
-          totalChecks > 0
-            ? parseFloat((weightedRt / totalChecks).toFixed(2))
-            : 0,
-        min: Math.min(...dailyStats.map((d) => d.minResponseTime)),
-        max: Math.max(...dailyStats.map((d) => d.maxResponseTime)),
-      };
-    } else {
-      responseTimeStats = { average: 0, min: 0, max: 0 };
-    }
-  } else {
-    const [uptime, rtAgg] = await Promise.all([
-      HealthCheck.uptimePercent(id, windowMs),
-      HealthCheck.aggregate([
-        { $match: { monitor: id, checkedAt: { $gte: since } } },
-        {
-          $group: {
-            _id: null,
-            avg: { $avg: "$responseTime" },
-            min: { $min: "$responseTime" },
-            max: { $max: "$responseTime" },
+  const endDate = new Date();
+  const since = new Date(endDate.getTime() - windowMs);
+  const periodStart = new Date(
+    Math.max(since.getTime(), new Date(monitor.createdAt).getTime()),
+  );
+  const elapsedSeconds = Math.max(0, (endDate - periodStart) / 1000);
+  const [result] = await HealthCheck.aggregate([
+    { $match: { monitor: id, checkedAt: { $gte: since, $lte: endDate } } },
+    {
+      $group: {
+        _id: null,
+        totalChecks: { $sum: 1 },
+        scheduledChecks: {
+          $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
+        },
+        successfulChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
+        },
+        failedChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DOWN] }, 1, 0] },
+        },
+        degradedChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0] },
+        },
+        unknownChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UNKNOWN] }, 1, 0] },
+        },
+        observedSeconds: {
+          $sum: {
+            $cond: [
+              { $ne: ["$scheduled", false] },
+              { $ifNull: ["$intervalSeconds", monitor.interval || 300] },
+              0,
+            ],
           },
         },
-      ]),
-    ]);
-
-    uptimePercentage = uptime;
-    const rt = rtAgg[0] || { avg: 0, min: 0, max: 0 };
-    responseTimeStats = {
-      average: parseFloat((rt.avg || 0).toFixed(2)),
-      min: rt.min || 0,
-      max: rt.max || 0,
-    };
-  }
+        average: { $avg: "$responseTime" },
+        min: { $min: "$responseTime" },
+        max: { $max: "$responseTime" },
+        estimatedDownSeconds: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$status", HEALTH_STATUS.DOWN] },
+                  { $ne: ["$scheduled", false] },
+                ],
+              },
+              { $ifNull: ["$intervalSeconds", monitor.interval] },
+              0,
+            ],
+          },
+        },
+        estimatedDegradedSeconds: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$status", HEALTH_STATUS.DEGRADED] },
+                  { $ne: ["$scheduled", false] },
+                ],
+              },
+              { $ifNull: ["$intervalSeconds", monitor.interval] },
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+  const totalChecks = result?.totalChecks || 0;
+  const expectedChecks =
+    elapsedSeconds > 0
+      ? Math.max(1, Math.ceil(elapsedSeconds / (monitor.interval || 300)))
+      : 0;
+  const uptimePercentage = totalChecks
+    ? Number(((result.successfulChecks / totalChecks) * 100).toFixed(2))
+    : null;
+  const responseTimeStats = {
+    average: Number((result?.average || 0).toFixed(2)),
+    min: result?.min || 0,
+    max: result?.max || 0,
+  };
+  const elapsedCoverageSeconds = Math.max(0, Math.round(elapsedSeconds));
 
   const [latestCheck, recentChecks, activeIncident] = await Promise.all([
     HealthCheck.findLatest(id),
@@ -371,6 +430,38 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
     uptime: {
       percentage: uptimePercentage,
       window,
+      basis: "observed_checks",
+      totalChecks,
+      scheduledChecks: result?.scheduledChecks || 0,
+      successfulChecks: result?.successfulChecks || 0,
+      failedChecks: result?.failedChecks || 0,
+      degradedChecks: result?.degradedChecks || 0,
+      unknownChecks: result?.unknownChecks || 0,
+      expectedChecks,
+      coveragePercentage: expectedChecks
+        ? Number(
+            Math.min(
+              100,
+              ((result?.scheduledChecks || 0) / expectedChecks) * 100,
+            ).toFixed(2),
+          )
+        : 0,
+      unobservedSeconds: Math.max(
+        0,
+        elapsedCoverageSeconds -
+          Math.min(
+            elapsedCoverageSeconds,
+            Math.round(result?.observedSeconds || 0),
+          ),
+      ),
+      estimatedDowntimeSeconds: Math.min(
+        Math.round(elapsedSeconds),
+        Math.round(result?.estimatedDownSeconds || 0),
+      ),
+      estimatedDegradedSeconds: Math.min(
+        Math.round(elapsedSeconds),
+        Math.round(result?.estimatedDegradedSeconds || 0),
+      ),
     },
     responseTime: {
       ...responseTimeStats,
@@ -422,6 +513,9 @@ const aggregateHourlyHealthCheckBuckets = (monitorId, since, until = null) =>
             $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0],
           },
         },
+        scheduledChecks: {
+          $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
+        },
         unknownChecks: {
           $sum: {
             $cond: [{ $eq: ["$status", HEALTH_STATUS.UNKNOWN] }, 1, 0],
@@ -439,7 +533,7 @@ export const getMonitorChartData = async (monitorId, { window }, user) => {
   const id = new mongoose.Types.ObjectId(monitorId);
 
   const monitor = await Monitor.findOne({ _id: id, owner: ownerId })
-    .select("_id")
+    .select("_id interval createdAt")
     .lean();
   if (!monitor) {
     throw ApiError.notFound(`Monitor not found with id: ${monitorId}`);
@@ -452,44 +546,93 @@ export const getMonitorChartData = async (monitorId, { window }, user) => {
 
   if (window === "24h") {
     const buckets = await aggregateHourlyHealthCheckBuckets(id, since);
-
-    dataPoints = buckets.map((b) => ({
-      timestamp: b._id,
-      avgResponseTime: parseFloat((b.avgResponseTime || 0).toFixed(2)),
-      minResponseTime: b.minResponseTime || 0,
-      maxResponseTime: b.maxResponseTime || 0,
-      totalChecks: b.totalChecks,
-      successfulChecks: b.successfulChecks,
-      failedChecks: b.failedChecks,
-      degradedChecks: b.degradedChecks,
-      unknownChecks: b.unknownChecks,
-      uptimePercentage:
-        b.totalChecks > 0
-          ? parseFloat(((b.successfulChecks / b.totalChecks) * 100).toFixed(2))
-          : 0,
-    }));
+    const byHour = new Map(buckets.map((bucket) => [bucket._id, bucket]));
+    dataPoints = [];
+    const firstHour = new Date(since);
+    firstHour.setUTCMinutes(0, 0, 0);
+    const lastHour = new Date();
+    lastHour.setUTCMinutes(0, 0, 0);
+    const chartNow = new Date();
+    for (
+      let hour = firstHour;
+      hour <= lastHour;
+      hour = new Date(hour.getTime() + 60 * 60 * 1000)
+    ) {
+      const key = hour.toISOString().slice(0, 13) + ":00:00.000Z";
+      const bucket = byHour.get(key);
+      const eligibleStart = Math.max(
+        hour.getTime(),
+        since.getTime(),
+        new Date(monitor.createdAt || since).getTime(),
+      );
+      const eligibleEnd = Math.min(
+        hour.getTime() + 60 * 60 * 1000,
+        chartNow.getTime(),
+      );
+      const eligibleSeconds = Math.max(0, (eligibleEnd - eligibleStart) / 1000);
+      const expectedChecks =
+        eligibleSeconds > 0
+          ? Math.max(1, Math.ceil(eligibleSeconds / (monitor.interval || 300)))
+          : 0;
+      dataPoints.push({
+        timestamp: key,
+        avgResponseTime: parseFloat((bucket?.avgResponseTime || 0).toFixed(2)),
+        minResponseTime: bucket?.minResponseTime || 0,
+        maxResponseTime: bucket?.maxResponseTime || 0,
+        totalChecks: bucket?.totalChecks || 0,
+        successfulChecks: bucket?.successfulChecks || 0,
+        failedChecks: bucket?.failedChecks || 0,
+        degradedChecks: bucket?.degradedChecks || 0,
+        unknownChecks: bucket?.unknownChecks || 0,
+        expectedChecks,
+        coveragePercentage: Number(
+          Math.min(
+            100,
+            ((bucket?.scheduledChecks || 0) / expectedChecks) * 100,
+          ).toFixed(2),
+        ),
+        uptimePercentage: bucket?.totalChecks
+          ? Number(
+              ((bucket.successfulChecks / bucket.totalChecks) * 100).toFixed(2),
+            )
+          : null,
+      });
+    }
   } else {
     const startDate = startOfDayUTC(since);
-    const endDate = endOfDayUTC(new Date());
+    const endDate = startOfDayUTC(new Date());
 
     const dailyStats = await DailyStat.getDateRangeStats(
       id,
       startDate,
       endDate,
     ).lean();
-
-    dataPoints = dailyStats.map((doc) => ({
-      timestamp: doc.date,
-      avgResponseTime: doc.avgResponseTime,
-      minResponseTime: doc.minResponseTime,
-      maxResponseTime: doc.maxResponseTime,
-      totalChecks: doc.totalChecks,
-      successfulChecks: doc.successfulChecks,
-      failedChecks: doc.failedChecks,
-      degradedChecks: doc.totalChecks - doc.successfulChecks - doc.failedChecks,
-      unknownChecks: 0,
-      uptimePercentage: doc.uptimePercentage,
-    }));
+    const byDate = new Map(
+      dailyStats.map((doc) => [new Date(doc.date).toISOString(), doc]),
+    );
+    dataPoints = [];
+    for (
+      let day = startDate;
+      day <= endDate;
+      day = new Date(day.getTime() + 24 * 60 * 60 * 1000)
+    ) {
+      const doc = byDate.get(day.toISOString());
+      dataPoints.push({
+        timestamp: day,
+        avgResponseTime: doc?.avgResponseTime || 0,
+        minResponseTime: doc?.minResponseTime || 0,
+        maxResponseTime: doc?.maxResponseTime || 0,
+        totalChecks: doc?.totalChecks || 0,
+        successfulChecks: doc?.successfulChecks || 0,
+        failedChecks: doc?.failedChecks || 0,
+        degradedChecks: doc?.degradedChecks || 0,
+        unknownChecks: doc?.unknownChecks || 0,
+        expectedChecks: doc?.expectedChecks || 0,
+        coveragePercentage: doc?.coveragePercentage || 0,
+        uptimePercentage: doc?.totalChecks ? doc.uptimePercentage : null,
+        downtimeSeconds: doc?.estimatedDowntimeSeconds || 0,
+      });
+    }
   }
 
   return {
@@ -579,6 +722,49 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
             $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0],
           },
         },
+        unknownChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UNKNOWN] }, 1, 0] },
+        },
+        scheduledChecks: {
+          $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
+        },
+        estimatedDownSeconds: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$status", HEALTH_STATUS.DOWN] },
+                  { $ne: ["$scheduled", false] },
+                ],
+              },
+              { $ifNull: ["$intervalSeconds", monitor.interval] },
+              0,
+            ],
+          },
+        },
+        estimatedDegradedSeconds: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$status", HEALTH_STATUS.DEGRADED] },
+                  { $ne: ["$scheduled", false] },
+                ],
+              },
+              { $ifNull: ["$intervalSeconds", monitor.interval] },
+              0,
+            ],
+          },
+        },
+        observedSeconds: {
+          $sum: {
+            $cond: [
+              { $ne: ["$scheduled", false] },
+              { $ifNull: ["$intervalSeconds", monitor.interval || 300] },
+              0,
+            ],
+          },
+        },
         avgResponseTime: { $avg: "$responseTime" },
         minResponseTime: { $min: "$responseTime" },
         maxResponseTime: { $max: "$responseTime" },
@@ -594,26 +780,77 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
   ]);
 
   if (!result || result.totalChecks === 0) {
+    const eligibleStart = new Date(
+      Math.max(
+        startDate.getTime(),
+        new Date(monitor.createdAt || startDate).getTime(),
+      ),
+    );
+    const eligibleSeconds = Math.max(0, (endDate - eligibleStart) / 1000);
+    const expectedChecks =
+      eligibleSeconds > 0
+        ? Math.max(1, Math.ceil(eligibleSeconds / (monitor.interval || 300)))
+        : 0;
     return {
       totalChecks: 0,
       successfulChecks: 0,
       failedChecks: 0,
       degradedChecks: 0,
-      uptimePercentage: 0,
+      uptimePercentage: null,
+      unknownChecks: 0,
+      scheduledChecks: 0,
+      expectedChecks,
+      coveragePercentage: 0,
+      unobservedSeconds: Math.round(eligibleSeconds),
+      basis: "observed_checks",
       avgResponseTime: 0,
       minResponseTime: 0,
       maxResponseTime: 0,
       p95ResponseTime: 0,
       downtimeSeconds: 0,
+      estimatedDowntimeSeconds: 0,
       degradedSeconds: 0,
+      estimatedDegradedSeconds: 0,
     };
   }
+
+  const eligibleStart = new Date(
+    Math.max(
+      startDate.getTime(),
+      new Date(monitor.createdAt || startDate).getTime(),
+    ),
+  );
+  const eligibleSeconds = Math.max(0, (endDate - eligibleStart) / 1000);
+  const expectedChecks =
+    eligibleSeconds > 0
+      ? Math.max(1, Math.ceil(eligibleSeconds / (monitor.interval || 300)))
+      : 0;
 
   return {
     totalChecks: result.totalChecks,
     successfulChecks: result.successfulChecks,
     failedChecks: result.failedChecks,
     degradedChecks: result.degradedChecks,
+    unknownChecks: result.unknownChecks,
+    observedSeconds: result.observedSeconds,
+    expectedChecks,
+    scheduledChecks: result.scheduledChecks,
+    coveragePercentage: expectedChecks
+      ? Number(
+          Math.min(
+            100,
+            (result.scheduledChecks / expectedChecks) * 100,
+          ).toFixed(2),
+        )
+      : 0,
+    unobservedSeconds: Math.max(
+      0,
+      Math.round(
+        eligibleSeconds -
+          Math.min(eligibleSeconds, result.observedSeconds || 0),
+      ),
+    ),
+    basis: "observed_checks",
     uptimePercentage: parseFloat(
       ((result.successfulChecks / result.totalChecks) * 100).toFixed(2),
     ),
@@ -621,8 +858,22 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
     minResponseTime: result.minResponseTime || 0,
     maxResponseTime: result.maxResponseTime || 0,
     p95ResponseTime: Math.round(result.p95ResponseTime?.[0] || 0),
-    downtimeSeconds: result.failedChecks * monitor.interval,
-    degradedSeconds: result.degradedChecks * monitor.interval,
+    downtimeSeconds: Math.min(
+      Math.round(eligibleSeconds),
+      Math.round(result.estimatedDownSeconds || 0),
+    ),
+    estimatedDowntimeSeconds: Math.min(
+      Math.round(eligibleSeconds),
+      Math.round(result.estimatedDownSeconds || 0),
+    ),
+    degradedSeconds: Math.min(
+      Math.round(eligibleSeconds),
+      Math.round(result.estimatedDegradedSeconds || 0),
+    ),
+    estimatedDegradedSeconds: Math.min(
+      Math.round(eligibleSeconds),
+      Math.round(result.estimatedDegradedSeconds || 0),
+    ),
   };
 };
 
@@ -664,7 +915,13 @@ const computeAvailabilityBreakdown = async (monitorId, startDate, endDate) => {
   ]);
 
   if (!result || result.total === 0) {
-    return { frontend: 0, backend: 0, database: 0 };
+    return {
+      frontend: null,
+      backend: null,
+      database: null,
+      totalChecks: 0,
+      basis: "observed_checks",
+    };
   }
 
   const pct = (n) => parseFloat(((n / result.total) * 100).toFixed(2));
@@ -673,27 +930,69 @@ const computeAvailabilityBreakdown = async (monitorId, startDate, endDate) => {
     frontend: pct(result.frontendUp),
     backend: pct(result.backendUp),
     database: pct(result.databaseUp),
+    totalChecks: result.total,
+    basis: "observed_checks",
   };
 };
 
 /** Hourly chart series for short (<=2 day) analytics ranges — reuses the
  * shared bucket aggregation, sourced from raw HealthCheck documents. */
-const computeHourlyChart = async (monitorId, startDate, endDate) => {
+const computeHourlyChart = async (
+  monitorId,
+  startDate,
+  endDate,
+  intervalSeconds,
+) => {
   const buckets = await aggregateHourlyHealthCheckBuckets(
     monitorId,
     startDate,
     endDate,
   );
 
-  return buckets.map((b) => ({
-    timestamp: b._id,
-    avgResponseTime: parseFloat((b.avgResponseTime || 0).toFixed(2)),
-    uptimePercentage:
-      b.totalChecks > 0
-        ? parseFloat(((b.successfulChecks / b.totalChecks) * 100).toFixed(2))
+  const byHour = new Map(buckets.map((bucket) => [bucket._id, bucket]));
+  const points = [];
+  const firstHour = new Date(startDate);
+  firstHour.setUTCMinutes(0, 0, 0);
+  const lastHour = new Date(endDate);
+  lastHour.setUTCMinutes(0, 0, 0);
+  for (
+    let hour = firstHour;
+    hour <= lastHour;
+    hour = new Date(hour.getTime() + 60 * 60 * 1000)
+  ) {
+    const timestamp = hour.toISOString().slice(0, 13) + ":00:00.000Z";
+    const bucket = byHour.get(timestamp);
+    const start = Math.max(hour.getTime(), startDate.getTime());
+    const end = Math.min(hour.getTime() + 60 * 60 * 1000, endDate.getTime());
+    const expectedChecks =
+      end > start
+        ? Math.max(
+            1,
+            Math.ceil((end - start) / 1000 / (intervalSeconds || 300)),
+          )
+        : 0;
+    points.push({
+      timestamp,
+      avgResponseTime: Number((bucket?.avgResponseTime || 0).toFixed(2)),
+      uptimePercentage: bucket?.totalChecks
+        ? Number(
+            ((bucket.successfulChecks / bucket.totalChecks) * 100).toFixed(2),
+          )
+        : null,
+      totalChecks: bucket?.totalChecks || 0,
+      scheduledChecks: bucket?.scheduledChecks || 0,
+      expectedChecks,
+      coveragePercentage: expectedChecks
+        ? Number(
+            Math.min(
+              100,
+              ((bucket?.scheduledChecks || 0) / expectedChecks) * 100,
+            ).toFixed(2),
+          )
         : 0,
-    totalChecks: b.totalChecks,
-  }));
+    });
+  }
+  return points;
 };
 
 /** Daily chart series for longer analytics ranges — reuses the
@@ -707,13 +1006,31 @@ const computeDailyChart = async (monitorId, startDate, endDate) => {
     endOfDayUTC(endDate),
   ).lean();
 
-  return stats.map((d) => ({
-    timestamp: d.date,
-    avgResponseTime: d.avgResponseTime,
-    uptimePercentage: d.uptimePercentage,
-    totalChecks: d.totalChecks,
-    downtimeSeconds: d.downtimeSeconds,
-  }));
+  const byDate = new Map(
+    stats.map((stat) => [new Date(stat.date).toISOString(), stat]),
+  );
+  const points = [];
+  for (
+    let day = startOfDayUTC(startDate), last = startOfDayUTC(endDate);
+    day <= last;
+    day = new Date(day.getTime() + 24 * 60 * 60 * 1000)
+  ) {
+    const stat = byDate.get(day.toISOString());
+    points.push({
+      timestamp: day,
+      avgResponseTime: stat?.avgResponseTime || 0,
+      uptimePercentage: stat?.totalChecks ? stat.uptimePercentage : null,
+      totalChecks: stat?.totalChecks || 0,
+      successfulChecks: stat?.successfulChecks || 0,
+      failedChecks: stat?.failedChecks || 0,
+      degradedChecks: stat?.degradedChecks || 0,
+      unknownChecks: stat?.unknownChecks || 0,
+      expectedChecks: stat?.expectedChecks || 0,
+      coveragePercentage: stat?.coveragePercentage || 0,
+      downtimeSeconds: stat?.estimatedDowntimeSeconds || 0,
+    });
+  }
+  return points;
 };
 
 /**
@@ -739,7 +1056,7 @@ export const getMonitorAnalytics = async (monitorId, query, user) => {
     computeOverviewStats(id, monitor, startDate, endDate),
     computeAvailabilityBreakdown(id, startDate, endDate),
     granularity === "hourly"
-      ? computeHourlyChart(id, startDate, endDate)
+      ? computeHourlyChart(id, startDate, endDate, monitor.interval)
       : computeDailyChart(id, startDate, endDate),
   ]);
 
@@ -845,6 +1162,13 @@ export const getSystemChartData = async (user, windows = WINDOW_KEYS) => {
       const since = msBefore(windowMs);
 
       if (window === "24h") {
+        const now = new Date();
+        const schedules = await Monitor.find({
+          owner: resolveOwnerObjectId(user),
+          active: true,
+        })
+          .select("interval createdAt")
+          .lean();
         const buckets = await HealthCheck.aggregate([
           {
             $match: {
@@ -862,6 +1186,9 @@ export const getSystemChartData = async (user, windows = WINDOW_KEYS) => {
               },
               avgResponseTime: { $avg: "$responseTime" },
               totalChecks: { $sum: 1 },
+              scheduledChecks: {
+                $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
+              },
               successfulChecks: {
                 $sum: {
                   $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0],
@@ -872,19 +1199,58 @@ export const getSystemChartData = async (user, windows = WINDOW_KEYS) => {
           { $sort: { _id: 1 } },
         ]);
 
-        return [
-          window,
-          buckets.map((b) => ({
-            timestamp: b._id,
-            avgResponseTime: parseFloat((b.avgResponseTime || 0).toFixed(2)),
-            uptimePercentage:
-              b.totalChecks > 0
-                ? parseFloat(
-                    ((b.successfulChecks / b.totalChecks) * 100).toFixed(2),
-                  )
-                : 0,
-          })),
-        ];
+        const byHour = new Map(buckets.map((bucket) => [bucket._id, bucket]));
+        const chart = [];
+        const firstHour = new Date(since);
+        firstHour.setUTCMinutes(0, 0, 0);
+        const lastHour = new Date(now);
+        lastHour.setUTCMinutes(0, 0, 0);
+        for (
+          let hour = firstHour;
+          hour <= lastHour;
+          hour = new Date(hour.getTime() + 60 * 60 * 1000)
+        ) {
+          const timestamp = hour.toISOString().slice(0, 13) + ":00:00.000Z";
+          const bucket = byHour.get(timestamp);
+          const start = Math.max(hour.getTime(), since.getTime());
+          const end = Math.min(hour.getTime() + 60 * 60 * 1000, now.getTime());
+          const expectedChecks = schedules.reduce((sum, schedule) => {
+            const eligibleStart = Math.max(
+              start,
+              new Date(schedule.createdAt || since).getTime(),
+            );
+            const seconds = Math.max(0, (end - eligibleStart) / 1000);
+            return (
+              sum +
+              (seconds > 0
+                ? Math.max(1, Math.ceil(seconds / (schedule.interval || 300)))
+                : 0)
+            );
+          }, 0);
+          chart.push({
+            timestamp,
+            avgResponseTime: Number((bucket?.avgResponseTime || 0).toFixed(2)),
+            uptimePercentage: bucket?.totalChecks
+              ? Number(
+                  (
+                    (bucket.successfulChecks / bucket.totalChecks) *
+                    100
+                  ).toFixed(2),
+                )
+              : null,
+            totalChecks: bucket?.totalChecks || 0,
+            expectedChecks,
+            coveragePercentage: expectedChecks
+              ? Number(
+                  Math.min(
+                    100,
+                    ((bucket?.scheduledChecks || 0) / expectedChecks) * 100,
+                  ).toFixed(2),
+                )
+              : 0,
+          });
+        }
+        return [window, chart];
       }
 
       const startDate = startOfDayUTC(since);
@@ -902,6 +1268,11 @@ export const getSystemChartData = async (user, windows = WINDOW_KEYS) => {
             _id: "$date",
             totalChecks: { $sum: "$totalChecks" },
             successfulChecks: { $sum: "$successfulChecks" },
+            failedChecks: { $sum: "$failedChecks" },
+            degradedChecks: { $sum: "$degradedChecks" },
+            unknownChecks: { $sum: "$unknownChecks" },
+            expectedChecks: { $sum: "$expectedChecks" },
+            estimatedDowntimeSeconds: { $sum: "$estimatedDowntimeSeconds" },
             weightedRt: {
               $sum: { $multiply: ["$avgResponseTime", "$totalChecks"] },
             },
@@ -910,22 +1281,47 @@ export const getSystemChartData = async (user, windows = WINDOW_KEYS) => {
         { $sort: { _id: 1 } },
       ]);
 
-      return [
-        window,
-        dailyBuckets.map((b) => ({
-          timestamp: b._id,
+      const byDate = new Map(
+        dailyBuckets.map((bucket) => [
+          new Date(bucket._id).toISOString(),
+          bucket,
+        ]),
+      );
+      const chart = [];
+      for (
+        let day = startDate;
+        day <= startOfDayUTC(new Date());
+        day = new Date(day.getTime() + 24 * 60 * 60 * 1000)
+      ) {
+        const b = byDate.get(day.toISOString());
+        chart.push({
+          timestamp: day,
           avgResponseTime:
-            b.totalChecks > 0
+            b?.totalChecks > 0
               ? parseFloat((b.weightedRt / b.totalChecks).toFixed(2))
               : 0,
           uptimePercentage:
-            b.totalChecks > 0
+            b?.totalChecks > 0
               ? parseFloat(
                   ((b.successfulChecks / b.totalChecks) * 100).toFixed(2),
                 )
-              : 0,
-        })),
-      ];
+              : null,
+          totalChecks: b?.totalChecks || 0,
+          expectedChecks: b?.expectedChecks || 0,
+          coveragePercentage: b?.expectedChecks
+            ? Number(
+                Math.min(100, (b.totalChecks / b.expectedChecks) * 100).toFixed(
+                  2,
+                ),
+              )
+            : 0,
+          failedChecks: b?.failedChecks || 0,
+          degradedChecks: b?.degradedChecks || 0,
+          unknownChecks: b?.unknownChecks || 0,
+          downtimeSeconds: b?.estimatedDowntimeSeconds || 0,
+        });
+      }
+      return [window, chart];
     }),
   );
 
