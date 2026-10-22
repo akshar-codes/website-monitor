@@ -82,6 +82,12 @@ const ADMIN_DASHBOARD_NAV_ITEM = {
   icon: LayoutDashboard,
 };
 
+const ADMIN_PLANS_NAV_ITEM = {
+  label: "Plans",
+  path: "/admin/plans",
+  icon: CreditCard,
+};
+
 const ADMIN_PLAN_REQUESTS_NAV_ITEM = {
   label: "Plan Requests",
   path: ROUTES.ADMIN_PLAN_REQUESTS,
@@ -155,6 +161,7 @@ export default function Sidebar() {
     const adminItems = [
       ADMIN_DASHBOARD_NAV_ITEM,
       ADMIN_NAV_ITEM,
+      ADMIN_PLANS_NAV_ITEM,
       ADMIN_PLAN_REQUESTS_NAV_ITEM,
     ].filter((item) => !item.permission || can(item.permission));
 
