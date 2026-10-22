@@ -34,13 +34,31 @@ const metrics = {
 const inFlightMonitorIds = new Set();
 const activeTasks = new Set();
 
-const processMonitor = async (monitor, initiatedBy = null) => {
+const processMonitor = async (
+  monitor,
+  initiatedBy = null,
+  leaseToken = null,
+) => {
   const id = String(monitor._id);
   if (inFlightMonitorIds.has(id)) return null;
   inFlightMonitorIds.add(id);
   const startedAt = Date.now();
   try {
     const pollResult = await poll(monitor.url);
+    if (leaseToken) {
+      const current = await Monitor.findOne({
+        _id: monitor._id,
+        active: true,
+        checkLeaseToken: leaseToken,
+        url: monitor.url,
+      })
+        .select("_id")
+        .lean();
+      if (!current) {
+        logger.info("Discarding stale monitor result", { monitorId: id });
+        return null;
+      }
+    }
     const classification = classify(pollResult);
     const checkedAt = new Date();
     const executionKey = initiatedBy
@@ -93,6 +111,9 @@ const processMonitor = async (monitor, initiatedBy = null) => {
     logger.info("Monitor check completed", {
       monitorId: id,
       status: classification.status,
+      httpStatus: pollResult.httpStatus,
+      failureReason: classification.failureReason,
+      errorCode: pollResult.diagnostics?.errorCode || null,
       responseTimeMs: pollResult.responseTime,
       durationMs: Date.now() - startedAt,
     });
@@ -178,7 +199,7 @@ const runClaimedMonitor = async ({ monitor, token }) => {
     // Bound total work time as well as each network attempt. The promise is
     // still observed if the database stalls, keeping the job lease until its
     // underlying operations settle instead of permitting overlapping work.
-    work = processMonitor(monitor);
+    work = processMonitor(monitor, null, token);
     const deadline = new Promise((_, reject) => {
       timeout = setTimeout(
         () => reject(new Error("Monitor job exceeded its timeout")),
@@ -187,10 +208,12 @@ const runClaimedMonitor = async ({ monitor, token }) => {
       timeout.unref?.();
     });
     const completed = await Promise.race([work, deadline]);
-    metrics.checksCompleted += 1;
-    if (completed && completed.status !== "up") metrics.unhealthyChecks += 1;
-    metrics.totalExecutionMs += Date.now() - startedAt;
-    metrics.lastCheckAt = new Date();
+    if (completed) {
+      metrics.checksCompleted += 1;
+      if (completed.status !== "up") metrics.unhealthyChecks += 1;
+      metrics.totalExecutionMs += Date.now() - startedAt;
+      metrics.lastCheckAt = new Date();
+    }
     const latest = await Monitor.findById(monitor._id)
       .select("active interval")
       .lean();

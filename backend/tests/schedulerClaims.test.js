@@ -43,3 +43,21 @@ test("scheduler claim database errors propagate to the retrying dispatcher", asy
     expected,
   );
 });
+
+test("competing application instances can claim one due monitor only once", async () => {
+  let claimed = false;
+  const monitor = { _id: "shared-monitor" };
+  const Monitor = {
+    findOneAndUpdate() {
+      if (claimed) return Promise.resolve(null);
+      claimed = true;
+      return Promise.resolve(monitor);
+    },
+  };
+  const claims = await Promise.all(
+    Array.from({ length: 8 }, (_, index) =>
+      claimNextDueMonitor({ Monitor, token: `instance-${index}` }),
+    ),
+  );
+  assert.equal(claims.filter(Boolean).length, 1);
+});

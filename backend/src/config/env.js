@@ -11,267 +11,294 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 // ── Schema ─────────────────────────────────────────────────────────────────
 
-const envSchema = z.object({
-  // ── Server ──
-  NODE_ENV: z
-    .enum(["development", "production", "test"])
-    .default("development"),
-  PORT: z.coerce.number().int().positive().default(5000),
+const envSchema = z
+  .object({
+    // ── Server ──
+    NODE_ENV: z
+      .enum(["development", "production", "test"])
+      .default("development"),
+    PORT: z.coerce.number().int().positive().default(5000),
 
-  // ── MongoDB ──
-  MONGO_URI: z
-    .string({ required_error: "MONGO_URI is required" })
-    .min(1, "MONGO_URI cannot be empty"),
+    // ── MongoDB ──
+    MONGO_URI: z
+      .string({ required_error: "MONGO_URI is required" })
+      .min(1, "MONGO_URI cannot be empty"),
 
-  // ── Logging ──
-  LOG_LEVEL: z
-    .enum(["error", "warn", "info", "http", "verbose", "debug", "silly"])
-    .optional(),
-  LOG_DIR: z.string().optional(),
+    // ── Logging ──
+    LOG_LEVEL: z
+      .enum(["error", "warn", "info", "http", "verbose", "debug", "silly"])
+      .optional(),
+    LOG_DIR: z.string().optional(),
 
-  // ── Rate limiting ──
-  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
-  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+    // ── Rate limiting ──
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
 
-  // ── Redis (reserved for a future background-queue integration) ──
-  REDIS_HOST: z.string().default("127.0.0.1"),
-  REDIS_PORT: z.coerce.number().int().positive().default(6379),
+    // ── Redis (reserved for a future background-queue integration) ──
+    REDIS_HOST: z.string().default("127.0.0.1"),
+    REDIS_PORT: z.coerce.number().int().positive().default(6379),
 
-  // ── Monitoring worker (HTTP health checks) ──
-  POLL_TICK_MS: z.coerce.number().int().positive().default(10_000),
-  POLL_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
-  POLL_TOTAL_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
-  HEALTH_CHECK_MAX_RESPONSE_BYTES: z.coerce
-    .number()
-    .int()
-    .positive()
-    .max(10_485_760)
-    .default(1_048_576),
-  /** Maximum number of monitor pipelines a process may execute at once. */
-  MONITOR_JOB_CONCURRENCY: z.coerce
-    .number()
-    .int()
-    .positive()
-    .max(100)
-    .default(10),
-  /** Lease duration also bounds recovery time after a worker process crashes. */
-  MONITOR_JOB_LEASE_MS: z.coerce.number().int().min(10_000).default(60_000),
-  /** Delay before retrying a pipeline that failed outside the HTTP poller. */
-  MONITOR_JOB_RETRY_DELAY_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(30_000),
-  MONITOR_RETRY_COUNT: z.coerce.number().int().min(0).max(5).default(2),
-  MONITOR_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
-  MONITOR_DIAGNOSTIC_RETENTION_DAYS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(30),
-  MONITOR_RETENTION_BATCH_SIZE: z.coerce
-    .number()
-    .int()
-    .positive()
-    .max(5000)
-    .default(500),
-  MONITOR_MAINTENANCE_INTERVAL_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(60 * 60 * 1000),
-  MONITOR_RETRY_DELAY: z.coerce
-    .number()
-    .int()
-    .min(0)
-    .max(30_000)
-    .default(1_000),
-  CONSECUTIVE_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(2),
-  CONSECUTIVE_SUCCESS_THRESHOLD: z.coerce.number().int().positive().default(2),
+    // ── Monitoring worker (HTTP health checks) ──
+    POLL_TICK_MS: z.coerce.number().int().positive().default(10_000),
+    POLL_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+    POLL_TOTAL_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+    HEALTH_CHECK_MAX_RESPONSE_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(10_485_760)
+      .default(1_048_576),
+    /** Maximum number of monitor pipelines a process may execute at once. */
+    MONITOR_JOB_CONCURRENCY: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .default(10),
+    /** Lease duration also bounds recovery time after a worker process crashes. */
+    MONITOR_JOB_LEASE_MS: z.coerce.number().int().min(10_000).default(60_000),
+    /** Delay before retrying a pipeline that failed outside the HTTP poller. */
+    MONITOR_JOB_RETRY_DELAY_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30_000),
+    MONITOR_RETRY_COUNT: z.coerce.number().int().min(0).max(5).default(2),
+    MONITOR_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+    MONITOR_DIAGNOSTIC_RETENTION_DAYS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30),
+    MONITOR_RETENTION_BATCH_SIZE: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(5000)
+      .default(500),
+    MONITOR_MAINTENANCE_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(60 * 60 * 1000),
+    MONITOR_RETRY_DELAY: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(30_000)
+      .default(1_000),
+    CONSECUTIVE_FAILURE_THRESHOLD: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(2),
+    CONSECUTIVE_SUCCESS_THRESHOLD: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(2),
 
-  // ── SSL / domain monitoring worker ──
-  // Deliberately on its own, much slower cadence than the HTTP
-  // health-check worker above — see workers/sslScheduler.js for the
-  // rationale.
+    // ── SSL / domain monitoring worker ──
+    // Deliberately on its own, much slower cadence than the HTTP
+    // health-check worker above — see workers/sslScheduler.js for the
+    // rationale.
 
-  /** How often the SSL scheduler wakes up to look for due monitors. */
-  SSL_CHECK_TICK_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(15 * 60 * 1000),
+    /** How often the SSL scheduler wakes up to look for due monitors. */
+    SSL_CHECK_TICK_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(15 * 60 * 1000),
 
-  /** How often each individual monitor's certificate/domain is rechecked. */
-  SSL_CHECK_INTERVAL_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(24 * 60 * 60 * 1000),
+    /** How often each individual monitor's certificate/domain is rechecked. */
+    SSL_CHECK_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(24 * 60 * 60 * 1000),
 
-  /** Timeout for the raw TLS handshake used to read a certificate. */
-  SSL_CHECK_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
-  SSL_CHECK_CONCURRENCY: z.coerce.number().int().positive().max(20).default(3),
+    /** Timeout for the raw TLS handshake used to read a certificate. */
+    SSL_CHECK_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+    SSL_CHECK_CONCURRENCY: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(20)
+      .default(3),
 
-  /** Timeout for the RDAP domain-registration lookup. */
-  DOMAIN_LOOKUP_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+    /** Timeout for the RDAP domain-registration lookup. */
+    DOMAIN_LOOKUP_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(10_000),
 
-  // ── Production hardening ──
+    // ── Production hardening ──
 
-  /** Comma-separated whitelist of origins allowed to make credentialed requests. */
-  CORS_ORIGIN: z
-    .string({ required_error: "CORS_ORIGIN is required" })
-    .min(1, "CORS_ORIGIN cannot be empty"),
+    /** Comma-separated whitelist of origins allowed to make credentialed requests. */
+    CORS_ORIGIN: z
+      .string({ required_error: "CORS_ORIGIN is required" })
+      .min(1, "CORS_ORIGIN cannot be empty"),
 
-  /** express.json()/urlencoded() body size limit, e.g. "1mb", "500kb". */
-  MAX_BODY_SIZE: z.string().default("1mb"),
+    /** express.json()/urlencoded() body size limit, e.g. "1mb", "500kb". */
+    MAX_BODY_SIZE: z.string().default("1mb"),
 
-  /**
-   * Number of reverse-proxy hops to trust for req.ip / X-Forwarded-*.
-   */
-  TRUST_PROXY: z.coerce.number().int().min(0).default(1),
+    /**
+     * Number of reverse-proxy hops to trust for req.ip / X-Forwarded-*.
+     */
+    TRUST_PROXY: z.coerce.number().int().min(0).default(1),
 
-  /**
-   * Signs cookies (via cookie-parser) so they're tamper-evident — required
-   */
-  COOKIE_SECRET: z
-    .string({ required_error: "COOKIE_SECRET is required" })
-    .min(32, "COOKIE_SECRET must be at least 32 characters"),
+    /**
+     * Signs cookies (via cookie-parser) so they're tamper-evident — required
+     */
+    COOKIE_SECRET: z
+      .string({ required_error: "COOKIE_SECRET is required" })
+      .min(32, "COOKIE_SECRET must be at least 32 characters"),
 
-  // ── Sessions & authentication ──
+    // ── Sessions & authentication ──
 
-  /** Signs the session-ID cookie (express-session) — required, min 32 chars. */
-  SESSION_SECRET: z
-    .string({ required_error: "SESSION_SECRET is required" })
-    .min(32, "SESSION_SECRET must be at least 32 characters"),
+    /** Signs the session-ID cookie (express-session) — required, min 32 chars. */
+    SESSION_SECRET: z
+      .string({ required_error: "SESSION_SECRET is required" })
+      .min(32, "SESSION_SECRET must be at least 32 characters"),
 
-  /** Name of the session cookie. */
-  SESSION_NAME: z.string().default("wm.sid"),
+    /** Name of the session cookie. */
+    SESSION_NAME: z.string().default("wm.sid"),
 
-  /**
-   * Default session lifetime (no "remember me") in milliseconds.
-   * Combined with `rolling: true`, this acts as a sliding idle-timeout —
-   * active users stay signed in; idle ones expire. Defaults to 1 day.
-   */
-  SESSION_DEFAULT_MAX_AGE_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(24 * 60 * 60 * 1000),
+    /**
+     * Default session lifetime (no "remember me") in milliseconds.
+     * Combined with `rolling: true`, this acts as a sliding idle-timeout —
+     * active users stay signed in; idle ones expire. Defaults to 1 day.
+     */
+    SESSION_DEFAULT_MAX_AGE_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(24 * 60 * 60 * 1000),
 
-  /**
-   * "Remember me" session lifetime in milliseconds — also used as the
-   * MongoStore fallback TTL so every session document has a hard upper
-   * bound even if `cookie.expires` is ever missing. Defaults to 30 days.
-   */
-  SESSION_REMEMBER_ME_MAX_AGE_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(30 * 24 * 60 * 60 * 1000),
+    /**
+     * "Remember me" session lifetime in milliseconds — also used as the
+     * MongoStore fallback TTL so every session document has a hard upper
+     * bound even if `cookie.expires` is ever missing. Defaults to 30 days.
+     */
+    SESSION_REMEMBER_ME_MAX_AGE_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30 * 24 * 60 * 60 * 1000),
 
-  /** Rate-limit window/max applied specifically to /auth/login and /auth/register. */
-  AUTH_RATE_LIMIT_WINDOW_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(900_000),
-  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+    /** Rate-limit window/max applied specifically to /auth/login and /auth/register. */
+    AUTH_RATE_LIMIT_WINDOW_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(900_000),
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
 
-  // ── Client / frontend ──
+    // ── Client / frontend ──
 
-  /** Canonical frontend origin used to build links embedded in emails. */
-  CLIENT_URL: z
-    .string({ required_error: "CLIENT_URL is required" })
-    .url("CLIENT_URL must be a valid URL"),
+    /** Canonical frontend origin used to build links embedded in emails. */
+    CLIENT_URL: z
+      .string({ required_error: "CLIENT_URL is required" })
+      .url("CLIENT_URL must be a valid URL"),
 
-  // ── Email / SMTP ──
+    // ── Email / SMTP ──
 
-  SMTP_HOST: z
-    .string({ required_error: "SMTP_HOST is required" })
-    .min(1, "SMTP_HOST cannot be empty"),
-  SMTP_PORT: z.coerce.number().int().positive().default(587),
-  SMTP_SECURE: z
-    .enum(["true", "false"])
-    .optional()
-    .default("false")
-    .transform((v) => v === "true"),
-  SMTP_USER: z
-    .string({ required_error: "SMTP_USER is required" })
-    .min(1, "SMTP_USER cannot be empty"),
-  SMTP_PASS: z
-    .string({ required_error: "SMTP_PASS is required" })
-    .min(1, "SMTP_PASS cannot be empty"),
-  SMTP_FROM_EMAIL: z
-    .string({ required_error: "SMTP_FROM_EMAIL is required" })
-    .email("SMTP_FROM_EMAIL must be a valid email address"),
-  SMTP_FROM_NAME: z.string().default("WebMonitor"),
+    SMTP_HOST: z
+      .string({ required_error: "SMTP_HOST is required" })
+      .min(1, "SMTP_HOST cannot be empty"),
+    SMTP_PORT: z.coerce.number().int().positive().default(587),
+    SMTP_SECURE: z
+      .enum(["true", "false"])
+      .optional()
+      .default("false")
+      .transform((v) => v === "true"),
+    SMTP_USER: z
+      .string({ required_error: "SMTP_USER is required" })
+      .min(1, "SMTP_USER cannot be empty"),
+    SMTP_PASS: z
+      .string({ required_error: "SMTP_PASS is required" })
+      .min(1, "SMTP_PASS cannot be empty"),
+    SMTP_FROM_EMAIL: z
+      .string({ required_error: "SMTP_FROM_EMAIL is required" })
+      .email("SMTP_FROM_EMAIL must be a valid email address"),
+    SMTP_FROM_NAME: z.string().default("WebMonitor"),
 
-  // ── Email verification ──
+    // ── Email verification ──
 
-  /** How long an issued verification token stays valid. Defaults to 24 hours. */
-  EMAIL_VERIFICATION_TOKEN_EXPIRES_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(24 * 60 * 60 * 1000),
+    /** How long an issued verification token stays valid. Defaults to 24 hours. */
+    EMAIL_VERIFICATION_TOKEN_EXPIRES_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(24 * 60 * 60 * 1000),
 
-  /** Minimum gap between resend requests for the same account. Defaults to 60s. */
-  EMAIL_VERIFICATION_RESEND_COOLDOWN_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(60 * 1000),
+    /** Minimum gap between resend requests for the same account. Defaults to 60s. */
+    EMAIL_VERIFICATION_RESEND_COOLDOWN_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(60 * 1000),
 
-  // ── Password reset ──
-  PASSWORD_RESET_TOKEN_EXPIRES_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(60 * 60 * 1000),
+    // ── Password reset ──
+    PASSWORD_RESET_TOKEN_EXPIRES_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(60 * 60 * 1000),
 
-  // ── OAuth providers ──
-  // All optional: a provider is only registered with Passport once its
-  // clientID + clientSecret + callbackURL are ALL present (see
-  // config/oauth/providers.config.js). Omitting a provider's vars entirely
-  // disables it without breaking startup — existing deployments that don't
-  // configure OAuth keep working unchanged.
+    // ── OAuth providers ──
+    // All optional: a provider is only registered with Passport once its
+    // clientID + clientSecret + callbackURL are ALL present (see
+    // config/oauth/providers.config.js). Omitting a provider's vars entirely
+    // disables it without breaking startup — existing deployments that don't
+    // configure OAuth keep working unchanged.
 
-  /** Where the browser lands after an OAuth attempt (success or failure). */
-  OAUTH_CALLBACK_PATH: z.string().default("/oauth/callback"),
+    /** Where the browser lands after an OAuth attempt (success or failure). */
+    OAUTH_CALLBACK_PATH: z.string().default("/oauth/callback"),
 
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_CALLBACK_URL: z
-    .string()
-    .url("GOOGLE_CALLBACK_URL must be a valid URL")
-    .optional(),
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+    GOOGLE_CALLBACK_URL: z
+      .string()
+      .url("GOOGLE_CALLBACK_URL must be a valid URL")
+      .optional(),
 
-  GITHUB_CLIENT_ID: z.string().optional(),
-  GITHUB_CLIENT_SECRET: z.string().optional(),
-  GITHUB_CALLBACK_URL: z
-    .string()
-    .url("GITHUB_CALLBACK_URL must be a valid URL")
-    .optional(),
+    GITHUB_CLIENT_ID: z.string().optional(),
+    GITHUB_CLIENT_SECRET: z.string().optional(),
+    GITHUB_CALLBACK_URL: z
+      .string()
+      .url("GITHUB_CALLBACK_URL must be a valid URL")
+      .optional(),
 
-  // ── Profile / avatar uploads ──
-  // Local-disk storage — no cloud object storage (S3/Cloudinary/etc.) is
-  // configured anywhere else in this stack, so profile avatars are served
-  // straight off disk via express.static (see app.js) rather than pulling
-  // in a cloud SDK for a single upload path. Swapping to cloud storage
-  // later only requires changing middlewares/uploadAvatar.js and
-  // services/profile.service.js — nothing else depends on the storage
-  // mechanism.
+    // ── Profile / avatar uploads ──
+    // Local-disk storage — no cloud object storage (S3/Cloudinary/etc.) is
+    // configured anywhere else in this stack, so profile avatars are served
+    // straight off disk via express.static (see app.js) rather than pulling
+    // in a cloud SDK for a single upload path. Swapping to cloud storage
+    // later only requires changing middlewares/uploadAvatar.js and
+    // services/profile.service.js — nothing else depends on the storage
+    // mechanism.
 
-  /** Directory (relative to the backend project root) avatar files are written to. */
-  AVATAR_UPLOAD_DIR: z.string().default("uploads/avatars"),
+    /** Directory (relative to the backend project root) avatar files are written to. */
+    AVATAR_UPLOAD_DIR: z.string().default("uploads/avatars"),
 
-  /** Maximum accepted avatar upload size, in bytes. Defaults to 2 MB. */
-  AVATAR_MAX_FILE_SIZE_BYTES: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(2 * 1024 * 1024),
-});
+    /** Maximum accepted avatar upload size, in bytes. Defaults to 2 MB. */
+    AVATAR_MAX_FILE_SIZE_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(2 * 1024 * 1024),
+  })
+  .refine(
+    (config) =>
+      config.MONITOR_JOB_LEASE_MS > config.POLL_TOTAL_TIMEOUT_MS + 5_000,
+    {
+      message:
+        "MONITOR_JOB_LEASE_MS must exceed POLL_TOTAL_TIMEOUT_MS by at least 5 seconds",
+      path: ["MONITOR_JOB_LEASE_MS"],
+    },
+  );
 
 const parsed = envSchema.safeParse(process.env);
 
