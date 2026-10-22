@@ -1,7 +1,12 @@
 import { renderBaseEmail, renderButton, escapeHtml } from "../baseTemplate.js";
 import { getPlanDefinition } from "../../../config/plans.js";
 
-export function buildPlanUpgradeRejectedEmail({ name, plan, reason, billingUrl }) {
+export function buildPlanUpgradeRejectedEmail({
+  name,
+  plan,
+  reason,
+  billingUrl,
+}) {
   const safeName = escapeHtml(name || "there");
   const definition = getPlanDefinition(plan);
   const planName = escapeHtml(definition?.name || plan);

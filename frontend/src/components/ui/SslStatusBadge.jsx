@@ -49,7 +49,8 @@ export default function SslStatusBadge({
   showLabel = true,
   className,
 }) {
-  const config = SSL_STATUS_CONFIG[status] || SSL_STATUS_CONFIG[SSL_STATUS.PENDING];
+  const config =
+    SSL_STATUS_CONFIG[status] || SSL_STATUS_CONFIG[SSL_STATUS.PENDING];
   const tone = TONE_CLASSES[config.tone] || TONE_CLASSES.neutral;
   const Icon = TONE_ICONS[config.tone] || HelpCircle;
 
@@ -74,11 +75,16 @@ export default function SslStatusBadge({
 
 /** Inline dot only — for use in tables/lists, mirrors StatusBadge's StatusDot. */
 export function SslStatusDot({ status, className }) {
-  const config = SSL_STATUS_CONFIG[status] || SSL_STATUS_CONFIG[SSL_STATUS.PENDING];
+  const config =
+    SSL_STATUS_CONFIG[status] || SSL_STATUS_CONFIG[SSL_STATUS.PENDING];
   const tone = TONE_CLASSES[config.tone] || TONE_CLASSES.neutral;
   return (
     <span
-      className={cn("inline-block h-2 w-2 shrink-0 rounded-full", tone.dot, className)}
+      className={cn(
+        "inline-block h-2 w-2 shrink-0 rounded-full",
+        tone.dot,
+        className,
+      )}
     />
   );
 }

@@ -98,7 +98,11 @@ const ADMIN_INCIDENTS_NAV_ITEM = {
   path: "/admin/incidents",
   icon: AlertTriangle,
 };
-const ADMIN_AUDIT_NAV_ITEM = { label: "Audit & Security", path: "/admin/audit-logs", icon: History };
+const ADMIN_AUDIT_NAV_ITEM = {
+  label: "Audit & Security",
+  path: "/admin/audit-logs",
+  icon: History,
+};
 
 const ADMIN_PLAN_REQUESTS_NAV_ITEM = {
   label: "Plan Requests",

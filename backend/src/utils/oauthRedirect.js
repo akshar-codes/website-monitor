@@ -6,7 +6,12 @@ import env from "../config/env.js";
  * these query params to decide what to render — see
  * frontend/src/pages/OAuthCallback.jsx.
  */
-export const buildOAuthRedirectUrl = ({ status, code, message, email } = {}) => {
+export const buildOAuthRedirectUrl = ({
+  status,
+  code,
+  message,
+  email,
+} = {}) => {
   const url = new URL(env.OAUTH_CALLBACK_PATH, env.CLIENT_URL);
 
   if (status) url.searchParams.set("status", status);

@@ -1,5 +1,8 @@
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { PROVIDER_DEFINITIONS, isProviderConfigured } from "./providers.config.js";
+import {
+  PROVIDER_DEFINITIONS,
+  isProviderConfigured,
+} from "./providers.config.js";
 import { OAUTH_PROVIDERS } from "../constants.js";
 import { findOrCreateOAuthUser } from "../../services/oauth.service.js";
 import logger from "../../utils/logger.js";

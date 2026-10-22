@@ -84,7 +84,11 @@ const processMonitor = async (
           checkedAt,
         },
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
+      {
+        upsert: true,
+        returnDocument: "after",
+        setDefaultsOnInsert: true,
+      },
     );
     await handleIncident(monitor, healthCheck);
     await updateDailyStat(monitor, healthCheck);
@@ -165,7 +169,7 @@ export const claimNextDueMonitor = async (deps = {}) => {
       },
       {
         sort: { nextCheckAt: 1, _id: 1 },
-        new: true,
+        returnDocument: "after",
         select: "+checkLeaseToken",
       },
     )

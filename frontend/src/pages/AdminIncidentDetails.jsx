@@ -147,12 +147,12 @@ export default function AdminIncidentDetails() {
       )}
       {confirm && (
         <div
-          className="fixed inset-0 z-[60] grid place-items-center bg-black/70"
+          className="fixed inset-0 z-60 grid place-items-center bg-black/70"
           onClick={(e) => {
             if (e.target === e.currentTarget) setConfirm(false);
           }}
         >
-          <div className="w-[min(92vw,480px)] rounded-xl border border-zinc-700 bg-[#111113] p-5">
+          <div className="w-[min(92vw,480px)] rounded-xl border border-zinc-700 bg-bg-surface p-5">
             <h2 className="font-semibold text-white">Resolution details</h2>
             <label className="mt-4 block text-sm text-zinc-300">
               Resolution notes

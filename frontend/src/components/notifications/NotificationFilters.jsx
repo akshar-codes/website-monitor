@@ -1,5 +1,8 @@
 import { cn } from "../../utils/cn";
-import { CATEGORY_FILTERS, STATUS_FILTERS } from "../../constants/notifications";
+import {
+  CATEGORY_FILTERS,
+  STATUS_FILTERS,
+} from "../../constants/notifications";
 
 export default function NotificationFilters({
   category,
@@ -12,7 +15,8 @@ export default function NotificationFilters({
     <div className="mb-5 flex flex-wrap items-center gap-3">
       <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border-default bg-bg-elevated p-1">
         {CATEGORY_FILTERS.map((f) => {
-          const count = f.value === "all" ? undefined : unreadByCategory[f.value];
+          const count =
+            f.value === "all" ? undefined : unreadByCategory[f.value];
           return (
             <button
               key={f.value}

@@ -140,14 +140,12 @@ export default function Insights() {
   const [statsWindow, setStatsWindow] = useState("30d");
   const [chartWindow, setChartWindow] = useState("7d");
 
-
   const {
     data: statsData,
     loading: statsLoading,
     refetch: refetchStats,
   } = useDowntimeStats({ window: statsWindow });
   const stats = statsData?.data;
-
 
   const { data: allIncidentsData, loading: allIncidentsLoading } =
     useIncidentList({
@@ -294,7 +292,9 @@ export default function Insights() {
                   return (
                     <div key={label}>
                       <div className="mb-1.5 flex items-center justify-between">
-                        <span className="text-xs text-text-secondary">{label}</span>
+                        <span className="text-xs text-text-secondary">
+                          {label}
+                        </span>
                         <span className="text-xs font-semibold text-white">
                           {value}
                         </span>

@@ -38,7 +38,12 @@ const activitySchema = new mongoose.Schema(
       maxlength: [500, "Description cannot exceed 500 characters"],
     },
 
-    outcome: { type: String, enum: ["success", "failure"], default: "success", index: true },
+    outcome: {
+      type: String,
+      enum: ["success", "failure"],
+      default: "success",
+      index: true,
+    },
 
     entityType: {
       type: String,

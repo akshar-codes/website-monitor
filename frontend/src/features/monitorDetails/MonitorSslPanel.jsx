@@ -14,11 +14,10 @@ export default function MonitorSslPanel({ monitorId }) {
   const { data, loading, refetch } = useMonitorSsl(monitorId);
   const payload = data?.data;
 
-  const { triggerCheck, checking, updateSettings, updatingSettings } = useSslMutations(
-    () => {
+  const { triggerCheck, checking, updateSettings, updatingSettings } =
+    useSslMutations(() => {
       refetch();
-    },
-  );
+    });
 
   const isInitialLoad = loading && !data;
 
@@ -84,10 +83,17 @@ export default function MonitorSslPanel({ monitorId }) {
           </div>
         </div>
 
-        <SslWarningAlert status={ssl.status} daysRemaining={ssl.daysRemaining} className="mb-5" />
+        <SslWarningAlert
+          status={ssl.status}
+          daysRemaining={ssl.daysRemaining}
+          className="mb-5"
+        />
 
         <div className="flex flex-wrap items-center justify-center gap-8 py-2 sm:justify-start">
-          <SslExpiryCountdown daysRemaining={ssl.daysRemaining} label="Certificate expiry" />
+          <SslExpiryCountdown
+            daysRemaining={ssl.daysRemaining}
+            label="Certificate expiry"
+          />
           <SslExpiryCountdown
             daysRemaining={ssl.domain?.daysRemaining}
             label="Domain expiry"

@@ -108,7 +108,6 @@ const userPreferenceSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: [true, "User reference is required"],
-      unique: true,
     },
 
     theme: {
@@ -182,7 +181,10 @@ const userPreferenceSchema = new mongoose.Schema(
 // Enforces one preference document per user at the database level and
 // backs the lookup every read/write does.
 userPreferenceSchema.index({ user: 1 }, { unique: true });
-userPreferenceSchema.index({ "notifications.email.enabled": 1, "notifications.frequency": 1 });
+userPreferenceSchema.index({
+  "notifications.email.enabled": 1,
+  "notifications.frequency": 1,
+});
 
 // ── Statics ──
 

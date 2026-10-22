@@ -343,7 +343,12 @@ export const dispatchNotificationDigests = async () => {
       type: { $in: types },
       createdAt: { $lte: new Date(Date.now() - age) },
       ...(prefs.notifications.email.enabledAt
-        ? { createdAt: { $gte: prefs.notifications.email.enabledAt, $lte: new Date(Date.now() - age) } }
+        ? {
+            createdAt: {
+              $gte: prefs.notifications.email.enabledAt,
+              $lte: new Date(Date.now() - age),
+            },
+          }
         : {}),
       "channels.email.sent": false,
     })

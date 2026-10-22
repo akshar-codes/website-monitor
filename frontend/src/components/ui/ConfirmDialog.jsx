@@ -23,7 +23,7 @@ export default function ConfirmDialog({
         <div
           className={cn(
             "pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full opacity-[0.15] blur-3xl",
-            isDanger ? "bg-red-500" : "bg-emerald-500"
+            isDanger ? "bg-red-500" : "bg-emerald-500",
           )}
         />
 
@@ -34,7 +34,7 @@ export default function ConfirmDialog({
                 "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border shadow-sm",
                 isDanger
                   ? "border-red-500/20 bg-red-500/10 text-red-500 shadow-red-500/10"
-                  : "border-emerald-500/20 bg-emerald-500/10 text-emerald-400 shadow-emerald-500/10"
+                  : "border-emerald-500/20 bg-emerald-500/10 text-emerald-400 shadow-emerald-500/10",
               )}
             >
               <Icon size={22} strokeWidth={2.5} />

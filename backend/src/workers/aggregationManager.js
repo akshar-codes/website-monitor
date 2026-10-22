@@ -148,7 +148,7 @@ export const reconcileDailyStat = async (monitor, date, deps = {}) => {
   return dailyStats.findOneAndUpdate(
     { monitor: monitor._id, date: bucketDate },
     { $set: { monitor: monitor._id, date: bucketDate, ...summary } },
-    { upsert: true, new: true, returnDocument: "after" },
+    { upsert: true, returnDocument: "after" },
   );
 };
 
@@ -202,7 +202,7 @@ export const reconcileDailyStatsForRange = async (
       await dailyStats.findOneAndUpdate(
         { monitor: monitor._id, date: day },
         { $set: { monitor: monitor._id, date: day, ...summary } },
-        { upsert: true, new: true, returnDocument: "after" },
+        { upsert: true, returnDocument: "after" },
       ),
     );
   }

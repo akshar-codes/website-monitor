@@ -105,7 +105,7 @@ export default function AdminPlans() {
           User plan assignments
         </h2>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[650px] text-left text-sm">
+          <table className="w-full min-w-162.5 text-left text-sm">
             <thead>
               <tr className="border-b border-zinc-800 text-xs uppercase text-zinc-500">
                 <th className="pb-3">User</th>

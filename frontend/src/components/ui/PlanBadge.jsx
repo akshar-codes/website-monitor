@@ -48,9 +48,7 @@ export default function PlanBadge({
         className,
       )}
     >
-      {showIcon && (
-        <Icon size={size === "lg" ? 13 : 11} className="shrink-0" />
-      )}
+      {showIcon && <Icon size={size === "lg" ? 13 : 11} className="shrink-0" />}
       {config.label}
     </span>
   );

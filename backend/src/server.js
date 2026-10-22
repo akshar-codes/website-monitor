@@ -7,7 +7,7 @@ import { start, stop } from "./workers/scheduler.js";
 import {
   start as startSslScheduler,
   stop as stopSslScheduler,
-} from "./workers/sslScheduler.js";
+} from "./services/sslScheduler.js";
 import { verifyMailTransport } from "./config/mail.js";
 import { dispatchNotificationDigests } from "./services/notification.service.js";
 

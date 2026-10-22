@@ -120,8 +120,8 @@ export default function UsageDashboard({ usage, loading }) {
       {monitors.atLimit && (
         <div className="mt-5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3.5 py-3">
           <p className="text-xs text-amber-200">
-            You&apos;ve used all {monitors.limit} monitors on your plan.
-            Upgrade to add more.
+            You&apos;ve used all {monitors.limit} monitors on your plan. Upgrade
+            to add more.
           </p>
         </div>
       )}

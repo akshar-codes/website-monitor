@@ -45,7 +45,10 @@ export function useSslMutations(onSuccess) {
     async (monitorId, enabled) => {
       setUpdatingSettings(true);
       try {
-        const { data, message } = await sslApi.updateSslSettings(monitorId, enabled);
+        const { data, message } = await sslApi.updateSslSettings(
+          monitorId,
+          enabled,
+        );
         toast.success(message || "SSL monitoring settings updated");
         onSuccess?.(data);
         return data;

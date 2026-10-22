@@ -14,10 +14,10 @@ import EmptyState from "../components/ui/EmptyState";
 import { useAdminDashboard } from "../hooks/useAdmin";
 
 const colors = ["#34d399", "#10b981", "#059669", "#52525b"];
-const card = "rounded-xl border border-[#27272a] bg-[#111113] p-5";
+const card = "rounded-xl border border-[#27272a] bg-bg-surface p-5";
 const title = "text-xs font-medium uppercase tracking-wider text-zinc-500";
 const dateInput =
-  "rounded-lg border border-[#303034] bg-[#111113] px-3 py-2 text-sm text-zinc-200 outline-none focus:border-emerald-500";
+  "rounded-lg border border-[#303034] bg-bg-surface px-3 py-2 text-sm text-zinc-200 outline-none focus:border-emerald-500";
 
 function StatCard({ label, value, icon: Icon, detail }) {
   return (

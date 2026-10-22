@@ -30,7 +30,9 @@ export default function OAuthCallback() {
   const message = searchParams.get("message");
   const email = searchParams.get("email") || "";
 
-  const [phase, setPhase] = useState(status === "success" ? "pending" : "failed");
+  const [phase, setPhase] = useState(
+    status === "success" ? "pending" : "failed",
+  );
 
   // Guards against React StrictMode's double-invoked effects re-triggering
   // the redirect logic.
@@ -49,7 +51,10 @@ export default function OAuthCallback() {
 
   if (phase === "pending") {
     return (
-      <AuthLayout animKey="oauth-pending" marketingPanel={<LoginMarketingPanel />}>
+      <AuthLayout
+        animKey="oauth-pending"
+        marketingPanel={<LoginMarketingPanel />}
+      >
         <VerificationStatusCard status="pending" message="Finishing sign-in…" />
       </AuthLayout>
     );

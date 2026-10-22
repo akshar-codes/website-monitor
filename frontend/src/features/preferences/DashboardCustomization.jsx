@@ -23,8 +23,13 @@ export default function DashboardCustomization({
   onSave,
   saving = false,
 }) {
-  const { defaultWindow, autoRefreshInterval, compactMode, widgets, widgetOrder } =
-    dashboard;
+  const {
+    defaultWindow,
+    autoRefreshInterval,
+    compactMode,
+    widgets,
+    widgetOrder,
+  } = dashboard;
 
   const setField = (field, value) => onChange({ ...dashboard, [field]: value });
 
@@ -64,7 +69,9 @@ export default function DashboardCustomization({
         <FormField label="Auto-refresh interval">
           <Select
             value={autoRefreshInterval}
-            onChange={(e) => setField("autoRefreshInterval", Number(e.target.value))}
+            onChange={(e) =>
+              setField("autoRefreshInterval", Number(e.target.value))
+            }
           >
             {DASHBOARD_REFRESH_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>

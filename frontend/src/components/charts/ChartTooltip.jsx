@@ -1,4 +1,3 @@
-
 export default function ChartTooltip({
   active,
   payload,
@@ -24,7 +23,9 @@ export default function ChartTooltip({
               className="inline-block h-2 w-2 rounded-full shrink-0"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-[11px] text-text-secondary">{entry.name}</span>
+            <span className="text-[11px] text-text-secondary">
+              {entry.name}
+            </span>
             <span className="ml-auto pl-4 text-[11px] font-semibold text-white">
               {formatter ? formatter(entry.value, entry.name) : entry.value}
             </span>

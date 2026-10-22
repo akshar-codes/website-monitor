@@ -113,5 +113,9 @@ const createOAuthCallbackHandler = (providerName) =>
     })(req, res, next);
   });
 
-export const googleCallback = createOAuthCallbackHandler(OAUTH_PROVIDERS.GOOGLE);
-export const githubCallback = createOAuthCallbackHandler(OAUTH_PROVIDERS.GITHUB);
+export const googleCallback = createOAuthCallbackHandler(
+  OAUTH_PROVIDERS.GOOGLE,
+);
+export const githubCallback = createOAuthCallbackHandler(
+  OAUTH_PROVIDERS.GITHUB,
+);

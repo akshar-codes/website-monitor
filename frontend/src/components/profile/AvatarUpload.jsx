@@ -147,7 +147,9 @@ export default function AvatarUpload({
           )}
         </div>
 
-        <p className={cn("text-[11px] text-text-muted", error && "text-red-400")}>
+        <p
+          className={cn("text-[11px] text-text-muted", error && "text-red-400")}
+        >
           {error || "JPEG, PNG, or WebP. Max 2MB."}
         </p>
       </div>

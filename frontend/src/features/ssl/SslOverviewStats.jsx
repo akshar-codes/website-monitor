@@ -36,7 +36,9 @@ export default function SslOverviewStats({ overview, loading }) {
       iconColor: "text-amber-400",
       iconBg: "bg-amber-500/10",
       accent:
-        (statusCounts[SSL_STATUS.EXPIRING_SOON] ?? 0) > 0 ? "text-amber-400" : "text-white",
+        (statusCounts[SSL_STATUS.EXPIRING_SOON] ?? 0) > 0
+          ? "text-amber-400"
+          : "text-white",
     },
     {
       label: "Expired / Invalid",

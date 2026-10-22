@@ -30,7 +30,8 @@ export default function NotificationItem({
   submitting = false,
   compact = false,
 }) {
-  const config = CATEGORY_CONFIG[notification.category] || CATEGORY_CONFIG.system;
+  const config =
+    CATEGORY_CONFIG[notification.category] || CATEGORY_CONFIG.system;
   const Icon = config.icon;
 
   const content = (

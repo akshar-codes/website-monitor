@@ -1,5 +1,8 @@
 import { FormField, Select } from "../../components/ui/Input";
-import { DATE_FORMAT_OPTIONS, TIME_FORMAT_OPTIONS } from "../../constants/preferences";
+import {
+  DATE_FORMAT_OPTIONS,
+  TIME_FORMAT_OPTIONS,
+} from "../../constants/preferences";
 
 export default function DateTimeFormatSelector({
   dateFormat,

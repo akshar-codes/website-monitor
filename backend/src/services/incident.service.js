@@ -208,15 +208,20 @@ export const updateIncidentStatus = async (
   if (resolutionNotes != null) set.resolutionNotes = resolutionNotes;
   if (status === INCIDENT_STATUS.RESOLVED) {
     set.endedAt = changedAt;
-    set.duration = Math.max(0, Math.round((changedAt - incident.startedAt) / 1000));
+    set.duration = Math.max(
+      0,
+      Math.round((changedAt - incident.startedAt) / 1000),
+    );
   }
   const updatedIncident = await Incident.findOneAndUpdate(
     { _id: id, status: previousStatus },
     { $set: set, $push: { statusHistory: { status, changedAt } } },
-    { new: true },
+    { returnDocument: "after" },
   );
   if (!updatedIncident) {
-    throw ApiError.conflict("This incident changed while you were updating it. Refresh and try again.");
+    throw ApiError.conflict(
+      "This incident changed while you were updating it. Refresh and try again.",
+    );
   }
   await logStatusChange();
 

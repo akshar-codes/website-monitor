@@ -75,9 +75,8 @@ export const findOrCreateOAuthUser = async ({
   }
 
   // ── 2/3. Existing account with the same email ──
-  const existingByEmail = await User.findByEmail(normalizedEmail).select(
-    "+oauthAccounts",
-  );
+  const existingByEmail =
+    await User.findByEmail(normalizedEmail).select("+oauthAccounts");
 
   if (existingByEmail) {
     if (!emailVerifiedByProvider) {

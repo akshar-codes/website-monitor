@@ -28,8 +28,11 @@ export async function triggerSslCheck(monitorId) {
  * PATCH /api/ssl/monitors/:id/settings
  */
 export async function updateSslSettings(monitorId, sslMonitoringEnabled) {
-  const { data } = await apiClient.patch(`/ssl/monitors/${monitorId}/settings`, {
-    sslMonitoringEnabled,
-  });
+  const { data } = await apiClient.patch(
+    `/ssl/monitors/${monitorId}/settings`,
+    {
+      sslMonitoringEnabled,
+    },
+  );
   return data;
 }

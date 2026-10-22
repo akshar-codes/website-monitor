@@ -25,7 +25,12 @@ export default function SslMonitoring() {
         title="SSL & Domain Monitoring"
         subtitle="Certificate validity, expiry tracking, and domain registration status across your monitors"
         actions={
-          <Button variant="secondary" size="sm" icon={RefreshCw} onClick={refetch}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
+            onClick={refetch}
+          >
             Refresh
           </Button>
         }
@@ -52,7 +57,8 @@ export default function SslMonitoring() {
           </div>
 
           {!isInitialLoad &&
-            (expiringSoonCertificates.length > 0 || expiringSoonDomains.length > 0) && (
+            (expiringSoonCertificates.length > 0 ||
+              expiringSoonDomains.length > 0) && (
               <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {expiringSoonCertificates.length > 0 && (
                   <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
@@ -111,7 +117,9 @@ export default function SslMonitoring() {
             )}
 
           <div>
-            <SectionLabel className="mb-3">All Monitored Endpoints</SectionLabel>
+            <SectionLabel className="mb-3">
+              All Monitored Endpoints
+            </SectionLabel>
             {isInitialLoad ? (
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -119,7 +127,10 @@ export default function SslMonitoring() {
                 ))}
               </div>
             ) : (
-              <SslMonitorsTable items={overview?.monitors || []} loading={false} />
+              <SslMonitorsTable
+                items={overview?.monitors || []}
+                loading={false}
+              />
             )}
           </div>
         </>

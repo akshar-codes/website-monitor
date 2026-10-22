@@ -4,7 +4,11 @@ import { Select } from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import { COMMON_TIMEZONES } from "../../constants/preferences";
 
-export default function TimezoneSelector({ value, onChange, disabled = false }) {
+export default function TimezoneSelector({
+  value,
+  onChange,
+  disabled = false,
+}) {
   const browserTimezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
     [],

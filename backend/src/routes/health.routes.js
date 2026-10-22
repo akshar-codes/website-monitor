@@ -28,7 +28,7 @@ router.get(
       environment: process.env.NODE_ENV,
       mongo: stateMap[mongoState] || "unknown",
     });
-  })
+  }),
 );
 
 export default router;

@@ -3,10 +3,20 @@ import Incident from "../models/Incident.js";
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
 import { logActivity } from "../utils/activityLogger.js";
-import { ACTIVITY_ACTIONS, ACTIVITY_CATEGORIES } from "../config/activityConstants.js";
-import { HEALTH_STATUS, INCIDENT_STATUS, INCIDENT_SEVERITY } from "../config/constants.js";
+import {
+  ACTIVITY_ACTIONS,
+  ACTIVITY_CATEGORIES,
+} from "../config/activityConstants.js";
+import {
+  HEALTH_STATUS,
+  INCIDENT_STATUS,
+  INCIDENT_SEVERITY,
+} from "../config/constants.js";
 import { createNotification } from "../services/notification.service.js";
-import { NOTIFICATION_TYPES, NOTIFICATION_PRIORITIES } from "../config/notificationConstants.js";
+import {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_PRIORITIES,
+} from "../config/notificationConstants.js";
 
 const ACTIVE_STATUSES = [
   INCIDENT_STATUS.ONGOING,
@@ -20,7 +30,14 @@ const deriveSeverity = (status) => {
   return INCIDENT_SEVERITY.MAJOR;
 };
 
-const writeActivity = (monitor, incident, action, description, metadata, deps) =>
+const writeActivity = (
+  monitor,
+  incident,
+  action,
+  description,
+  metadata,
+  deps,
+) =>
   deps.logActivity({
     userId: monitor.owner,
     category: ACTIVITY_CATEGORIES.INCIDENT,
@@ -79,20 +96,31 @@ const openIncident = async (monitor, healthCheck, failureCount, deps) => {
     activeIncident,
     ACTIVITY_ACTIONS.INCIDENT_AUTO_OPENED,
     `Incident opened for monitor "${monitor.name}" after ${failureCount} consecutive failures`,
-    { monitorId: String(monitor._id), triggerCheckId: String(healthCheck._id), failureReason: healthCheck.failureReason || null },
+    {
+      monitorId: String(monitor._id),
+      triggerCheckId: String(healthCheck._id),
+      failureReason: healthCheck.failureReason || null,
+    },
     deps,
   );
-  await notify({
-    ownerId: monitor.owner,
-    type: NOTIFICATION_TYPES.INCIDENT_OPENED,
-    title: `${monitor.name} is down`,
-    message: `WebMonitor detected ${failureCount} consecutive failures for "${monitor.name}" — severity: ${activeIncident.severity}.`,
-    priority: activeIncident.severity === INCIDENT_SEVERITY.CRITICAL
-      ? NOTIFICATION_PRIORITIES.CRITICAL
-      : NOTIFICATION_PRIORITIES.HIGH,
-    link: "/insights",
-    relatedResource: { resourceType: "Incident", resourceId: activeIncident._id },
-  }, deps);
+  await notify(
+    {
+      ownerId: monitor.owner,
+      type: NOTIFICATION_TYPES.INCIDENT_OPENED,
+      title: `${monitor.name} is down`,
+      message: `WebMonitor detected ${failureCount} consecutive failures for "${monitor.name}" — severity: ${activeIncident.severity}.`,
+      priority:
+        activeIncident.severity === INCIDENT_SEVERITY.CRITICAL
+          ? NOTIFICATION_PRIORITIES.CRITICAL
+          : NOTIFICATION_PRIORITIES.HIGH,
+      link: "/insights",
+      relatedResource: {
+        resourceType: "Incident",
+        resourceId: activeIncident._id,
+      },
+    },
+    deps,
+  );
   return activeIncident;
 };
 
@@ -104,7 +132,10 @@ const resolveIncident = async (monitor, healthCheck, deps) => {
   if (!activeIncident) return null;
 
   const endedAt = healthCheck.checkedAt || new Date();
-  const duration = Math.max(0, Math.round((endedAt - activeIncident.startedAt) / 1000));
+  const duration = Math.max(
+    0,
+    Math.round((endedAt - activeIncident.startedAt) / 1000),
+  );
   const resolved = await deps.Incident.findOneAndUpdate(
     { _id: activeIncident._id, status: { $in: ACTIVE_STATUSES } },
     {
@@ -115,9 +146,11 @@ const resolveIncident = async (monitor, healthCheck, deps) => {
         recoveryCheck: healthCheck._id,
         resolutionNotes: `Auto-resolved after ${env.CONSECUTIVE_SUCCESS_THRESHOLD} consecutive healthy checks.`,
       },
-      $push: { statusHistory: { status: INCIDENT_STATUS.RESOLVED, changedAt: endedAt } },
+      $push: {
+        statusHistory: { status: INCIDENT_STATUS.RESOLVED, changedAt: endedAt },
+      },
     },
-    { new: true },
+    { returnDocument: "after" },
   );
   // The active-status predicate makes this transition single-winner. A retry
   // or competing worker cannot emit duplicate events after it has resolved.
@@ -134,18 +167,25 @@ const resolveIncident = async (monitor, healthCheck, deps) => {
     resolved,
     ACTIVITY_ACTIONS.INCIDENT_AUTO_RESOLVED,
     `Incident for monitor "${monitor.name}" auto-resolved after consecutive healthy checks`,
-    { monitorId: String(monitor._id), recoveryCheckId: String(healthCheck._id), durationSeconds: resolved.duration },
+    {
+      monitorId: String(monitor._id),
+      recoveryCheckId: String(healthCheck._id),
+      durationSeconds: resolved.duration,
+    },
     deps,
   );
-  await notify({
-    ownerId: monitor.owner,
-    type: NOTIFICATION_TYPES.INCIDENT_RESOLVED,
-    title: `${monitor.name} is back up`,
-    message: `The incident affecting "${monitor.name}" has been resolved after ${resolved.durationDisplay || `${resolved.duration}s`}.`,
-    priority: NOTIFICATION_PRIORITIES.NORMAL,
-    link: "/insights",
-    relatedResource: { resourceType: "Incident", resourceId: resolved._id },
-  }, deps);
+  await notify(
+    {
+      ownerId: monitor.owner,
+      type: NOTIFICATION_TYPES.INCIDENT_RESOLVED,
+      title: `${monitor.name} is back up`,
+      message: `The incident affecting "${monitor.name}" has been resolved after ${resolved.durationDisplay || `${resolved.duration}s`}.`,
+      priority: NOTIFICATION_PRIORITIES.NORMAL,
+      link: "/insights",
+      relatedResource: { resourceType: "Incident", resourceId: resolved._id },
+    },
+    deps,
+  );
   return resolved;
 };
 
@@ -167,25 +207,38 @@ export const handleIncident = async (monitor, healthCheck, overrides = {}) => {
     isHealthy
       ? {
           $inc: { consecutiveSuccesses: 1 },
-          $set: { consecutiveFailures: 0, lastIncidentCheckId: healthCheck._id },
+          $set: {
+            consecutiveFailures: 0,
+            lastIncidentCheckId: healthCheck._id,
+          },
         }
       : {
           $inc: { consecutiveFailures: 1 },
-          $set: { consecutiveSuccesses: 0, lastIncidentCheckId: healthCheck._id },
+          $set: {
+            consecutiveSuccesses: 0,
+            lastIncidentCheckId: healthCheck._id,
+          },
         },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   // If this persisted check was already counted, continue reconciling its
   // threshold transition. This closes the crash window between counter write
   // and incident write without counting the same check twice.
   if (!updatedMonitor) {
-    updatedMonitor = await deps.Monitor.findById(monitor._id).select("+lastIncidentCheckId");
-    if (!updatedMonitor || String(updatedMonitor.lastIncidentCheckId) !== String(healthCheck._id)) return null;
+    updatedMonitor = await deps.Monitor.findById(monitor._id).select(
+      "+lastIncidentCheckId",
+    );
+    if (
+      !updatedMonitor ||
+      String(updatedMonitor.lastIncidentCheckId) !== String(healthCheck._id)
+    )
+      return null;
   }
 
   if (isHealthy) {
-    if (updatedMonitor.consecutiveSuccesses < env.CONSECUTIVE_SUCCESS_THRESHOLD) return null;
+    if (updatedMonitor.consecutiveSuccesses < env.CONSECUTIVE_SUCCESS_THRESHOLD)
+      return null;
     return resolveIncident(monitor, healthCheck, deps);
   }
 
@@ -197,5 +250,10 @@ export const handleIncident = async (monitor, healthCheck, overrides = {}) => {
     });
     return null;
   }
-  return openIncident(monitor, healthCheck, updatedMonitor.consecutiveFailures, deps);
+  return openIncident(
+    monitor,
+    healthCheck,
+    updatedMonitor.consecutiveFailures,
+    deps,
+  );
 };

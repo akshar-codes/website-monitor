@@ -273,7 +273,11 @@ export default function App() {
                       />
                       <Route
                         path="/admin/audit-logs"
-                        element={<Suspense fallback={<PageFallback />}><AdminAuditLogs /></Suspense>}
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <AdminAuditLogs />
+                          </Suspense>
+                        }
                       />
                       <Route
                         path="/admin/incidents/:id"

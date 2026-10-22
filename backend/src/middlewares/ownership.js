@@ -7,20 +7,6 @@ import { ROLES } from "../config/constants.js";
  * requesting user's ID, unless the user's role is listed in `bypassRoles`
  * (admins, by default). The loaded document is attached to
  * `req[attachAs]` so the downstream handler doesn't have to re-fetch it.
- *
- * Not currently wired to any route: every user-scoped resource in this
- * codebase (Monitor, Incident, HealthCheck, DailyStat) is already scoped
- * to `owner` directly inside its service layer (see
- * services/monitor.service.js#getOwnedMonitorIds and its callers), so
- * there is no route today that needs a *generic* ownership check on top
- * of that. This factory is kept ready for the next user-owned resource
- * that doesn't want to duplicate that per-service scoping pattern:
- *
- *   router.get(
- *     "/:id",
- *     requireOwnership(SomeUserOwnedModel, { ownerField: "owner" }),
- *     getSomeUserOwnedResource,
- *   );
  */
 export const requireOwnership =
   (

@@ -23,8 +23,13 @@ export default function Profile() {
     refetchUser();
   }, [refetch, refetchUser]);
 
-  const { updateProfile, uploadAvatar, deleteAvatar, submitting, avatarSubmitting } =
-    useProfileMutations(handleMutationSuccess);
+  const {
+    updateProfile,
+    uploadAvatar,
+    deleteAvatar,
+    submitting,
+    avatarSubmitting,
+  } = useProfileMutations(handleMutationSuccess);
 
   return (
     <PageContainer>

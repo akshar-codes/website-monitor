@@ -1,6 +1,9 @@
 import Activity from "../models/Activity.js";
 import logger from "./logger.js";
-import { redactActivityText, sanitizeActivityMetadata } from "./activityRedaction.js";
+import {
+  redactActivityText,
+  sanitizeActivityMetadata,
+} from "./activityRedaction.js";
 
 /**
  * Reusable activity-logging entry point — the ONLY place Activity

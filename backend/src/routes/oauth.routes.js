@@ -13,7 +13,10 @@
 
 import { Router } from "express";
 import passport from "../config/passport.js";
-import { googleCallback, githubCallback } from "../controllers/oauth.controller.js";
+import {
+  googleCallback,
+  githubCallback,
+} from "../controllers/oauth.controller.js";
 import { authLimiter } from "../middlewares/rateLimiter.js";
 import { isGuest } from "../middlewares/authenticate.js";
 import {

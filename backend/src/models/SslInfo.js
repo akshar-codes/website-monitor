@@ -78,7 +78,6 @@ const sslInfoSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Monitor",
       required: [true, "Monitor reference is required"],
-      unique: true,
     },
 
     hostname: {

@@ -35,7 +35,11 @@ function DayLabel({ date }) {
   yesterday.setDate(yesterday.getDate() - 1);
   const isYesterday = isSameDay(date, yesterday);
 
-  const label = isToday ? "Today" : isYesterday ? "Yesterday" : formatDate(date);
+  const label = isToday
+    ? "Today"
+    : isYesterday
+      ? "Yesterday"
+      : formatDate(date);
 
   return (
     <p className="sticky top-0 z-[1] bg-bg-surface/95 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-widest text-text-muted backdrop-blur">
@@ -99,7 +103,10 @@ export default function ActivityTimeline({
               <DayLabel date={group.date} />
               <div>
                 {group.items.map((activity) => (
-                  <ActivityRow key={activity.id || activity._id} activity={activity} />
+                  <ActivityRow
+                    key={activity.id || activity._id}
+                    activity={activity}
+                  />
                 ))}
               </div>
             </div>

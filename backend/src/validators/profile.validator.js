@@ -6,10 +6,7 @@ const nameField = z
   .min(2, "Name must be at least 2 characters")
   .max(120, "Name cannot exceed 120 characters");
 
-const bioField = z
-  .string()
-  .trim()
-  .max(500, "Bio cannot exceed 500 characters");
+const bioField = z.string().trim().max(500, "Bio cannot exceed 500 characters");
 
 const locationField = z
   .string()

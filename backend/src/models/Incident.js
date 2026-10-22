@@ -26,7 +26,6 @@ const incidentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Monitor",
       required: [true, "Monitor reference is required"],
-      index: true,
     },
 
     // ── The health check that triggered this incident ──

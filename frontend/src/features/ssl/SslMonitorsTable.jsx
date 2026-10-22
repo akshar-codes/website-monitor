@@ -82,9 +82,14 @@ export default function SslMonitorsTable({ items = [], loading = false }) {
                   className="flex items-center gap-1.5 truncate text-sm font-medium text-white transition-colors hover:text-emerald-400"
                 >
                   {monitor.name || getDomain(monitor.url)}
-                  <ExternalLink size={11} className="shrink-0 text-text-disabled" />
+                  <ExternalLink
+                    size={11}
+                    className="shrink-0 text-text-disabled"
+                  />
                 </Link>
-                <p className="truncate text-xs text-text-muted">{getDomain(monitor.url)}</p>
+                <p className="truncate text-xs text-text-muted">
+                  {getDomain(monitor.url)}
+                </p>
               </div>
 
               <div>
@@ -116,7 +121,9 @@ export default function SslMonitorsTable({ items = [], loading = false }) {
 
               <div>
                 <p className="text-xs text-text-muted">
-                  {item.lastCheckedAt ? formatRelative(item.lastCheckedAt) : "Never"}
+                  {item.lastCheckedAt
+                    ? formatRelative(item.lastCheckedAt)
+                    : "Never"}
                 </p>
               </div>
             </div>

@@ -43,7 +43,8 @@ export default function DomainInfoCard({ domain, loading }) {
   }
 
   const statusConfig =
-    DOMAIN_STATUS_CONFIG[domain.status] || DOMAIN_STATUS_CONFIG[DOMAIN_STATUS.UNKNOWN];
+    DOMAIN_STATUS_CONFIG[domain.status] ||
+    DOMAIN_STATUS_CONFIG[DOMAIN_STATUS.UNKNOWN];
 
   return (
     <div className="rounded-xl border border-border-subtle bg-bg-surface p-6">
@@ -66,7 +67,9 @@ export default function DomainInfoCard({ domain, loading }) {
           </div>
           <div>
             <p className="text-[11px] text-text-muted">Domain</p>
-            <p className="mt-0.5 text-sm font-medium text-white">{domain.name}</p>
+            <p className="mt-0.5 text-sm font-medium text-white">
+              {domain.name}
+            </p>
           </div>
         </div>
 
@@ -77,7 +80,9 @@ export default function DomainInfoCard({ domain, loading }) {
             </div>
             <div>
               <p className="text-[11px] text-text-muted">Registrar</p>
-              <p className="mt-0.5 text-sm font-medium text-white">{domain.registrar}</p>
+              <p className="mt-0.5 text-sm font-medium text-white">
+                {domain.registrar}
+              </p>
             </div>
           </div>
         )}

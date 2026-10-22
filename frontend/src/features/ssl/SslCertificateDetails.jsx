@@ -1,4 +1,11 @@
-import { ShieldCheck, Fingerprint, Calendar, Layers, KeyRound, Globe } from "lucide-react";
+import {
+  ShieldCheck,
+  Fingerprint,
+  Calendar,
+  Layers,
+  KeyRound,
+  Globe,
+} from "lucide-react";
 import { Skeleton } from "../../components/ui/Skeleton";
 import EmptyState from "../../components/ui/EmptyState";
 import { formatDateTime } from "../../utils/format";
@@ -40,7 +47,9 @@ export default function SslCertificateDetails({ certificate, loading }) {
     return (
       <div className="rounded-xl border border-border-subtle bg-bg-surface">
         <div className="border-b border-border-subtle px-6 py-4">
-          <p className="text-sm font-semibold text-white">Certificate Details</p>
+          <p className="text-sm font-semibold text-white">
+            Certificate Details
+          </p>
         </div>
         <EmptyState
           icon={ShieldCheck}
@@ -65,7 +74,11 @@ export default function SslCertificateDetails({ certificate, loading }) {
 
       <div className="space-y-4">
         <DetailRow icon={Globe} label="Issued to" value={certificate.subject} />
-        <DetailRow icon={ShieldCheck} label="Issued by" value={certificate.issuer} />
+        <DetailRow
+          icon={ShieldCheck}
+          label="Issued by"
+          value={certificate.issuer}
+        />
         <DetailRow
           icon={Calendar}
           label="Valid from"
@@ -76,7 +89,11 @@ export default function SslCertificateDetails({ certificate, loading }) {
           label="Valid to"
           value={formatDateTime(certificate.validTo)}
         />
-        <DetailRow icon={Layers} label="Protocol" value={certificate.protocol} />
+        <DetailRow
+          icon={Layers}
+          label="Protocol"
+          value={certificate.protocol}
+        />
         <DetailRow
           icon={KeyRound}
           label="Signature algorithm"
@@ -92,7 +109,8 @@ export default function SslCertificateDetails({ certificate, loading }) {
         {certificate.subjectAlternativeNames?.length > 0 && (
           <div>
             <p className="mb-2 text-[11px] text-text-muted">
-              Subject alternative names ({certificate.subjectAlternativeNames.length})
+              Subject alternative names (
+              {certificate.subjectAlternativeNames.length})
             </p>
             <div className="flex flex-wrap gap-1.5">
               {certificate.subjectAlternativeNames.map((san) => (

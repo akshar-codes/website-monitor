@@ -24,9 +24,7 @@ export const getUsageForUser = async (user) => {
   const monitorLimit = definition.limits.maxMonitors; // null = unlimited
 
   const unlimited = monitorLimit == null;
-  const remaining = unlimited
-    ? null
-    : Math.max(0, monitorLimit - monitorCount);
+  const remaining = unlimited ? null : Math.max(0, monitorLimit - monitorCount);
   const percentUsed = unlimited
     ? 0
     : monitorLimit === 0

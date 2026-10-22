@@ -1,7 +1,11 @@
 import { Select } from "../../components/ui/Input";
 import { LANGUAGE_OPTIONS } from "../../constants/preferences";
 
-export default function LanguageSelector({ value, onChange, disabled = false }) {
+export default function LanguageSelector({
+  value,
+  onChange,
+  disabled = false,
+}) {
   return (
     <Select
       value={value}

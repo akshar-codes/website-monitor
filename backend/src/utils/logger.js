@@ -25,7 +25,14 @@ if (!env.isTest && !fs.existsSync(LOG_DIR)) {
  */
 const redactMeta = format((info) => {
   const { level, message, timestamp, stack, service, ...meta } = info;
-  const redacted = { level, message, timestamp, stack, service, ...redact(meta) };
+  const redacted = {
+    level,
+    message,
+    timestamp,
+    stack,
+    service,
+    ...redact(meta),
+  };
   for (const sym of Object.getOwnPropertySymbols(info)) {
     redacted[sym] = info[sym];
   }

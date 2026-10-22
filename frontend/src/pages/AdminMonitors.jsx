@@ -119,7 +119,7 @@ export default function AdminMonitors() {
         </div>
       )}
       <div className="overflow-x-auto rounded-xl border border-border-subtle bg-bg-surface">
-        <table className="w-full min-w-[850px] text-left text-sm">
+        <table className="w-full min-w-212.5 text-left text-sm">
           <thead>
             <tr className="border-b border-border-subtle text-[11px] uppercase text-text-disabled">
               <th className="px-4 py-3">Monitor</th>

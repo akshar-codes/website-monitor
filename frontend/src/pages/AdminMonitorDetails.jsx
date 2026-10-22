@@ -148,7 +148,7 @@ export default function AdminMonitorDetails() {
               </h2>
               {data.recentChecks.length ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[600px] text-left text-sm">
+                  <table className="w-full min-w-150 text-left text-sm">
                     <thead>
                       <tr className="text-xs uppercase text-zinc-500">
                         <th className="py-2">Checked</th>

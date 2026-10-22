@@ -72,7 +72,8 @@ export default function RecentActivitySummary({ summary, loading }) {
         ) : (
           <div className="space-y-3">
             {byCategory.map(({ category, count }) => {
-              const pct = totalLast30Days > 0 ? (count / totalLast30Days) * 100 : 0;
+              const pct =
+                totalLast30Days > 0 ? (count / totalLast30Days) * 100 : 0;
               return (
                 <div key={category}>
                   <div className="mb-1.5 flex items-center justify-between">

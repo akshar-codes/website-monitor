@@ -13,10 +13,7 @@ const profileSchema = z.object({
     .min(2, "Name must be at least 2 characters")
     .max(120, "Name cannot exceed 120 characters"),
   bio: z.string().trim().max(500, "Bio cannot exceed 500 characters"),
-  location: z
-    .string()
-    .trim()
-    .max(120, "Location cannot exceed 120 characters"),
+  location: z.string().trim().max(120, "Location cannot exceed 120 characters"),
   website: z
     .string()
     .trim()
