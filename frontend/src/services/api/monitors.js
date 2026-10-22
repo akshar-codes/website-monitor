@@ -16,6 +16,11 @@ export async function getMonitorById(id) {
   return data;
 }
 
+export async function getMonitorDiagnostics(id) {
+  const { data } = await apiClient.get(`/monitors/${id}/diagnostics`);
+  return data;
+}
+
 /**
  * POST /api/monitors
  */

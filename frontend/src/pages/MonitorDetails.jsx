@@ -19,6 +19,7 @@ import MonitorInfoCard from "../features/monitorDetails/MonitorInfoCard";
 import MonitorRecentChecks from "../features/monitorDetails/MonitorRecentChecks";
 import MonitorSslPanel from "../features/monitorDetails/MonitorSslPanel";
 import MonitorAnalytics from "../features/monitorDetails/MonitorAnalytics";
+import MonitorDiagnostics from "../features/monitorDetails/MonitorDiagnostics";
 import { useMonitorDetails, useMonitorMutations } from "../hooks/useMonitors";
 import { useUsage } from "../hooks/useUsage";
 import { ROUTES } from "../constants/routes";
@@ -189,6 +190,11 @@ export default function MonitorDetails() {
       <div className="mb-6">
         <SectionLabel className="mb-3">SSL &amp; Domain</SectionLabel>
         <MonitorSslPanel monitorId={id} />
+      </div>
+
+      <div className="mb-6">
+        <SectionLabel className="mb-3">Diagnostics</SectionLabel>
+        <MonitorDiagnostics monitorId={id} />
       </div>
 
       {/* Analytics & performance insights — custom date-range reporting,
