@@ -67,6 +67,11 @@ const monitorSchema = new mongoose.Schema(
       default: Date.now, // first check fires immediately
     },
 
+    // Mongo-backed lease makes scheduled checks exclusive across API replicas.
+    // Expired leases are reclaimable, so process restarts cannot strand jobs.
+    checkLeaseToken: { type: String, default: null, select: false },
+    checkLeaseUntil: { type: Date, default: null, select: false },
+
     consecutiveFailures: {
       type: Number,
       default: 0,

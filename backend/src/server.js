@@ -19,32 +19,35 @@ let digestTimer = null;
  * Graceful shutdown — stops both the health-check and SSL polling
  * schedulers, closes the HTTP server, then exits.
  */
-const shutdown = (signal, exitCode = 0) => {
+const shutdown = async (signal, exitCode = 0) => {
   if (shuttingDown) return;
   shuttingDown = true;
 
   logger.info(`${signal} received — shutting down gracefully`);
 
+  // Keep the shutdown deadline active while worker tasks drain too.
+  const forceShutdownTimer = setTimeout(() => {
+    logger.error("Could not finish graceful shutdown in time, forcing shutdown");
+    process.exit(1);
+  }, 10_000);
+  forceShutdownTimer.unref?.();
+
   // Stop the schedulers first (no new polls/checks)
-  stop();
+  await stop();
   stopSslScheduler();
   if (digestTimer) clearInterval(digestTimer);
 
   if (!server) {
+    clearTimeout(forceShutdownTimer);
     process.exit(exitCode);
     return;
   }
 
   server.close(() => {
+    clearTimeout(forceShutdownTimer);
     logger.info("HTTP server closed");
     process.exit(exitCode);
   });
-
-  // Force-kill after 10 s if connections linger
-  setTimeout(() => {
-    logger.error("Could not close connections in time, forcing shutdown");
-    process.exit(1);
-  }, 10_000);
 };
 
 // Registered up front so a crash during startup (e.g. inside connectDB)

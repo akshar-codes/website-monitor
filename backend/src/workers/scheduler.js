@@ -1,38 +1,29 @@
+import { randomUUID } from "node:crypto";
 import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
-
 import { poll } from "./poller.js";
 import { classify } from "./classifier.js";
 import { handleIncident } from "./incidentManager.js";
 import { updateDailyStat } from "./aggregationManager.js";
 import { logActivity } from "../utils/activityLogger.js";
-import {
-  ACTIVITY_CATEGORIES,
-  ACTIVITY_ACTIONS,
-} from "../config/activityConstants.js";
+import { ACTIVITY_CATEGORIES, ACTIVITY_ACTIONS } from "../config/activityConstants.js";
 
 let intervalId = null;
-let isRunning = false;
+let stopped = true;
+let tickPromise = null;
 const inFlightMonitorIds = new Set();
-
-// ─────────────────────────────────────────────
-// Per-monitor pipeline
-// ─────────────────────────────────────────────
+const activeTasks = new Set();
 
 const processMonitor = async (monitor, initiatedBy = null) => {
   const id = String(monitor._id);
   if (inFlightMonitorIds.has(id)) return null;
   inFlightMonitorIds.add(id);
+  const startedAt = Date.now();
   try {
-    // 1. Poll the endpoint
     const pollResult = await poll(monitor.url);
-
-    // 2. Classify the raw result
     const classification = classify(pollResult);
-
-    // 3. Persist HealthCheck
     const healthCheck = await HealthCheck.create({
       monitor: monitor._id,
       status: classification.status,
@@ -46,19 +37,14 @@ const processMonitor = async (monitor, initiatedBy = null) => {
       diagnostics: pollResult.diagnostics,
       checkedAt: new Date(),
     });
-
-    // 4. Incident lifecycle
     await handleIncident(monitor, healthCheck);
-
-    // 5. Daily aggregation
     await updateDailyStat(monitor, healthCheck);
-
-    // 6. Advance the monitor's schedule
-    await Monitor.findByIdAndUpdate(monitor._id, {
-      lastCheckedAt: new Date(),
-      nextCheckAt: new Date(Date.now() + monitor.interval * 1000),
-    });
-
+    if (initiatedBy) {
+      await Monitor.findByIdAndUpdate(monitor._id, {
+        lastCheckedAt: new Date(),
+        nextCheckAt: new Date(Date.now() + monitor.interval * 1000),
+      });
+    }
     if (initiatedBy) {
       await logActivity({
         userId: initiatedBy.id || initiatedBy._id,
@@ -67,16 +53,15 @@ const processMonitor = async (monitor, initiatedBy = null) => {
         description: `Triggered a manual health check for monitor "${monitor.name}"`,
         entityType: "Monitor",
         entityId: monitor._id,
-        metadata: {
-          targetOwner: String(monitor.owner),
-          status: classification.status,
-        },
+        metadata: { targetOwner: String(monitor.owner), status: classification.status },
       });
     }
-
-    logger.debug(
-      `Checked "${monitor.name}" — ${classification.status} (${pollResult.responseTime}ms)`,
-    );
+    logger.info("Monitor check completed", {
+      monitorId: id,
+      status: classification.status,
+      responseTimeMs: pollResult.responseTime,
+      durationMs: Date.now() - startedAt,
+    });
     return healthCheck;
   } finally {
     inFlightMonitorIds.delete(id);
@@ -89,75 +74,107 @@ export const runMonitorCheck = async (monitorId, initiatedBy) => {
   return processMonitor(monitor, initiatedBy);
 };
 
-// ─────────────────────────────────────────────
-// Tick
-// ─────────────────────────────────────────────
+// Claim each due job with one atomic MongoDB update. All replicas compete for
+// the same document; only one receives the lease token and may run the check.
+const claimNextDueMonitor = async () => {
+  const now = new Date();
+  const token = randomUUID();
+  return Monitor.findOneAndUpdate(
+    {
+      active: true,
+      nextCheckAt: { $lte: now },
+      $or: [
+        { checkLeaseUntil: null },
+        { checkLeaseUntil: { $exists: false } },
+        { checkLeaseUntil: { $lte: now } },
+      ],
+    },
+    { $set: { checkLeaseToken: token, checkLeaseUntil: new Date(now.getTime() + env.MONITOR_JOB_LEASE_MS) } },
+    { sort: { nextCheckAt: 1 }, new: true, select: "+checkLeaseToken" },
+  ).then((monitor) => monitor ? { monitor, token } : null);
+};
 
-const tick = async () => {
-  if (isRunning) {
-    logger.debug("Previous tick still running — skipping");
-    return;
-  }
-
-  isRunning = true;
-
+const runClaimedMonitor = async ({ monitor, token }) => {
+  const id = String(monitor._id);
+  const query = { _id: monitor._id, checkLeaseToken: token };
+  let timeout;
+  let heartbeat;
+  let work;
   try {
-    const dueMonitors = await Monitor.findDue();
-
-    if (dueMonitors.length === 0) return;
-
-    logger.debug(`Tick: ${dueMonitors.length} monitor(s) due`);
-
-    const results = await Promise.allSettled(
-      dueMonitors.map((m) => processMonitor(m)),
-    );
-
-    // Log any per-monitor failures (they shouldn't crash the scheduler)
-    for (let i = 0; i < results.length; i++) {
-      if (results[i].status === "rejected") {
-        logger.error(
-          `Failed to process monitor "${dueMonitors[i].name}": ${results[i].reason?.message || results[i].reason}`,
-        );
-      }
-    }
+    heartbeat = setInterval(() => {
+      Monitor.updateOne(query, { $set: { checkLeaseUntil: new Date(Date.now() + env.MONITOR_JOB_LEASE_MS) } })
+        .catch((error) => logger.error("Monitor lease renewal failed", { monitorId: id, error: error.message }));
+    }, Math.max(1_000, Math.floor(env.MONITOR_JOB_LEASE_MS / 3)));
+    heartbeat.unref?.();
+    // Bound total work time as well as each network attempt. The promise is
+    // still observed if the database stalls, keeping the job lease until its
+    // underlying operations settle instead of permitting overlapping work.
+    work = processMonitor(monitor);
+    const deadline = new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error("Monitor job exceeded its timeout")), env.MONITOR_JOB_LEASE_MS - 5_000);
+      timeout.unref?.();
+    });
+    await Promise.race([work, deadline]);
+    await Monitor.updateOne(query, {
+      $set: { lastCheckedAt: new Date(), nextCheckAt: new Date(Date.now() + monitor.interval * 1000) },
+      $unset: { checkLeaseToken: 1, checkLeaseUntil: 1 },
+    });
   } catch (error) {
-    logger.error(`Scheduler tick failed: ${error.message}`);
+    if (work && error.message === "Monitor job exceeded its timeout") {
+      // The poll pipeline has no safe cancellation point for its database
+      // writes. Keep ownership until it settles, then apply the retry policy.
+      await work.catch(() => {});
+    }
+    logger.error("Monitor job failed", { monitorId: id, monitorName: monitor.name, error: error.message });
+    await Monitor.updateOne(query, {
+      $set: { nextCheckAt: new Date(Date.now() + env.MONITOR_JOB_RETRY_DELAY_MS) },
+      $unset: { checkLeaseToken: 1, checkLeaseUntil: 1 },
+    });
   } finally {
-    isRunning = false;
+    clearTimeout(timeout);
+    clearInterval(heartbeat);
   }
 };
 
-// ─────────────────────────────────────────────
-// Public API
-// ─────────────────────────────────────────────
+const tick = async () => {
+  if (stopped || tickPromise) return tickPromise;
+  tickPromise = (async () => {
+    const available = Math.max(0, env.MONITOR_JOB_CONCURRENCY - activeTasks.size);
+    const claims = await Promise.all(Array.from({ length: available }, () => claimNextDueMonitor()));
+    for (const claim of claims.filter(Boolean)) {
+      const task = runClaimedMonitor(claim).catch((error) => {
+        logger.error("Monitor job cleanup failed", { monitorId: String(claim.monitor._id), error: error.message });
+      }).finally(() => activeTasks.delete(task));
+      activeTasks.add(task);
+    }
+  })().catch((error) => logger.error("Scheduler dispatch failed", { error: error.message }))
+    .finally(() => { tickPromise = null; });
+  return tickPromise;
+};
 
-/**
- * Start the scheduler.
- */
 export const start = () => {
-  if (intervalId) {
+  if (!stopped) {
     logger.warn("Scheduler already running");
     return;
   }
-
-  const tickMs = env.POLL_TICK_MS;
-  intervalId = setInterval(tick, tickMs);
-
-  // Fire the first tick immediately so monitors don't wait for the first interval
-  tick();
-
-  logger.info(
-    `Scheduler started — tick every ${tickMs / 1000}s, timeout ${env.POLL_TIMEOUT_MS / 1000}s, retries ${env.MONITOR_RETRY_COUNT}, failure threshold ${env.CONSECUTIVE_FAILURE_THRESHOLD}`,
-  );
+  stopped = false;
+  intervalId = setInterval(tick, env.POLL_TICK_MS);
+  intervalId.unref?.();
+  void tick(); // overdue work is recovered immediately after startup
+  logger.info("Monitoring scheduler started", {
+    tickMs: env.POLL_TICK_MS,
+    concurrency: env.MONITOR_JOB_CONCURRENCY,
+    leaseMs: env.MONITOR_JOB_LEASE_MS,
+    pollTimeoutMs: env.POLL_TIMEOUT_MS,
+    retries: env.MONITOR_RETRY_COUNT,
+  });
 };
 
-/**
- * Stop the scheduler gracefully.
- */
-export const stop = () => {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
-    logger.info("Scheduler stopped");
-  }
+export const stop = async () => {
+  stopped = true;
+  if (intervalId) clearInterval(intervalId);
+  intervalId = null;
+  await tickPromise;
+  await Promise.allSettled([...activeTasks]);
+  logger.info("Monitoring scheduler stopped", { activeJobs: activeTasks.size });
 };

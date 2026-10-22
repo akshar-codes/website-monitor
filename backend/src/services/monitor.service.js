@@ -205,6 +205,8 @@ export const updateMonitor = async (id, data, user) => {
   if (data.active === true) {
     data.nextCheckAt = new Date();
   }
+  // Re-evaluate cadence promptly after a configured interval changes.
+  if (data.interval !== undefined) data.nextCheckAt = new Date();
 
   const monitor = await Monitor.findOneAndUpdate(
     { _id: id, owner: ownerId },
