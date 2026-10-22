@@ -27,14 +27,16 @@ const shutdown = async (signal, exitCode = 0) => {
 
   // Keep the shutdown deadline active while worker tasks drain too.
   const forceShutdownTimer = setTimeout(() => {
-    logger.error("Could not finish graceful shutdown in time, forcing shutdown");
+    logger.error(
+      "Could not finish graceful shutdown in time, forcing shutdown",
+    );
     process.exit(1);
   }, 10_000);
   forceShutdownTimer.unref?.();
 
   // Stop the schedulers first (no new polls/checks)
   await stop();
-  stopSslScheduler();
+  await stopSslScheduler();
   if (digestTimer) clearInterval(digestTimer);
 
   if (!server) {

@@ -63,6 +63,23 @@ const envSchema = z.object({
     .positive()
     .default(30_000),
   MONITOR_RETRY_COUNT: z.coerce.number().int().min(0).max(5).default(2),
+  MONITOR_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+  MONITOR_DIAGNOSTIC_RETENTION_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(30),
+  MONITOR_RETENTION_BATCH_SIZE: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(5000)
+    .default(500),
+  MONITOR_MAINTENANCE_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 1000),
   MONITOR_RETRY_DELAY: z.coerce
     .number()
     .int()

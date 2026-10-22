@@ -136,6 +136,8 @@ const incidentSchema = new mongoose.Schema(
 
 // Incident history for a monitor, newest first (detail page / timeline)
 incidentSchema.index({ monitor: 1, startedAt: -1 });
+incidentSchema.index({ triggerCheck: 1 });
+incidentSchema.index({ recoveryCheck: 1 });
 
 // Active incidents across all monitors (dashboard alert banner)
 incidentSchema.index({ status: 1, startedAt: -1 });
@@ -145,7 +147,18 @@ incidentSchema.index({ monitor: 1, status: 1 });
 // At most one unresolved incident per monitor, including concurrent upserts.
 incidentSchema.index(
   { monitor: 1 },
-  { unique: true, partialFilterExpression: { status: { $in: [INCIDENT_STATUS.ONGOING, INCIDENT_STATUS.INVESTIGATING, INCIDENT_STATUS.IDENTIFIED] } } },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: {
+        $in: [
+          INCIDENT_STATUS.ONGOING,
+          INCIDENT_STATUS.INVESTIGATING,
+          INCIDENT_STATUS.IDENTIFIED,
+        ],
+      },
+    },
+  },
 );
 
 // Severity filter (ops triage view)

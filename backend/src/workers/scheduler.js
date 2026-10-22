@@ -7,6 +7,7 @@ import { poll } from "./poller.js";
 import { classify } from "./classifier.js";
 import { handleIncident } from "./incidentManager.js";
 import { updateDailyStat } from "./aggregationManager.js";
+import { runRetentionPass } from "./retentionManager.js";
 import { logActivity } from "../utils/activityLogger.js";
 import {
   ACTIVITY_CATEGORIES,
@@ -16,6 +17,20 @@ import {
 let intervalId = null;
 let stopped = true;
 let tickPromise = null;
+let maintenanceTimer = null;
+let maintenancePromise = null;
+let metricsTimer = null;
+let lastMetricsAt = 0;
+const metrics = {
+  checksCompleted: 0,
+  unhealthyChecks: 0,
+  jobErrors: 0,
+  schedulerErrors: 0,
+  totalExecutionMs: 0,
+  lastCheckAt: null,
+  lastSchedulerSuccessAt: null,
+  queueDepth: 0,
+};
 const inFlightMonitorIds = new Set();
 const activeTasks = new Set();
 
@@ -95,42 +110,50 @@ export const runMonitorCheck = async (monitorId, initiatedBy) => {
 
 // Claim each due job with one atomic MongoDB update. All replicas compete for
 // the same document; only one receives the lease token and may run the check.
-const claimNextDueMonitor = async () => {
-  const now = new Date();
-  const token = randomUUID();
-  return Monitor.findOneAndUpdate(
-    {
-      active: true,
-      nextCheckAt: { $lte: now },
-      $and: [
-        {
-          $or: [
-            { checkLeaseUntil: null },
-            { checkLeaseUntil: { $exists: false } },
-            { checkLeaseUntil: { $lte: now } },
-          ],
-        },
-        {
-          $or: [
-            { checkRetryAt: null },
-            { checkRetryAt: { $exists: false } },
-            { checkRetryAt: { $lte: now } },
-          ],
-        },
-      ],
-    },
-    {
-      $set: {
-        checkLeaseToken: token,
-        checkLeaseUntil: new Date(now.getTime() + env.MONITOR_JOB_LEASE_MS),
+export const claimNextDueMonitor = async (deps = {}) => {
+  const monitorModel = deps.Monitor || Monitor;
+  const now = deps.now || new Date();
+  const token = deps.token || randomUUID();
+  return monitorModel
+    .findOneAndUpdate(
+      {
+        active: true,
+        nextCheckAt: { $lte: now },
+        $and: [
+          {
+            $or: [
+              { checkLeaseUntil: null },
+              { checkLeaseUntil: { $exists: false } },
+              { checkLeaseUntil: { $lte: now } },
+            ],
+          },
+          {
+            $or: [
+              { checkRetryAt: null },
+              { checkRetryAt: { $exists: false } },
+              { checkRetryAt: { $lte: now } },
+            ],
+          },
+        ],
       },
-    },
-    { sort: { nextCheckAt: 1 }, new: true, select: "+checkLeaseToken" },
-  ).then((monitor) => (monitor ? { monitor, token } : null));
+      {
+        $set: {
+          checkLeaseToken: token,
+          checkLeaseUntil: new Date(now.getTime() + env.MONITOR_JOB_LEASE_MS),
+        },
+      },
+      {
+        sort: { nextCheckAt: 1, _id: 1 },
+        new: true,
+        select: "+checkLeaseToken",
+      },
+    )
+    .then((monitor) => (monitor ? { monitor, token } : null));
 };
 
 const runClaimedMonitor = async ({ monitor, token }) => {
   const id = String(monitor._id);
+  const startedAt = Date.now();
   const query = { _id: monitor._id, checkLeaseToken: token };
   let timeout;
   let heartbeat;
@@ -163,7 +186,11 @@ const runClaimedMonitor = async ({ monitor, token }) => {
       );
       timeout.unref?.();
     });
-    await Promise.race([work, deadline]);
+    const completed = await Promise.race([work, deadline]);
+    metrics.checksCompleted += 1;
+    if (completed && completed.status !== "up") metrics.unhealthyChecks += 1;
+    metrics.totalExecutionMs += Date.now() - startedAt;
+    metrics.lastCheckAt = new Date();
     const latest = await Monitor.findById(monitor._id)
       .select("active interval")
       .lean();
@@ -177,6 +204,7 @@ const runClaimedMonitor = async ({ monitor, token }) => {
       $unset: { checkLeaseToken: 1, checkLeaseUntil: 1, checkRetryAt: 1 },
     });
   } catch (error) {
+    metrics.jobErrors += 1;
     if (work && error.message === "Monitor job exceeded its timeout") {
       // The poll pipeline has no safe cancellation point for its database
       // writes. Keep ownership until it settles, then apply the retry policy.
@@ -209,6 +237,7 @@ const tick = async () => {
     const claims = await Promise.all(
       Array.from({ length: available }, () => claimNextDueMonitor()),
     );
+    metrics.lastSchedulerSuccessAt = new Date();
     for (const claim of claims.filter(Boolean)) {
       const task = runClaimedMonitor(claim)
         .catch((error) => {
@@ -217,18 +246,86 @@ const tick = async () => {
             error: error.message,
           });
         })
-        .finally(() => activeTasks.delete(task));
+        .finally(() => {
+          activeTasks.delete(task);
+          if (!stopped) setImmediate(tick);
+        });
       activeTasks.add(task);
     }
   })()
-    .catch((error) =>
-      logger.error("Scheduler dispatch failed", { error: error.message }),
-    )
+    .catch((error) => {
+      metrics.schedulerErrors += 1;
+      logger.error("Scheduler dispatch failed", { error: error.message });
+    })
     .finally(() => {
       tickPromise = null;
     });
   return tickPromise;
 };
+
+const runMaintenance = async () => {
+  if (stopped || maintenancePromise) return maintenancePromise;
+  maintenancePromise = runRetentionPass()
+    .then((result) => {
+      logger.info("Monitoring retention pass completed", result);
+      return result;
+    })
+    .catch((error) => {
+      logger.error("Monitoring retention pass failed", {
+        error: error.message,
+      });
+    })
+    .finally(() => {
+      maintenancePromise = null;
+    });
+  return maintenancePromise;
+};
+
+const emitOperationalMetrics = async () => {
+  const currentTime = Date.now();
+  if (currentTime - lastMetricsAt < 60_000 || stopped) return;
+  lastMetricsAt = currentTime;
+  try {
+    metrics.queueDepth = await Monitor.countDocuments({
+      active: true,
+      nextCheckAt: { $lte: new Date() },
+      $and: [
+        {
+          $or: [
+            { checkLeaseUntil: null },
+            { checkLeaseUntil: { $exists: false } },
+            { checkLeaseUntil: { $lte: new Date() } },
+          ],
+        },
+        {
+          $or: [
+            { checkRetryAt: null },
+            { checkRetryAt: { $exists: false } },
+            { checkRetryAt: { $lte: new Date() } },
+          ],
+        },
+      ],
+    });
+    logger.info("Monitoring scheduler metrics", {
+      ...metrics,
+      activeJobs: activeTasks.size,
+      averageExecutionMs: metrics.checksCompleted
+        ? Math.round(metrics.totalExecutionMs / metrics.checksCompleted)
+        : 0,
+    });
+  } catch (error) {
+    metrics.schedulerErrors += 1;
+    logger.error("Monitoring metrics collection failed", {
+      error: error.message,
+    });
+  }
+};
+
+export const getSchedulerMetrics = () => ({
+  ...metrics,
+  activeJobs: activeTasks.size,
+  concurrencyLimit: env.MONITOR_JOB_CONCURRENCY,
+});
 
 export const start = () => {
   if (!stopped) {
@@ -238,7 +335,15 @@ export const start = () => {
   stopped = false;
   intervalId = setInterval(tick, env.POLL_TICK_MS);
   intervalId.unref?.();
+  metricsTimer = setInterval(emitOperationalMetrics, 15_000);
+  metricsTimer.unref?.();
+  maintenanceTimer = setInterval(
+    runMaintenance,
+    env.MONITOR_MAINTENANCE_INTERVAL_MS,
+  );
+  maintenanceTimer.unref?.();
   void tick(); // overdue work is recovered immediately after startup
+  void runMaintenance();
   logger.info("Monitoring scheduler started", {
     tickMs: env.POLL_TICK_MS,
     concurrency: env.MONITOR_JOB_CONCURRENCY,
@@ -251,8 +356,13 @@ export const start = () => {
 export const stop = async () => {
   stopped = true;
   if (intervalId) clearInterval(intervalId);
+  if (metricsTimer) clearInterval(metricsTimer);
+  if (maintenanceTimer) clearInterval(maintenanceTimer);
   intervalId = null;
+  metricsTimer = null;
+  maintenanceTimer = null;
   await tickPromise;
+  await maintenancePromise;
   await Promise.allSettled([...activeTasks]);
   logger.info("Monitoring scheduler stopped", { activeJobs: activeTasks.size });
 };

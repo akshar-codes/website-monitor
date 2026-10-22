@@ -120,6 +120,8 @@ healthCheckSchema.index({ monitor: 1, status: 1, checkedAt: -1 });
 // Response-time analytics (P95 / P99 charts)
 healthCheckSchema.index({ monitor: 1, responseTime: 1 });
 healthCheckSchema.index({ executionKey: 1 }, { unique: true, sparse: true });
+// Retention scans and bounded cleanup pages walk history from oldest first.
+healthCheckSchema.index({ checkedAt: 1, _id: 1 });
 
 // ─────────────────────────────────────────────
 // Virtuals
