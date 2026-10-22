@@ -58,8 +58,9 @@ export default function MonitorFormModal({
   // what the client renders here; this is purely to avoid presenting an
   // option the request would just get rejected for.
   minIntervalSeconds = 30,
+  duplicateSource = null,
 }) {
-  const isEdit = !!monitor;
+  const isEdit = !!monitor && !duplicateSource;
 
   const allowedPresets = useMemo(
     () => INTERVAL_PRESETS.filter((s) => s >= minIntervalSeconds),
@@ -88,18 +89,20 @@ export default function MonitorFormModal({
 
   useEffect(() => {
     if (open) {
-      if (monitor) {
+      if (monitor || duplicateSource) {
         reset({
-          name: monitor.name || "",
-          url: monitor.url || "",
-          interval: monitor.interval || defaultInterval,
-          active: monitor.active ?? true,
+          name: duplicateSource
+            ? `Copy of ${duplicateSource.name}`.slice(0, 120)
+            : monitor.name || "",
+          url: (duplicateSource || monitor).url || "",
+          interval: (duplicateSource || monitor).interval || defaultInterval,
+          active: duplicateSource ? true : (monitor.active ?? true),
         });
       } else {
         reset({ name: "", url: "", interval: defaultInterval, active: true });
       }
     }
-  }, [open, monitor, reset, defaultInterval]);
+  }, [open, monitor, duplicateSource, reset, defaultInterval]);
 
   const handleFormSubmit = (data) => {
     onSubmit(data);
@@ -110,16 +113,25 @@ export default function MonitorFormModal({
   // selections — otherwise the field would silently jump to a different
   // value on open.
   const intervalOptions = useMemo(() => {
-    if (monitor && !allowedPresets.includes(monitor.interval)) {
-      return [monitor.interval, ...allowedPresets].sort((a, b) => a - b);
+    const existingMonitor = duplicateSource || monitor;
+    if (existingMonitor && !allowedPresets.includes(existingMonitor.interval)) {
+      return [existingMonitor.interval, ...allowedPresets].sort(
+        (a, b) => a - b,
+      );
     }
     return allowedPresets;
-  }, [monitor, allowedPresets]);
+  }, [monitor, duplicateSource, allowedPresets]);
 
   return (
     <Modal open={open} onClose={onClose}>
       <ModalHeader
-        title={isEdit ? "Edit Monitor" : "Add Monitor"}
+        title={
+          isEdit
+            ? "Edit Monitor"
+            : duplicateSource
+              ? "Duplicate Monitor"
+              : "Add Monitor"
+        }
         description={
           isEdit
             ? "Update the monitor configuration."
@@ -197,7 +209,11 @@ export default function MonitorFormModal({
             Cancel
           </Button>
           <Button variant="primary" type="submit" loading={loading}>
-            {isEdit ? "Save Changes" : "Add Monitor"}
+            {isEdit
+              ? "Save Changes"
+              : duplicateSource
+                ? "Create Duplicate"
+                : "Add Monitor"}
           </Button>
         </ModalFooter>
       </form>

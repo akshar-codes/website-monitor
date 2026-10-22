@@ -97,6 +97,7 @@ export function useMonitorMutations(onSuccess, onError) {
         toast.success("Monitor created successfully");
         onSuccess?.("create");
       } catch (err) {
+        toast.error(err.response?.data?.message || "Could not create monitor");
         onError?.(err);
       } finally {
         setSubmitting(false);
@@ -113,6 +114,7 @@ export function useMonitorMutations(onSuccess, onError) {
         toast.success("Monitor updated successfully");
         onSuccess?.("update");
       } catch (err) {
+        toast.error(err.response?.data?.message || "Could not update monitor");
         onError?.(err);
       } finally {
         setSubmitting(false);
@@ -129,6 +131,7 @@ export function useMonitorMutations(onSuccess, onError) {
         toast.success(`"${name}" has been deleted`);
         onSuccess?.("delete");
       } catch (err) {
+        toast.error(err.response?.data?.message || "Could not delete monitor");
         onError?.(err);
       } finally {
         setSubmitting(false);
@@ -145,7 +148,48 @@ export function useMonitorMutations(onSuccess, onError) {
         toast.success(`"${name}" has been ${active ? "resumed" : "paused"}`);
         onSuccess?.("toggle");
       } catch (err) {
+        toast.error(
+          err.response?.data?.message || "Could not change monitor status",
+        );
         onError?.(err);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [onSuccess, onError],
+  );
+
+  const duplicateMonitor = useCallback(
+    async (sourceId, payload) => {
+      setSubmitting(true);
+      try {
+        await monitorsApi.duplicateMonitor(sourceId, payload);
+        toast.success("Monitor duplicated successfully");
+        onSuccess?.("duplicate");
+      } catch (err) {
+        toast.error(
+          err.response?.data?.message || "Could not duplicate monitor",
+        );
+        onError?.(err);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [onSuccess, onError],
+  );
+
+  const runMonitorCheck = useCallback(
+    async (id) => {
+      setSubmitting(true);
+      try {
+        const response = await monitorsApi.runMonitorCheck(id);
+        toast.success(`Health check completed: ${response.data.status}`);
+        onSuccess?.("check");
+        return response.data;
+      } catch (err) {
+        toast.error(err.response?.data?.message || "Health check failed");
+        onError?.(err);
+        return null;
       } finally {
         setSubmitting(false);
       }
@@ -158,6 +202,8 @@ export function useMonitorMutations(onSuccess, onError) {
     updateMonitor,
     deleteMonitor,
     toggleMonitor,
+    duplicateMonitor,
+    runMonitorCheck,
     submitting,
   };
 }

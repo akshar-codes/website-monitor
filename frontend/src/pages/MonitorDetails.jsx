@@ -58,8 +58,13 @@ export default function MonitorDetails() {
     [navigate, refetch],
   );
 
-  const { updateMonitor, deleteMonitor, toggleMonitor, submitting } =
-    useMonitorMutations(handleMutationSuccess);
+  const {
+    updateMonitor,
+    deleteMonitor,
+    toggleMonitor,
+    runMonitorCheck,
+    submitting,
+  } = useMonitorMutations(handleMutationSuccess);
 
   const handleFormSubmit = (payload) => {
     updateMonitor(id, payload);
@@ -101,6 +106,8 @@ export default function MonitorDetails() {
           toggleMonitor(id, !details?.monitor?.active, details?.monitor?.name)
         }
         onDelete={() => setDeleteOpen(true)}
+        onManualCheck={() => runMonitorCheck(id)}
+        checking={submitting}
       />
 
       {/* Active incident banner */}

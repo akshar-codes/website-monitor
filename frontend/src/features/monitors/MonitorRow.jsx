@@ -7,6 +7,7 @@ import {
   Play,
   Trash2,
   ExternalLink,
+  Copy,
 } from "lucide-react";
 import StatusBadge from "../../components/ui/StatusBadge";
 import Can from "../../components/access/Can";
@@ -19,13 +20,17 @@ import {
   formatInterval,
 } from "../../utils/format";
 
-function ActionMenu({ monitor, onEdit, onToggle, onDelete }) {
+function ActionMenu({ monitor, onEdit, onToggle, onDelete, onDuplicate }) {
   const [open, setOpen] = useState(false);
   const { can } = usePermissions();
 
   // Hide the menu entirely when the user can't do anything through it —
   // an empty kebab menu is worse than no menu at all.
-  if (!can("monitor:update") && !can("monitor:delete")) {
+  if (
+    !can("monitor:update") &&
+    !can("monitor:delete") &&
+    !can("monitor:create")
+  ) {
     return null;
   }
 
@@ -68,6 +73,17 @@ function ActionMenu({ monitor, onEdit, onToggle, onDelete }) {
                 {monitor.active ? "Pause" : "Resume"}
               </button>
             </Can>
+            <Can permission="monitor:create">
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onDuplicate();
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-white"
+              >
+                <Copy size={13} /> Duplicate
+              </button>
+            </Can>
             <Can permission="monitor:delete">
               <>
                 <div className="my-1 h-px bg-bg-subtle" />
@@ -95,6 +111,7 @@ export default function MonitorRow({
   onEdit,
   onDelete,
   onToggle,
+  onDuplicate,
 }) {
   const status = monitor.active ? stats?.currentStatus || "unknown" : "paused";
 
@@ -176,6 +193,7 @@ export default function MonitorRow({
         onEdit={onEdit}
         onToggle={onToggle}
         onDelete={onDelete}
+        onDuplicate={onDuplicate}
       />
     </div>
   );

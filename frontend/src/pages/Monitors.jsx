@@ -17,7 +17,10 @@ import { useMonitorList, useMonitorMutations } from "../hooks/useMonitors";
 import { useUsage } from "../hooks/useUsage";
 import { useQuery } from "../hooks/useQuery";
 import * as dashboardApi from "../services/api/dashboard";
-import { isUpgradeRequiredError, getAccessErrorMessage } from "../utils/accessErrors";
+import {
+  isUpgradeRequiredError,
+  getAccessErrorMessage,
+} from "../utils/accessErrors";
 import { ROUTES } from "../constants/routes";
 import { cn } from "../utils/cn";
 
@@ -67,6 +70,7 @@ export default function Monitors() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editMonitor, setEditMonitor] = useState(null);
+  const [duplicateSource, setDuplicateSource] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [limitMessage, setLimitMessage] = useState("");
 
@@ -81,19 +85,22 @@ export default function Monitors() {
   const monitors = useMemo(() => monitorsData?.data || [], [monitorsData]);
   const pagination = monitorsData?.pagination;
 
-  const { data: usageData, loading: usageLoading, refetch: refetchUsage } =
-    useUsage();
+  const {
+    data: usageData,
+    loading: usageLoading,
+    refetch: refetchUsage,
+  } = useUsage();
   const usage = usageData?.data;
 
   // statsMap initializes as null from useQuery; guard with ?? {} so map access
   // never throws regardless of fetch state (null default only catches undefined).
-  const { data: statsMapRaw } =
-    useMonitorsWithStats(monitors);
+  const { data: statsMapRaw } = useMonitorsWithStats(monitors);
   const statsMap = statsMapRaw ?? {};
 
   const handleMutationSuccess = useCallback(() => {
     setFormOpen(false);
     setEditMonitor(null);
+    setDuplicateSource(null);
     setDeleteTarget(null);
     setLimitMessage("");
     refetch();
@@ -112,6 +119,7 @@ export default function Monitors() {
     updateMonitor,
     deleteMonitor,
     toggleMonitor,
+    duplicateMonitor,
     submitting,
   } = useMonitorMutations(handleMutationSuccess, handleMutationError);
 
@@ -125,7 +133,9 @@ export default function Monitors() {
   }, [monitors, search]);
 
   const handleFormSubmit = (data) => {
-    if (editMonitor) {
+    if (duplicateSource) {
+      duplicateMonitor(duplicateSource.id || duplicateSource._id, data);
+    } else if (editMonitor) {
       updateMonitor(editMonitor.id || editMonitor._id, data);
     } else {
       createMonitor(data);
@@ -285,6 +295,10 @@ export default function Monitors() {
               stats={statsMap[monitor.id || monitor._id]}
               onEdit={() => openEdit(monitor)}
               onDelete={() => setDeleteTarget(monitor)}
+              onDuplicate={() => {
+                setDuplicateSource(monitor);
+                setFormOpen(true);
+              }}
               onToggle={() =>
                 toggleMonitor(
                   monitor.id || monitor._id,
@@ -313,9 +327,11 @@ export default function Monitors() {
         onClose={() => {
           setFormOpen(false);
           setEditMonitor(null);
+          setDuplicateSource(null);
         }}
         onSubmit={handleFormSubmit}
         monitor={editMonitor}
+        duplicateSource={duplicateSource}
         loading={submitting}
         minIntervalSeconds={usage?.interval?.minSeconds ?? 30}
       />

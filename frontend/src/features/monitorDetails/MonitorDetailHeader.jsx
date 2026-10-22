@@ -20,6 +20,8 @@ export default function MonitorDetailHeader({
   onEdit,
   onToggle,
   onDelete,
+  onManualCheck,
+  checking,
 }) {
   if (loading || !monitor) {
     return (
@@ -71,6 +73,17 @@ export default function MonitorDetailHeader({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Can permission="monitor:update">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={RefreshCw}
+              loading={checking}
+              onClick={onManualCheck}
+            >
+              Check now
+            </Button>
+          </Can>
           <Button
             variant="secondary"
             size="sm"

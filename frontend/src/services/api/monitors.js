@@ -21,6 +21,16 @@ export async function getMonitorDiagnostics(id) {
   return data;
 }
 
+export async function runMonitorCheck(id) {
+  const { data } = await apiClient.post(`/monitors/${id}/check`);
+  return data;
+}
+
+export async function duplicateMonitor(id, payload) {
+  const { data } = await apiClient.post(`/monitors/${id}/duplicate`, payload);
+  return data;
+}
+
 /**
  * POST /api/monitors
  */
