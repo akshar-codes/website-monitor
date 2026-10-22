@@ -17,6 +17,21 @@ export async function checkAdminMonitor(id) {
   const { data } = await apiClient.post(`/admin/monitors/${id}/check`);
   return data?.data;
 }
+export async function getAdminIncidents(params = {}) {
+  const { data } = await apiClient.get("/admin/incidents", { params });
+  return data;
+}
+export async function getAdminIncident(id) {
+  const { data } = await apiClient.get(`/admin/incidents/${id}`);
+  return data?.data;
+}
+export async function resolveAdminIncident(id, payload) {
+  const { data } = await apiClient.post(
+    `/admin/incidents/${id}/resolve`,
+    payload,
+  );
+  return data?.data;
+}
 
 /**
  * GET /api/admin/users

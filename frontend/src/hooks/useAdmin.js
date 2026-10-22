@@ -40,6 +40,32 @@ export function useAdminMonitorCheck(onSuccess) {
   );
   return { check, submitting };
 }
+export function useAdminIncidents(params = {}) {
+  const paramsKey = JSON.stringify(params);
+  return useQuery(() => adminApi.getAdminIncidents(params), [paramsKey]);
+}
+export function useAdminIncident(id) {
+  return useQuery(() => adminApi.getAdminIncident(id), [id]);
+}
+export function useResolveAdminIncident(onSuccess) {
+  const [submitting, setSubmitting] = useState(false);
+  const resolve = useCallback(
+    async (id, payload) => {
+      setSubmitting(true);
+      try {
+        const data = await adminApi.resolveAdminIncident(id, payload);
+        toast.success("Incident resolved");
+        onSuccess?.(data);
+      } catch {
+        /* shared API interceptor reports request errors */
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [onSuccess],
+  );
+  return { resolve, submitting };
+}
 
 export function useUserList(params = {}) {
   const paramsKey = JSON.stringify(params);

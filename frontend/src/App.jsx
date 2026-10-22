@@ -32,6 +32,8 @@ import AdminUserDetails from "./pages/AdminUserDetails";
 import AdminPlans from "./pages/AdminPlans";
 import AdminMonitors from "./pages/AdminMonitors";
 import AdminMonitorDetails from "./pages/AdminMonitorDetails";
+import AdminIncidents from "./pages/AdminIncidents";
+import AdminIncidentDetails from "./pages/AdminIncidentDetails";
 import AdminPlanRequests from "./pages/AdminPlanRequests";
 import Unauthorized from "./pages/Unauthorized";
 import UpgradeRequired from "./pages/UpgradeRequired";
@@ -257,6 +259,22 @@ export default function App() {
                         element={
                           <Suspense fallback={<PageFallback />}>
                             <AdminMonitorDetails />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/admin/incidents"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <AdminIncidents />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/admin/incidents/:id"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <AdminIncidentDetails />
                           </Suspense>
                         }
                       />

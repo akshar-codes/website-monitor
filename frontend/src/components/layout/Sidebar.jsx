@@ -93,6 +93,11 @@ const ADMIN_MONITORS_NAV_ITEM = {
   path: "/admin/monitors",
   icon: Monitor,
 };
+const ADMIN_INCIDENTS_NAV_ITEM = {
+  label: "Incident Oversight",
+  path: "/admin/incidents",
+  icon: AlertTriangle,
+};
 
 const ADMIN_PLAN_REQUESTS_NAV_ITEM = {
   label: "Plan Requests",
@@ -169,6 +174,7 @@ export default function Sidebar() {
       ADMIN_NAV_ITEM,
       ADMIN_PLANS_NAV_ITEM,
       ADMIN_MONITORS_NAV_ITEM,
+      ADMIN_INCIDENTS_NAV_ITEM,
       ADMIN_PLAN_REQUESTS_NAV_ITEM,
     ].filter((item) => !item.permission || can(item.permission));
 
