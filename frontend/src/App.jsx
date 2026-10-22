@@ -199,6 +199,7 @@ export default function App() {
                       />
                       <Route path="account" element={<AccountSettings />} />
                       <Route path="profile" element={<Profile />} />
+                      <Route path="subscription" element={<Billing />} />
                       <Route path="preferences" element={<Preferences />} />
                       <Route path="security" element={<SecuritySettings />} />
                       <Route

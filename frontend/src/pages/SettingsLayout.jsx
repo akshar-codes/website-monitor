@@ -7,12 +7,14 @@ import {
   ShieldCheck,
   Bell,
   KeyRound,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "../utils/cn";
 
 const sections = [
   { label: "Account", path: "/settings/account", icon: CircleUserRound },
   { label: "Profile", path: "/settings/profile", icon: UserRound },
+  { label: "Subscription", path: "/settings/subscription", icon: CreditCard },
   {
     label: "Preferences",
     path: "/settings/preferences",

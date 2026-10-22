@@ -6,6 +6,7 @@ import CurrentPlanSummary from "../features/plans/CurrentPlanSummary";
 import UpgradePrompt from "../features/plans/UpgradePrompt";
 import PlanChangeModal from "../features/plans/PlanChangeModal";
 import PendingUpgradeBanner from "../features/plans/PendingUpgradeBanner";
+import PlanRequestHistory from "../features/plans/PlanRequestHistory";
 import UsageDashboard from "../components/usage/UsageDashboard";
 import Button from "../components/ui/Button";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
@@ -37,6 +38,7 @@ export default function Billing() {
   const [modalOpen, setModalOpen] = useState(false);
   const [actionPlanId, setActionPlanId] = useState(null);
   const [pendingDowngrade, setPendingDowngrade] = useState(null);
+  const [pendingUpgrade, setPendingUpgrade] = useState(null);
 
   const {
     data: currentPlanData,
@@ -44,8 +46,11 @@ export default function Billing() {
     refetch: refetchCurrentPlan,
   } = useCurrentPlan();
   const { data: catalogData, loading: catalogLoading } = usePlanCatalog();
-  const { data: usageData, loading: usageLoading, refetch: refetchUsage } =
-    useUsage();
+  const {
+    data: usageData,
+    loading: usageLoading,
+    refetch: refetchUsage,
+  } = useUsage();
   const {
     data: upgradeRequestData,
     loading: upgradeRequestLoading,
@@ -56,6 +61,7 @@ export default function Billing() {
   const plans = catalogData?.data || [];
   const usage = usageData?.data;
   const pendingRequest = upgradeRequestData?.data?.pending || null;
+  const requestHistory = upgradeRequestData?.data?.history || [];
 
   const handleDowngradeSuccess = async () => {
     setActionPlanId(null);
@@ -65,14 +71,13 @@ export default function Billing() {
 
   const handleUpgradeRequestSuccess = async () => {
     setActionPlanId(null);
+    setPendingUpgrade(null);
     setModalOpen(false);
     await refetchUpgradeRequest();
   };
 
   const { changePlan } = usePlanChange(handleDowngradeSuccess);
-  const { requestUpgrade } = useRequestPlanUpgrade(
-    handleUpgradeRequestSuccess,
-  );
+  const { requestUpgrade } = useRequestPlanUpgrade(handleUpgradeRequestSuccess);
 
   const handleSelectPlan = useCallback(
     async (planId) => {
@@ -85,6 +90,11 @@ export default function Billing() {
 
       if (changeType === "downgrade") {
         setPendingDowngrade(planId);
+        return;
+      }
+
+      if (changeType === "upgrade") {
+        setPendingUpgrade(planId);
         return;
       }
 
@@ -103,7 +113,16 @@ export default function Billing() {
   );
 
   const handleModalClose = () => {
-    if (!actionPlanId && !pendingDowngrade) setModalOpen(false);
+    if (!actionPlanId && !pendingDowngrade && !pendingUpgrade)
+      setModalOpen(false);
+  };
+
+  const handleConfirmUpgrade = async () => {
+    if (!pendingUpgrade) return;
+    setActionPlanId(pendingUpgrade);
+    const result = await requestUpgrade(pendingUpgrade);
+    if (!result) setActionPlanId(null);
+    setPendingUpgrade(null);
   };
 
   const handleConfirmDowngrade = async () => {
@@ -151,6 +170,15 @@ export default function Billing() {
         </div>
       )}
 
+      {!upgradeRequestLoading && requestHistory.length > 0 && (
+        <PlanRequestHistory
+          requests={requestHistory}
+          getPlanName={(planId) =>
+            plans.find((plan) => plan.id === planId)?.name || planId
+          }
+        />
+      )}
+
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CurrentPlanSummary
           currentPlan={currentPlan}
@@ -174,8 +202,8 @@ export default function Billing() {
           <p className="text-sm font-semibold text-white">Available plans</p>
         </div>
         <p className="mb-5 text-xs text-text-muted">
-          Downgrades apply immediately. Upgrades require admin approval since
-          no payment gateway is connected yet.
+          Downgrades apply immediately. Upgrades require admin approval since no
+          payment gateway is connected yet.
         </p>
         <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
           Compare & change plan
@@ -202,9 +230,19 @@ export default function Billing() {
         onClose={() => setPendingDowngrade(null)}
         onConfirm={handleConfirmDowngrade}
         title="Downgrade Plan?"
-        description="Are you sure you want to downgrade your plan? If you downgrade, you will have to request the admin again to upgrade to Pro."
+        description="Are you sure you want to downgrade your plan? You may need to request admin approval to restore paid plan access."
         confirmLabel="Downgrade"
         confirmVariant="danger"
+      />
+      <ConfirmDialog
+        open={!!pendingUpgrade}
+        onClose={() => !actionPlanId && setPendingUpgrade(null)}
+        onConfirm={handleConfirmUpgrade}
+        title="Request a plan upgrade?"
+        description="This submits an upgrade request for administrator review. Your current plan stays active until the request is approved."
+        confirmLabel="Submit request"
+        confirmVariant="primary"
+        loading={!!actionPlanId}
       />
     </PageContainer>
   );

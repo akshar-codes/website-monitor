@@ -30,7 +30,8 @@ export default function CurrentPlanSummary({ currentPlan, loading }) {
     );
   }
 
-  const { definition, status, startedAt } = currentPlan || {};
+  const { definition, status, startedAt, renewsAt, expiredAt, accountStatus } =
+    currentPlan || {};
   if (!definition) return null;
 
   const { limits } = definition;
@@ -51,10 +52,30 @@ export default function CurrentPlanSummary({ currentPlan, loading }) {
           <p className="mt-1 text-xs text-text-muted">{definition.tagline}</p>
         </div>
         <div className="text-right">
-          <p className="text-[11px] text-text-muted">Member since</p>
-          <p className="text-xs font-medium text-text-secondary">
-            {formatDate(startedAt)}
+          <span
+            className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${status === "active" ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : status === "expired" || status === "suspended" ? "border-red-500/20 bg-red-500/10 text-red-300" : "border-amber-500/20 bg-amber-500/10 text-amber-300"}`}
+          >
+            {status === "canceled" ? "Cancelled" : status || "Active"}
+          </span>
+          {accountStatus === "suspended" && (
+            <span className="ml-1 inline-flex rounded-full border border-red-500/20 bg-red-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-300">
+              Account suspended
+            </span>
+          )}
+          <p className="mt-2 text-[11px] text-text-muted">
+            Member since {formatDate(startedAt)}
           </p>
+          {renewsAt && (
+            <p className="mt-1 text-[11px] text-text-muted">
+              {status === "active" ? "Renews" : "Access until"}{" "}
+              {formatDate(renewsAt)}
+            </p>
+          )}
+          {expiredAt && (
+            <p className="mt-1 text-[11px] text-text-muted">
+              Ended {formatDate(expiredAt)}
+            </p>
+          )}
         </div>
       </div>
 
@@ -80,10 +101,6 @@ export default function CurrentPlanSummary({ currentPlan, loading }) {
           value={limits.teamMembers == null ? "Unlimited" : limits.teamMembers}
         />
       </div>
-
-      {status && status !== "active" && (
-        <p className="mt-4 text-[11px] text-amber-400">Plan status: {status}</p>
-      )}
     </div>
   );
 }
