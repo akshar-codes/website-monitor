@@ -77,8 +77,9 @@ export default function AdminIncidentDetails() {
                   </p>
                   <p className="text-xs text-zinc-500">
                     Duration{" "}
-                    {data.duration ??
-                      `${Math.floor((Date.now() - new Date(data.startedAt).getTime()) / 60000)} min`}
+                    {data.duration == null
+                      ? "Unavailable"
+                      : `${data.duration}s`}
                   </p>
                 </div>
               </div>

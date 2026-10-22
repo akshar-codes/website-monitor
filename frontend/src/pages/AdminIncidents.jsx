@@ -140,8 +140,9 @@ export default function AdminIncidents() {
                       {new Date(item.startedAt).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-400">
-                      {item.duration ??
-                        `${Math.floor((Date.now() - new Date(item.startedAt).getTime()) / 60000)} min`}
+                      {item.duration == null
+                        ? "Unavailable"
+                        : `${item.duration}s`}
                     </td>
                   </tr>
                 ))}

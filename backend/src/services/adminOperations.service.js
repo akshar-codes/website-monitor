@@ -19,6 +19,16 @@ const activeIncidentStatuses = [
   INCIDENT_STATUS.INVESTIGATING,
   INCIDENT_STATUS.IDENTIFIED,
 ];
+const getIncidentDurationSeconds = (incident) =>
+  incident.duration ??
+  (incident.status === INCIDENT_STATUS.RESOLVED || !incident.startedAt
+    ? null
+    : Math.max(
+        0,
+        Math.floor(
+          (Date.now() - new Date(incident.startedAt).getTime()) / 1000,
+        ),
+      ));
 const sensitiveHeaderPattern =
   /(auth|cookie|token|secret|api[-_]?key|password)/i;
 const safeUrl = (value) => {
@@ -324,7 +334,7 @@ export const getAdminMonitorDetail = async (id, window) => {
       id: String(incident._id),
       startedAt: incident.startedAt,
       endedAt: incident.endedAt,
-      duration: incident.duration,
+      duration: getIncidentDurationSeconds(incident),
       status: incident.status,
       severity: incident.severity,
       rootCause: incident.rootCause,
@@ -377,6 +387,7 @@ export const listAdminIncidents = async ({
   return {
     incidents: incidents.map((item) => ({
       ...item,
+      duration: getIncidentDurationSeconds(item),
       monitor: item.monitor
         ? { ...item.monitor, url: safeUrl(item.monitor.url) }
         : null,
@@ -402,6 +413,7 @@ export const getAdminIncidentDetail = async (id) => {
   if (!incident) throw ApiError.notFound(`Incident not found with id: ${id}`);
   return {
     ...incident,
+    duration: getIncidentDurationSeconds(incident),
     monitor: incident.monitor
       ? { ...incident.monitor, url: safeUrl(incident.monitor.url) }
       : null,

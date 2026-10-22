@@ -201,12 +201,7 @@ export default function AdminMonitorDetails() {
                       {i.endedAt
                         ? `– ${new Date(i.endedAt).toLocaleString()}`
                         : "· ongoing"}{" "}
-                      ·{" "}
-                      {i.duration ??
-                        Math.floor(
-                          (Date.now() - new Date(i.startedAt).getTime()) / 1000,
-                        )}
-                      s
+                      · {i.duration ?? "Unavailable"}s
                     </p>
                     {i.rootCause && (
                       <p className="mt-1 text-sm text-zinc-400">
