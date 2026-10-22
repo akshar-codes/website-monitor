@@ -4,7 +4,7 @@ import {
   SSL_STATUS_VALUES,
   DOMAIN_STATUS,
   DOMAIN_STATUS_VALUES,
-} from "../config/sslConstants.js";
+} from "../constants/sslConstants.js";
 
 // ── Sub-schemas ──────────────────────────────────────────────────────────────
 
@@ -15,13 +15,23 @@ const certificateSchema = new mongoose.Schema(
     validFrom: { type: Date, default: null },
     validTo: { type: Date, default: null },
     issuer: { type: String, default: null, trim: true, maxlength: 300 },
-    issuerOrganization: { type: String, default: null, trim: true, maxlength: 300 },
+    issuerOrganization: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 300,
+    },
     subject: { type: String, default: null, trim: true, maxlength: 300 },
     subjectAlternativeNames: { type: [String], default: [] },
     serialNumber: { type: String, default: null, trim: true, maxlength: 200 },
     fingerprint: { type: String, default: null, trim: true, maxlength: 200 },
     fingerprint256: { type: String, default: null, trim: true, maxlength: 200 },
-    signatureAlgorithm: { type: String, default: null, trim: true, maxlength: 100 },
+    signatureAlgorithm: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 100,
+    },
     protocol: { type: String, default: null, trim: true, maxlength: 20 },
     keyBits: { type: Number, default: null, min: 0 },
   },
@@ -147,7 +157,10 @@ sslInfoSchema.index({ "domain.expiresAt": 1 });
  * index on `monitor` rejects the loser with E11000, which is caught and
  * re-read instead of surfacing a duplicate-key error to the caller.
  */
-sslInfoSchema.statics.getOrCreateForMonitor = async function (monitorId, hostname) {
+sslInfoSchema.statics.getOrCreateForMonitor = async function (
+  monitorId,
+  hostname,
+) {
   let info = await this.findOne({ monitor: monitorId });
   if (info) return info;
 

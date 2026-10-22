@@ -1,4 +1,5 @@
 import MongoStore from "connect-mongo";
+import session from "express-session";
 import env from "./env.js";
 
 export const SESSION_COLLECTION_NAME = "sessions";
@@ -10,13 +11,15 @@ const sessionConfig = {
   saveUninitialized: false,
 
   rolling: true,
-  store: MongoStore.create({
-    mongoUrl: env.MONGO_URI,
-    collectionName: SESSION_COLLECTION_NAME,
+  store: env.isTest
+    ? new session.MemoryStore()
+    : MongoStore.create({
+        mongoUrl: env.MONGO_URI,
+        collectionName: SESSION_COLLECTION_NAME,
 
-    ttl: env.SESSION_REMEMBER_ME_MAX_AGE_MS / 1000,
-    autoRemove: "native",
-  }),
+        ttl: env.SESSION_REMEMBER_ME_MAX_AGE_MS / 1000,
+        autoRemove: "native",
+      }),
   cookie: {
     httpOnly: true,
     secure: env.isProd, // requires HTTPS — only enforce once actually served over it

@@ -3,7 +3,7 @@ import ApiError from "../utils/ApiError.js";
 import { sanitizeQueryTarget } from "../utils/sanitize.js";
 
 const formatZodErrors = (zodError, fallbackField) =>
-  zodError.errors.map((issue) => ({
+  (zodError.issues || zodError.errors || []).map((issue) => ({
     field: issue.path.length ? issue.path.join(".") : fallbackField,
     message: issue.message,
   }));

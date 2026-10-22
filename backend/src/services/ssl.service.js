@@ -7,8 +7,12 @@ import {
   extractHostname,
   isSslEligible,
   performSslCheck,
-} from "../workers/sslChecker.js";
-import { SSL_STATUS, DOMAIN_STATUS, SSL_STATUS_VALUES } from "../config/sslConstants.js";
+} from "./sslChecker.js";
+import {
+  SSL_STATUS,
+  DOMAIN_STATUS,
+  SSL_STATUS_VALUES,
+} from "../constants/sslConstants.js";
 import { getOwnedMonitorIds } from "./monitor.service.js";
 import { createNotification } from "./notification.service.js";
 import {
@@ -92,10 +96,17 @@ const domainNotificationCopy = (monitor, status, daysRemaining) => {
   }
 };
 
-const maybeNotify = async (monitor, kind, previousStatus, nextStatus, daysRemaining) => {
+const maybeNotify = async (
+  monitor,
+  kind,
+  previousStatus,
+  nextStatus,
+  daysRemaining,
+) => {
   if (previousStatus === nextStatus) return; // no transition — never re-notify
 
-  const notifiable = kind === "ssl" ? NOTIFIABLE_SSL_STATUSES : NOTIFIABLE_DOMAIN_STATUSES;
+  const notifiable =
+    kind === "ssl" ? NOTIFIABLE_SSL_STATUSES : NOTIFIABLE_DOMAIN_STATUSES;
   if (!notifiable.has(nextStatus)) return;
 
   const copy =
@@ -142,14 +153,17 @@ export const runAndPersistCheck = async (monitor) => {
   const previousSslStatus = info.status;
   const previousDomainStatus = info.domain?.status || null;
 
-  const { certResult, domainResult, cert, domain } = await performSslCheck(hostname);
+  const { certResult, domainResult, cert, domain } =
+    await performSslCheck(hostname);
 
   info.hostname = hostname;
   info.status = cert.status;
   info.daysRemaining = cert.daysRemaining;
   info.previousStatus = previousSslStatus;
   info.lastCheckedAt = new Date();
-  info.consecutiveFailures = certResult.ok ? 0 : (info.consecutiveFailures || 0) + 1;
+  info.consecutiveFailures = certResult.ok
+    ? 0
+    : (info.consecutiveFailures || 0) + 1;
   info.lastError = certResult.ok ? null : certResult.error;
 
   // Preserve the last-known-good certificate snapshot on a transient
@@ -176,16 +190,24 @@ export const runAndPersistCheck = async (monitor) => {
 
   info.domain = {
     name: domainResult.ok ? domainResult.name : info.domain?.name || hostname,
-    registrar: domainResult.ok ? domainResult.registrar : info.domain?.registrar || null,
+    registrar: domainResult.ok
+      ? domainResult.registrar
+      : info.domain?.registrar || null,
     registeredAt: domainResult.ok
       ? domainResult.registeredAt
       : info.domain?.registeredAt || null,
-    updatedAt: domainResult.ok ? domainResult.updatedAt : info.domain?.updatedAt || null,
-    expiresAt: domainResult.ok ? domainResult.expiresAt : info.domain?.expiresAt || null,
+    updatedAt: domainResult.ok
+      ? domainResult.updatedAt
+      : info.domain?.updatedAt || null,
+    expiresAt: domainResult.ok
+      ? domainResult.expiresAt
+      : info.domain?.expiresAt || null,
     nameServers: domainResult.ok
       ? domainResult.nameServers
       : info.domain?.nameServers || [],
-    statuses: domainResult.ok ? domainResult.statuses : info.domain?.statuses || [],
+    statuses: domainResult.ok
+      ? domainResult.statuses
+      : info.domain?.statuses || [],
     status: domain.status,
     daysRemaining: domain.daysRemaining,
     lookupError: domainResult.ok ? null : domainResult.error,
@@ -198,8 +220,20 @@ export const runAndPersistCheck = async (monitor) => {
     nextSslCheckAt: new Date(Date.now() + env.SSL_CHECK_INTERVAL_MS),
   });
 
-  await maybeNotify(monitor, "ssl", previousSslStatus, cert.status, cert.daysRemaining);
-  await maybeNotify(monitor, "domain", previousDomainStatus, domain.status, domain.daysRemaining);
+  await maybeNotify(
+    monitor,
+    "ssl",
+    previousSslStatus,
+    cert.status,
+    cert.daysRemaining,
+  );
+  await maybeNotify(
+    monitor,
+    "domain",
+    previousDomainStatus,
+    domain.status,
+    domain.daysRemaining,
+  );
 
   logger.debug(
     `SSL check for "${monitor.name}" (${hostname}) — ${cert.status}${
@@ -231,7 +265,10 @@ export const getMonitorSsl = async (monitorId, user) => {
   const eligible = isSslEligible(monitor.url);
 
   const info = eligible
-    ? await SslInfo.getOrCreateForMonitor(monitor._id, extractHostname(monitor.url))
+    ? await SslInfo.getOrCreateForMonitor(
+        monitor._id,
+        extractHostname(monitor.url),
+      )
     : null;
 
   return {
@@ -290,7 +327,9 @@ export const triggerManualCheck = async (monitorId, user) => {
 
   const info = await runAndPersistCheck(monitor);
   if (!info) {
-    throw ApiError.internal("SSL check could not be completed for this monitor");
+    throw ApiError.internal(
+      "SSL check could not be completed for this monitor",
+    );
   }
 
   await logActivity({
@@ -361,7 +400,9 @@ export const getSslOverview = async (user) => {
   ]);
 
   const eligibleMonitors = monitors.filter((m) => isSslEligible(m.url));
-  const monitoredCount = eligibleMonitors.filter((m) => m.sslMonitoringEnabled).length;
+  const monitoredCount = eligibleMonitors.filter(
+    (m) => m.sslMonitoringEnabled,
+  ).length;
 
   const statusCounts = Object.fromEntries(SSL_STATUS_VALUES.map((s) => [s, 0]));
   for (const doc of sslDocs) {
@@ -370,7 +411,9 @@ export const getSslOverview = async (user) => {
 
   const expiringSoonCertificates = sslDocs
     .filter(
-      (d) => d.status === SSL_STATUS.EXPIRING_SOON || d.status === SSL_STATUS.EXPIRED,
+      (d) =>
+        d.status === SSL_STATUS.EXPIRING_SOON ||
+        d.status === SSL_STATUS.EXPIRED,
     )
     .sort((a, b) => (a.daysRemaining ?? 0) - (b.daysRemaining ?? 0))
     .slice(0, 10);
@@ -381,7 +424,9 @@ export const getSslOverview = async (user) => {
         d.domain?.status === DOMAIN_STATUS.EXPIRING_SOON ||
         d.domain?.status === DOMAIN_STATUS.EXPIRED,
     )
-    .sort((a, b) => (a.domain?.daysRemaining ?? 0) - (b.domain?.daysRemaining ?? 0))
+    .sort(
+      (a, b) => (a.domain?.daysRemaining ?? 0) - (b.domain?.daysRemaining ?? 0),
+    )
     .slice(0, 10);
 
   return {

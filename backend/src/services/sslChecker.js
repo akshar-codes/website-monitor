@@ -15,7 +15,7 @@ import {
   DOMAIN_STATUS,
   SSL_EXPIRY_THRESHOLDS,
   DOMAIN_EXPIRY_THRESHOLDS,
-} from "../config/sslConstants.js";
+} from "../constants/sslConstants.js";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -105,7 +105,12 @@ const fetchPeerCertificate = (hostname, port, timeoutMs) =>
  * Normalises Node's raw peer-certificate object into the shape persisted
  * on SslInfo.certificate.
  */
-const parseCertificate = ({ cert, protocol, authorized, authorizationError }) => {
+const parseCertificate = ({
+  cert,
+  protocol,
+  authorized,
+  authorizationError,
+}) => {
   const validFrom = cert.valid_from ? new Date(cert.valid_from) : null;
   const validTo = cert.valid_to ? new Date(cert.valid_to) : null;
 
@@ -184,7 +189,10 @@ export const checkDomain = async (hostname, timeoutMs) => {
     clearTimeout(timer);
 
     if (!response.ok) {
-      return { ok: false, error: `RDAP lookup returned HTTP ${response.status}` };
+      return {
+        ok: false,
+        error: `RDAP lookup returned HTTP ${response.status}`,
+      };
     }
 
     const body = await response.json();
@@ -202,7 +210,9 @@ export const checkDomain = async (hostname, timeoutMs) => {
       (e.roles || []).includes("registrar"),
     );
     const registrar =
-      registrarEntity?.vcardArray?.[1]?.find((field) => field[0] === "fn")?.[3] ||
+      registrarEntity?.vcardArray?.[1]?.find(
+        (field) => field[0] === "fn",
+      )?.[3] ||
       registrarEntity?.handle ||
       null;
 
