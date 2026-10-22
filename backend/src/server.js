@@ -9,9 +9,11 @@ import {
   stop as stopSslScheduler,
 } from "./workers/sslScheduler.js";
 import { verifyMailTransport } from "./config/mail.js";
+import { dispatchNotificationDigests } from "./services/notification.service.js";
 
 let server = null;
 let shuttingDown = false;
+let digestTimer = null;
 
 /**
  * Graceful shutdown — stops both the health-check and SSL polling
@@ -26,6 +28,7 @@ const shutdown = (signal, exitCode = 0) => {
   // Stop the schedulers first (no new polls/checks)
   stop();
   stopSslScheduler();
+  if (digestTimer) clearInterval(digestTimer);
 
   if (!server) {
     process.exit(exitCode);
@@ -60,6 +63,14 @@ const startServer = async () => {
   // 3. Start the monitoring schedulers
   start();
   startSslScheduler();
+  digestTimer = setInterval(
+    () =>
+      dispatchNotificationDigests().catch((error) =>
+        logger.error(`Notification digest run failed: ${error.message}`),
+      ),
+    15 * 60 * 1000,
+  );
+  digestTimer.unref?.();
 
   // 4. Start listening
   server = app.listen(env.PORT, () => {

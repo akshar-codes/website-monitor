@@ -88,6 +88,34 @@ export const updateDashboardPreferences = async (user, data) => {
   return prefs;
 };
 
+export const updateNotificationPreferences = async (user, data) => {
+  const userId = resolveUserId(user);
+  const prefs = await UserPreference.getOrCreateForUser(userId);
+  const current = prefs.notifications.toObject();
+  const email = { ...current.email, ...(data.email || {}) };
+  if (data.email?.enabled === true && current.email.enabled !== true) {
+    email.enabledAt = new Date();
+  } else if (data.email?.enabled === false) {
+    email.enabledAt = null;
+  }
+  prefs.notifications = {
+    ...current,
+    ...(data.inApp ? { inApp: { ...current.inApp, ...data.inApp } } : {}),
+    ...(data.email ? { email } : {}),
+    ...(data.frequency ? { frequency: data.frequency } : {}),
+  };
+  prefs.markModified("notifications");
+  await prefs.save();
+  await logActivity({
+    userId,
+    category: ACTIVITY_CATEGORIES.PREFERENCES,
+    action: ACTIVITY_ACTIONS.PREFERENCES_UPDATED,
+    description: "Updated notification preferences",
+    metadata: { changedFields: Object.keys(data) },
+  });
+  return prefs;
+};
+
 // ── Reset ────────────────────────────────────────────────────────────────────
 
 /**

@@ -1,4 +1,10 @@
 import Notification from "../models/Notification.js";
+import UserPreference from "../models/UserPreference.js";
+import User from "../models/User.js";
+import {
+  sendNotificationEmail,
+  sendNotificationDigestEmail,
+} from "./email.service.js";
 import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
 import {
@@ -7,6 +13,42 @@ import {
   NOTIFICATION_STATUS_FILTER_UNREAD,
   NOTIFICATION_STATUS_FILTER_READ,
 } from "../config/notificationConstants.js";
+
+const alertPreferenceKey = (type) => {
+  if (type === "monitor_down" || type === "monitor_degraded")
+    return "monitorDown";
+  if (type === "monitor_up") return "monitorRecovery";
+  if (
+    [
+      "ssl_expiring_soon",
+      "ssl_expired",
+      "ssl_invalid",
+      "domain_expiring_soon",
+      "domain_expired",
+    ].includes(type)
+  )
+    return "sslExpiry";
+  if (["incident_opened", "incident_resolved"].includes(type))
+    return "incidents";
+  if (
+    [
+      "plan_upgraded",
+      "plan_downgraded",
+      "plan_upgrade_request_approved",
+      "plan_upgrade_request_rejected",
+      "usage_limit_reached",
+    ].includes(type)
+  )
+    return "billing";
+  if (type === "account_security") return "accountSecurity";
+  return "systemAnnouncements";
+};
+const emailPreferenceKey = (type) =>
+  ["monitorDown", "monitorRecovery", "sslExpiry", "incidents"].includes(
+    alertPreferenceKey(type),
+  )
+    ? alertPreferenceKey(type)
+    : null;
 
 const resolveOwnerId = (user) => user.id || user._id.toString();
 
@@ -28,22 +70,54 @@ const resolveOwnerId = (user) => user.id || user._id.toString();
  * models/Notification.js), so nothing else in the create/read/update path
  * needs to change.
  */
-const dispatchChannels = async (notification) => {
+const dispatchChannels = async (notification, preferences, user) => {
   notification.channels.inApp = {
-    sent: true,
-    sentAt: new Date(),
+    sent: preferences.inApp[alertPreferenceKey(notification.type)] !== false,
+    sentAt:
+      preferences.inApp[alertPreferenceKey(notification.type)] !== false
+        ? new Date()
+        : null,
     error: null,
   };
 
-  await dispatchEmailChannel(notification);
   await dispatchPushChannel(notification);
 
   await notification.save();
+  // SMTP latency must not hold up monitor checks or notification API work.
+  void dispatchEmailChannel(notification, preferences, user);
 };
 
 // eslint-disable-next-line no-unused-vars
-const dispatchEmailChannel = async (notification) => {
-  // Not yet implemented — see the dispatchChannels comment above.
+const dispatchEmailChannel = async (notification, preferences, user) => {
+  const key = emailPreferenceKey(notification.type);
+  if (
+    !preferences.email.enabled ||
+    !key ||
+    preferences.email[key] === false ||
+    preferences.frequency !== "immediate"
+  )
+    return;
+  try {
+    await sendNotificationEmail(user, notification);
+    await Notification.updateOne(
+      { _id: notification._id },
+      {
+        $set: {
+          "channels.email.sent": true,
+          "channels.email.sentAt": new Date(),
+          "channels.email.error": null,
+        },
+      },
+    );
+  } catch (error) {
+    await Notification.updateOne(
+      { _id: notification._id },
+      { $set: { "channels.email.error": error.message } },
+    );
+    logger.warn(
+      `Notification email failed for ${user.email}: ${error.message}`,
+    );
+  }
 };
 
 // eslint-disable-next-line no-unused-vars
@@ -70,6 +144,21 @@ export const createNotification = async ({
   }
 
   try {
+    const prefsDoc = await UserPreference.getOrCreateForUser(ownerId);
+    const preferences = prefsDoc.notifications.toObject();
+    const inAppEnabled = preferences.inApp[alertPreferenceKey(type)] !== false;
+    const emailKey = emailPreferenceKey(type);
+    const emailEnabled =
+      preferences.email.enabled &&
+      emailKey &&
+      preferences.email[emailKey] !== false;
+    if (!inAppEnabled && !emailEnabled) return null;
+    const needsImmediateEmail =
+      emailEnabled && preferences.frequency === "immediate";
+    const user = needsImmediateEmail
+      ? await User.findById(ownerId).select("name email")
+      : null;
+    if (needsImmediateEmail && !user) return null;
     const notification = await Notification.create({
       owner: ownerId,
       type,
@@ -88,7 +177,7 @@ export const createNotification = async ({
       expiresAt,
     });
 
-    await dispatchChannels(notification);
+    await dispatchChannels(notification, preferences, user);
 
     return notification;
   } catch (error) {
@@ -120,7 +209,7 @@ export const getNotifications = async (
   { page, limit, category, status },
 ) => {
   const ownerId = resolveOwnerId(user);
-  const filter = { owner: ownerId };
+  const filter = { owner: ownerId, "channels.inApp.sent": true };
 
   if (category) filter.category = category;
   if (status === NOTIFICATION_STATUS_FILTER_UNREAD) filter.read = false;
@@ -214,6 +303,75 @@ export const deleteNotification = async (user, id) => {
  */
 export const clearReadNotifications = async (user) => {
   const ownerId = resolveOwnerId(user);
-  const result = await Notification.deleteMany({ owner: ownerId, read: true });
+  const result = await Notification.deleteMany({
+    owner: ownerId,
+    read: true,
+    "channels.inApp.sent": true,
+  });
   return result.deletedCount;
+};
+
+export const dispatchNotificationDigests = async () => {
+  const prefsList = await UserPreference.find({
+    "notifications.email.enabled": true,
+    "notifications.frequency": { $in: ["daily", "weekly"] },
+  })
+    .select("user notifications")
+    .lean();
+  const eligibleTypes = [
+    "monitor_down",
+    "monitor_up",
+    "monitor_degraded",
+    "incident_opened",
+    "incident_resolved",
+    "ssl_expiring_soon",
+    "ssl_expired",
+    "ssl_invalid",
+    "domain_expiring_soon",
+    "domain_expired",
+  ];
+  for (const prefs of prefsList) {
+    const frequency = prefs.notifications.frequency;
+    const age = (frequency === "daily" ? 1 : 7) * 24 * 60 * 60 * 1000;
+    const types = eligibleTypes.filter((type) => {
+      const key = emailPreferenceKey(type);
+      return key && prefs.notifications.email[key] !== false;
+    });
+    if (!types.length) continue;
+    const pending = await Notification.find({
+      owner: prefs.user,
+      type: { $in: types },
+      createdAt: { $lte: new Date(Date.now() - age) },
+      ...(prefs.notifications.email.enabledAt
+        ? { createdAt: { $gte: prefs.notifications.email.enabledAt, $lte: new Date(Date.now() - age) } }
+        : {}),
+      "channels.email.sent": false,
+    })
+      .sort({ createdAt: 1 })
+      .limit(100);
+    if (!pending.length) continue;
+    const user = await User.findById(prefs.user).select("name email");
+    if (!user) continue;
+    try {
+      await sendNotificationDigestEmail(user, pending, frequency);
+      await Notification.updateMany(
+        { _id: { $in: pending.map((item) => item._id) } },
+        {
+          $set: {
+            "channels.email.sent": true,
+            "channels.email.sentAt": new Date(),
+            "channels.email.error": null,
+          },
+        },
+      );
+    } catch (error) {
+      await Notification.updateMany(
+        { _id: { $in: pending.map((item) => item._id) } },
+        { $set: { "channels.email.error": error.message } },
+      );
+      logger.warn(
+        `Notification digest failed for ${user.email}: ${error.message}`,
+      );
+    }
+  }
 };

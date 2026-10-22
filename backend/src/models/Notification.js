@@ -145,6 +145,9 @@ notificationSchema.index({ owner: 1, category: 1, createdAt: -1 });
 // unread badges).
 notificationSchema.index({ owner: 1, category: 1, read: 1, createdAt: -1 });
 
+// Pending email digests are selected per owner and delivery state, oldest first.
+notificationSchema.index({ owner: 1, "channels.email.sent": 1, createdAt: 1 });
+
 // TTL cleanup — only applies to documents that opted into an expiry.
 notificationSchema.index(
   { expiresAt: 1 },
@@ -173,7 +176,11 @@ notificationSchema.pre("validate", function deriveCategory() {
 // ─────────────────────────────────────────────
 
 notificationSchema.statics.countUnreadForUser = function (ownerId) {
-  return this.countDocuments({ owner: ownerId, read: false });
+  return this.countDocuments({
+    owner: ownerId,
+    read: false,
+    "channels.inApp.sent": true,
+  });
 };
 
 /**
@@ -187,6 +194,7 @@ notificationSchema.statics.getUnreadSummary = async function (ownerId) {
       $match: {
         owner: new mongoose.Types.ObjectId(ownerId),
         read: false,
+        "channels.inApp.sent": true,
       },
     },
     {

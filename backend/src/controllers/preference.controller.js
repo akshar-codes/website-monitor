@@ -46,6 +46,17 @@ export const updateDashboardPreferences = asyncHandler(async (req, res) => {
   });
 });
 
+export const updateNotificationPreferences = asyncHandler(async (req, res) => {
+  const data = await preferenceService.updateNotificationPreferences(
+    req.user,
+    req.body,
+  );
+  sendSuccess(res, {
+    message: "Notification preferences updated successfully",
+    data,
+  });
+});
+
 /**
  * POST /api/preferences/reset
  * Resets every preference field back to its schema default.

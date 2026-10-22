@@ -118,3 +118,51 @@ export const sendPlanUpgradeRequestRejectedEmail = async (
 
   logger.info(`Plan-upgrade-rejected email sent to ${user.email}`);
 };
+
+const escapeEmailText = (value = "") =>
+  String(value).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+
+export const sendNotificationEmail = async (user, notification) => {
+  const title = escapeEmailText(notification.title);
+  const message = escapeEmailText(notification.message);
+  const actionUrl = notification.link
+    ? `${env.CLIENT_URL}${notification.link}`
+    : env.CLIENT_URL;
+  const html = `<div style="font-family:Arial,sans-serif;color:#18181b;max-width:600px"><h2>${title}</h2><p>${message}</p><p><a href="${escapeEmailText(actionUrl)}">View in Website Monitor</a></p></div>`;
+  await sendMail({
+    to: user.email,
+    subject: notification.title.replace(/[\r\n]+/g, " "),
+    html,
+    text: `${notification.title}\n\n${notification.message}\n\n${actionUrl}`,
+  });
+};
+
+export const sendNotificationDigestEmail = async (
+  user,
+  notifications,
+  frequency,
+) => {
+  const rows = notifications
+    .map(
+      (item) =>
+        `<li><strong>${escapeEmailText(item.title)}</strong><br/>${escapeEmailText(item.message)}</li>`,
+    )
+    .join("");
+  const html = `<div style="font-family:Arial,sans-serif;color:#18181b;max-width:600px"><h2>Your ${frequency} monitoring digest</h2><ul>${rows}</ul><p><a href="${escapeEmailText(env.CLIENT_URL)}">Open Website Monitor</a></p></div>`;
+  const text = [
+    `Your ${frequency} monitoring digest`,
+    ...notifications.map((item) => `${item.title}: ${item.message}`),
+  ].join("\n\n");
+  await sendMail({
+    to: user.email,
+    subject: `Website Monitor ${frequency} digest (${notifications.length})`,
+    html,
+    text,
+  });
+};

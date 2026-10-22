@@ -70,3 +70,30 @@ export const updateDashboardPreferencesSchema = z
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one dashboard preference field must be provided",
   });
+
+const notificationSwitchesSchema = z.object({
+  monitorDown: z.boolean().optional(),
+  monitorRecovery: z.boolean().optional(),
+  sslExpiry: z.boolean().optional(),
+  incidents: z.boolean().optional(),
+  billing: z.boolean().optional(),
+  accountSecurity: z.boolean().optional(),
+  systemAnnouncements: z.boolean().optional(),
+});
+export const updateNotificationPreferencesSchema = z
+  .object({
+    inApp: notificationSwitchesSchema.optional(),
+    email: z
+      .object({
+        enabled: z.boolean().optional(),
+        monitorDown: z.boolean().optional(),
+        monitorRecovery: z.boolean().optional(),
+        sslExpiry: z.boolean().optional(),
+        incidents: z.boolean().optional(),
+      })
+      .optional(),
+    frequency: z.enum(["immediate", "daily", "weekly"]).optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one notification preference must be provided",
+  });

@@ -18,12 +18,14 @@ import {
   getPreferences,
   updatePreferences,
   updateDashboardPreferences,
+  updateNotificationPreferences,
   resetPreferences,
 } from "../controllers/preference.controller.js";
 import { validate } from "../middlewares/validate.js";
 import {
   updatePreferencesSchema,
   updateDashboardPreferencesSchema,
+  updateNotificationPreferencesSchema,
 } from "../validators/preference.validator.js";
 
 const router = Router();
@@ -36,6 +38,12 @@ router.patch(
   "/dashboard",
   validate(updateDashboardPreferencesSchema, "body"),
   updateDashboardPreferences,
+);
+
+router.patch(
+  "/notifications",
+  validate(updateNotificationPreferencesSchema, "body"),
+  updateNotificationPreferences,
 );
 
 router.post("/reset", resetPreferences);

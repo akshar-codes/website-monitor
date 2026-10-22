@@ -67,6 +67,34 @@ const dashboardPreferencesSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const notificationPreferencesSchema = new mongoose.Schema(
+  {
+    inApp: {
+      monitorDown: { type: Boolean, default: true },
+      monitorRecovery: { type: Boolean, default: true },
+      sslExpiry: { type: Boolean, default: true },
+      incidents: { type: Boolean, default: true },
+      billing: { type: Boolean, default: true },
+      accountSecurity: { type: Boolean, default: true },
+      systemAnnouncements: { type: Boolean, default: true },
+    },
+    email: {
+      enabled: { type: Boolean, default: false },
+      monitorDown: { type: Boolean, default: true },
+      monitorRecovery: { type: Boolean, default: true },
+      sslExpiry: { type: Boolean, default: true },
+      incidents: { type: Boolean, default: true },
+      enabledAt: { type: Date, default: null },
+    },
+    frequency: {
+      type: String,
+      enum: ["immediate", "daily", "weekly"],
+      default: "immediate",
+    },
+  },
+  { _id: false },
+);
+
 // ── Top-level preferences ────────────────────────────────────────────────────
 
 const userPreferenceSchema = new mongoose.Schema(
@@ -129,6 +157,7 @@ const userPreferenceSchema = new mongoose.Schema(
       type: dashboardPreferencesSchema,
       default: () => ({}),
     },
+    notifications: { type: notificationPreferencesSchema, default: () => ({}) },
   },
   {
     timestamps: true,
@@ -153,6 +182,7 @@ const userPreferenceSchema = new mongoose.Schema(
 // Enforces one preference document per user at the database level and
 // backs the lookup every read/write does.
 userPreferenceSchema.index({ user: 1 }, { unique: true });
+userPreferenceSchema.index({ "notifications.email.enabled": 1, "notifications.frequency": 1 });
 
 // ── Statics ──
 
