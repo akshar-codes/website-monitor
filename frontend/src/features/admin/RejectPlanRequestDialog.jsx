@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Modal,
   ModalHeader,
@@ -15,13 +15,12 @@ export default function RejectPlanRequestDialog({
   targetRequest,
   loading = false,
 }) {
-  const [reason, setReason] = useState("");
-
-  // Clear any leftover text from a previous rejection whenever the dialog
-  // opens for a new request.
-  useEffect(() => {
-    if (open) setReason("");
-  }, [open]);
+  const requestKey = open
+    ? targetRequest?.id || targetRequest?._id || "open"
+    : "closed";
+  const [draft, setDraft] = useState({ key: requestKey, reason: "" });
+  const reason = draft.key === requestKey ? draft.reason : "";
+  const setReason = (value) => setDraft({ key: requestKey, reason: value });
 
   return (
     <Modal open={open} onClose={onClose}>

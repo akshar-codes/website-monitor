@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CheckCircle2, Circle } from "lucide-react";
 import {
   Modal,
@@ -56,21 +56,24 @@ export default function IncidentDetailsModal({
   onUpdateStatus,
   updating = false,
 }) {
-  const [nextStatus, setNextStatus] = useState("");
-  const [rootCause, setRootCause] = useState("");
-  const [resolutionNotes, setResolutionNotes] = useState("");
-
-  // Re-hydrate the form whenever a fresh incident loads (opening the
-  // modal, or switching to a different incident), so a previous
-  // selection never lingers.
-  useEffect(() => {
-    if (open && incident) {
-      const allowed = ALLOWED_TRANSITIONS[incident.status] || [];
-      setNextStatus(allowed[0] || "");
-      setRootCause(incident.rootCause || "");
-      setResolutionNotes(incident.resolutionNotes || "");
-    }
-  }, [open, incident]);
+  const formKey =
+    open && incident
+      ? `${incident.id || incident._id}:${incident.status}:${incident.rootCause || ""}:${incident.resolutionNotes || ""}`
+      : "closed";
+  const defaults = {
+    nextStatus: (ALLOWED_TRANSITIONS[incident?.status] || [])[0] || "",
+    rootCause: incident?.rootCause || "",
+    resolutionNotes: incident?.resolutionNotes || "",
+  };
+  const [form, setForm] = useState(() => ({ key: formKey, ...defaults }));
+  const current = form.key === formKey ? form : { key: formKey, ...defaults };
+  const { nextStatus, rootCause, resolutionNotes } = current;
+  const setField = (field, value) =>
+    setForm((previous) => ({
+      ...(previous.key === formKey ? previous : { key: formKey, ...defaults }),
+      [field]: value,
+      key: formKey,
+    }));
 
   if (!open) return null;
 
@@ -227,7 +230,7 @@ export default function IncidentDetailsModal({
                   <FormField label="New status">
                     <Select
                       value={nextStatus}
-                      onChange={(e) => setNextStatus(e.target.value)}
+                      onChange={(e) => setField("nextStatus", e.target.value)}
                       disabled={updating}
                     >
                       {allowedTransitions.map((s) => (
@@ -241,7 +244,7 @@ export default function IncidentDetailsModal({
                   <FormField label="Root cause (optional)">
                     <Textarea
                       value={rootCause}
-                      onChange={(e) => setRootCause(e.target.value)}
+                      onChange={(e) => setField("rootCause", e.target.value)}
                       rows={2}
                       maxLength={2000}
                       placeholder="What caused this incident?"
@@ -253,7 +256,9 @@ export default function IncidentDetailsModal({
                     <FormField label="Resolution notes (optional)">
                       <Textarea
                         value={resolutionNotes}
-                        onChange={(e) => setResolutionNotes(e.target.value)}
+                        onChange={(e) =>
+                          setField("resolutionNotes", e.target.value)
+                        }
                         rows={2}
                         maxLength={5000}
                         placeholder="How was this incident resolved?"

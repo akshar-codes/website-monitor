@@ -1,7 +1,7 @@
 import { useCallback, useContext, useState } from "react";
 import { toast } from "sonner";
 import { useQuery } from "./useQuery";
-import { NotificationsContext } from "../context/NotificationsContext";
+import { NotificationsContext } from "../contexts/NotificationsContext";
 import * as notificationsApi from "../services/api/notifications";
 
 export function useNotificationsCenter() {

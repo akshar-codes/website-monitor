@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Modal,
   ModalHeader,
@@ -16,17 +16,27 @@ export default function ApprovePlanRequestDialog({
   targetRequest,
   loading = false,
 }) {
-  const [grantedPlan, setGrantedPlan] = useState("");
-  const [reason, setReason] = useState("");
-  const [expiresAt, setExpiresAt] = useState("");
-
-  useEffect(() => {
-    if (open && targetRequest) {
-      setGrantedPlan(targetRequest.requestedPlan);
-      setReason("");
-      setExpiresAt("");
-    }
-  }, [open, targetRequest]);
+  const requestKey =
+    open && targetRequest
+      ? `${targetRequest.id || targetRequest._id}:${targetRequest.requestedPlan}`
+      : "closed";
+  const defaults = {
+    grantedPlan: targetRequest?.requestedPlan || "",
+    reason: "",
+    expiresAt: "",
+  };
+  const [form, setForm] = useState(() => ({ key: requestKey, ...defaults }));
+  const current =
+    form.key === requestKey ? form : { key: requestKey, ...defaults };
+  const { grantedPlan, reason, expiresAt } = current;
+  const setField = (field, value) =>
+    setForm((previous) => ({
+      ...(previous.key === requestKey
+        ? previous
+        : { key: requestKey, ...defaults }),
+      [field]: value,
+      key: requestKey,
+    }));
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -46,7 +56,7 @@ export default function ApprovePlanRequestDialog({
         >
           <Select
             value={grantedPlan}
-            onChange={(e) => setGrantedPlan(e.target.value)}
+            onChange={(e) => setField("grantedPlan", e.target.value)}
             disabled={loading}
           >
             {PLAN_VALUES.map((planId) => (
@@ -60,7 +70,7 @@ export default function ApprovePlanRequestDialog({
         <FormField label="Administrative reason">
           <input
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={(e) => setField("reason", e.target.value)}
             maxLength={500}
             className="w-full rounded-md border border-border-default bg-bg-elevated px-3 py-2 text-sm text-white"
             placeholder="Required audit reason"
@@ -70,7 +80,7 @@ export default function ApprovePlanRequestDialog({
           <input
             type="datetime-local"
             value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
+            onChange={(e) => setField("expiresAt", e.target.value)}
             className="w-full rounded-md border border-border-default bg-bg-elevated px-3 py-2 text-sm text-white"
           />
         </FormField>

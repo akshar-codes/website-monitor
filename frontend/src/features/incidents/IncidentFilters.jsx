@@ -32,7 +32,12 @@ export default function IncidentFilters({
   retentionDays,
   totalCount,
 }) {
-  const [localSearch, setLocalSearch] = useState(search);
+  const [searchDraft, setSearchDraft] = useState({
+    source: search,
+    value: search,
+  });
+  const localSearch =
+    searchDraft.source === search ? searchDraft.value : search;
 
   // Debounce the search box before it drives the server-side query — a
   // request per keystroke would otherwise hammer the list endpoint.
@@ -41,13 +46,10 @@ export default function IncidentFilters({
       if (localSearch !== search) onSearchChange(localSearch);
     }, 350);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localSearch]);
+  }, [localSearch, onSearchChange, search]);
 
-  // Keep the input in sync if the parent resets search externally.
-  useEffect(() => {
-    setLocalSearch(search);
-  }, [search]);
+  const updateSearchDraft = (value) =>
+    setSearchDraft({ source: search, value });
 
   return (
     <div className="mb-5 space-y-3">
@@ -59,7 +61,7 @@ export default function IncidentFilters({
           />
           <Input
             value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
+            onChange={(e) => updateSearchDraft(e.target.value)}
             placeholder="Search by monitor, URL, or root cause…"
             className="pl-9"
           />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Save, RotateCcw } from "lucide-react";
@@ -14,7 +14,10 @@ import TimezoneSelector from "../features/preferences/TimezoneSelector";
 import LanguageSelector from "../features/preferences/LanguageSelector";
 import DateTimeFormatSelector from "../features/preferences/DateTimeFormatSelector";
 import DashboardCustomization from "../features/preferences/DashboardCustomization";
-import { usePreferences, usePreferenceMutations } from "../hooks/usePreferences";
+import {
+  usePreferences,
+  usePreferenceMutations,
+} from "../hooks/usePreferences";
 import {
   THEME_OPTIONS,
   LANGUAGE_OPTIONS,
@@ -49,11 +52,20 @@ export default function Preferences() {
     resetting,
   } = usePreferenceMutations();
 
-  const [dashboardDraft, setDashboardDraft] = useState(null);
+  const [dashboardState, setDashboardState] = useState({
+    source: preferences,
+    value: preferences?.dashboard || null,
+  });
+  const dashboardDraft =
+    dashboardState.source === preferences
+      ? dashboardState.value
+      : preferences?.dashboard || null;
+  const setDashboardDraft = (value) =>
+    setDashboardState({ source: preferences, value });
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
 
   const {
-    watch,
+    control,
     setValue,
     handleSubmit,
     reset,
@@ -76,14 +88,13 @@ export default function Preferences() {
       dateFormat: preferences.dateFormat,
       timeFormat: preferences.timeFormat,
     });
-    setDashboardDraft(preferences.dashboard);
   }, [preferences, reset]);
 
-  const theme = watch("theme");
-  const timezone = watch("timezone");
-  const language = watch("language");
-  const dateFormat = watch("dateFormat");
-  const timeFormat = watch("timeFormat");
+  const theme = useWatch({ control, name: "theme" });
+  const timezone = useWatch({ control, name: "timezone" });
+  const language = useWatch({ control, name: "language" });
+  const dateFormat = useWatch({ control, name: "dateFormat" });
+  const timeFormat = useWatch({ control, name: "timeFormat" });
 
   const onSubmitGeneral = async (data) => {
     const result = await savePreferences(data);

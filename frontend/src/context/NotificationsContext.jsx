@@ -1,15 +1,7 @@
-import {
-  createContext,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { NotificationsContext } from "../contexts/NotificationsContext";
 import { useAuth } from "../hooks/useAuth";
 import * as notificationsApi from "../services/api/notifications";
-
-export const NotificationsContext = createContext(null);
 
 const DROPDOWN_LIMIT = 8;
 const POLL_INTERVAL_MS = 45000;
@@ -63,12 +55,15 @@ export function NotificationsProvider({ children }) {
   }, [user]);
 
   useEffect(() => {
-    load();
+    const initialLoad = setTimeout(load, 0);
 
-    if (!user) return undefined;
+    if (!user) return () => clearTimeout(initialLoad);
 
     pollRef.current = setInterval(load, POLL_INTERVAL_MS);
-    return () => clearInterval(pollRef.current);
+    return () => {
+      clearTimeout(initialLoad);
+      clearInterval(pollRef.current);
+    };
   }, [user, load]);
 
   const markReadLocal = useCallback((id) => {

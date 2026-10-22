@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { PermissionsContext } from "../context/PermissionsContext";
+import { PermissionsContext } from "../contexts/PermissionsContext";
 
 export function usePermissions() {
   const context = useContext(PermissionsContext);

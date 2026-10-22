@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Bell, Mail, RotateCcw, Save } from "lucide-react";
 import PageContainer from "../components/layout/PageContainer";
 import PageHeader from "../components/layout/PageHeader";
@@ -67,20 +67,29 @@ export default function NotificationSettings() {
   const { preferences, loading } = usePreferences();
   const { saveNotificationPreferences, submittingNotifications } =
     usePreferenceMutations();
-  const [draft, setDraft] = useState(DEFAULTS);
-
-  useEffect(() => {
-    if (preferences?.notifications)
-      setDraft({
+  const notifications = preferences?.notifications;
+  const normalized = notifications
+    ? {
         ...DEFAULTS,
-        ...preferences.notifications,
-        inApp: { ...DEFAULTS.inApp, ...preferences.notifications.inApp },
-        email: { ...DEFAULTS.email, ...preferences.notifications.email },
-      });
-  }, [preferences]);
+        ...notifications,
+        inApp: { ...DEFAULTS.inApp, ...notifications.inApp },
+        email: { ...DEFAULTS.email, ...notifications.email },
+      }
+    : DEFAULTS;
+  const [draftOverride, setDraftOverride] = useState({
+    source: notifications,
+    value: normalized,
+  });
+  const draft =
+    draftOverride.source === notifications ? draftOverride.value : normalized;
+  const updateDraft = (updater) =>
+    setDraftOverride({
+      source: notifications,
+      value: typeof updater === "function" ? updater(draft) : updater,
+    });
 
   const setGroupValue = (group, key, value) =>
-    setDraft((current) => ({
+    updateDraft((current) => ({
       ...current,
       [group]: { ...current[group], [key]: value },
     }));
@@ -90,7 +99,7 @@ export default function NotificationSettings() {
   };
   const reset = async () => {
     const result = await saveNotificationPreferences(DEFAULTS);
-    if (result) setDraft(DEFAULTS);
+    if (result) updateDraft(DEFAULTS);
   };
 
   return (
@@ -204,7 +213,7 @@ export default function NotificationSettings() {
               <select
                 value={draft.frequency}
                 onChange={(e) =>
-                  setDraft((current) => ({
+                  updateDraft((current) => ({
                     ...current,
                     frequency: e.target.value,
                   }))

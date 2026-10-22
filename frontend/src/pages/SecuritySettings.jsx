@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
@@ -112,14 +112,14 @@ export default function SecuritySettings() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     reset,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(passwordSchema),
     defaultValues: { currentPassword: "", password: "", confirmPassword: "" },
   });
-  const newPassword = watch("password", "");
+  const newPassword = useWatch({ control, name: "password", defaultValue: "" });
 
   const refreshSessions = useCallback(async () => {
     setSessionsLoading(true);
@@ -205,6 +205,10 @@ export default function SecuritySettings() {
     () => sessions.filter((session) => !session.current),
     [sessions],
   );
+  const displayedSessions = [
+    ...sessions.filter((session) => session.current),
+    ...otherSessions,
+  ];
   const providerLabel = (provider) =>
     provider.charAt(0).toUpperCase() + provider.slice(1);
 
@@ -347,7 +351,7 @@ export default function SecuritySettings() {
           </p>
         ) : (
           <div className="divide-y divide-border-subtle rounded-lg border border-border-subtle">
-            {sessions.map((session) => {
+            {displayedSessions.map((session) => {
               const { label, icon: DeviceIcon } = deviceLabel(
                 session.userAgent || "",
               );

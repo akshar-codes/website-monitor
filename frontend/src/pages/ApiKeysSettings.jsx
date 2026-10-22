@@ -42,7 +42,8 @@ export default function ApiKeysSettings() {
   }, []);
 
   useEffect(() => {
-    loadKeys();
+    const request = setTimeout(loadKeys, 0);
+    return () => clearTimeout(request);
   }, [loadKeys]);
 
   const handleCreate = async (event) => {
@@ -220,7 +221,7 @@ export default function ApiKeysSettings() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-sm">
+              <table className="w-full min-w-190 text-left text-sm">
                 <thead className="bg-bg-overlay text-xs uppercase tracking-wide text-text-muted">
                   <tr>
                     <th className="px-5 py-3">Name</th>

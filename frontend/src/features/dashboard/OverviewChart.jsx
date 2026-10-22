@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -42,8 +42,16 @@ export default function OverviewChart({
   loading = false,
   defaultWindow = "24h",
 }) {
-  const [window, setWindow] = useState("24h");
-  useEffect(() => setWindow(defaultWindow), [defaultWindow]);
+  const [windowSelection, setWindowSelection] = useState({
+    source: defaultWindow,
+    value: defaultWindow,
+  });
+  const window =
+    windowSelection.source === defaultWindow
+      ? windowSelection.value
+      : defaultWindow;
+  const setWindow = (value) =>
+    setWindowSelection({ source: defaultWindow, value });
   const [skeletonHeights] = useState(() =>
     Array.from({ length: 14 }, () => 25 + Math.random() * 65),
   );

@@ -1,15 +1,8 @@
-import {
-  createContext,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { PermissionsContext } from "../contexts/PermissionsContext";
 import { useAuth } from "../hooks/useAuth";
 import * as plansApi from "../services/api/plans";
 import { planHasFeature } from "../constants/features";
-
-export const PermissionsContext = createContext(null);
 
 /**
  * Role-based permissions now come straight from `user.permissions` — a
@@ -52,7 +45,8 @@ export function PermissionsProvider({ children }) {
   }, [user]);
 
   useEffect(() => {
-    loadPlan();
+    const request = setTimeout(loadPlan, 0);
+    return () => clearTimeout(request);
   }, [loadPlan]);
 
   const value = useMemo(() => {
@@ -61,7 +55,8 @@ export function PermissionsProvider({ children }) {
     const can = (permission) => userPermissions.includes(permission);
     const canAny = (permissions = []) => permissions.some(can);
     const canAll = (permissions = []) => permissions.every(can);
-    const hasFeature = (featureKey) => planHasFeature(planDefinition, featureKey);
+    const hasFeature = (featureKey) =>
+      planHasFeature(planDefinition, featureKey);
 
     return {
       can,

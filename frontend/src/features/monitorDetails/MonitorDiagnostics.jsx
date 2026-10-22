@@ -32,25 +32,26 @@ const Value = ({ label, value }) => (
 
 export default function MonitorDiagnostics({ monitorId }) {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedMonitorId, setLoadedMonitorId] = useState(null);
   const [error, setError] = useState(false);
+  const loading = loadedMonitorId !== monitorId;
 
   useEffect(() => {
     let alive = true;
-    setLoading(true);
     monitorsApi
       .getMonitorDiagnostics(monitorId)
       .then((response) => {
         if (alive) {
           setData(response.data);
+          setLoadedMonitorId(monitorId);
           setError(false);
         }
       })
       .catch(() => {
-        if (alive) setError(true);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
+        if (alive) {
+          setError(true);
+          setLoadedMonitorId(monitorId);
+        }
       });
     return () => {
       alive = false;

@@ -23,6 +23,8 @@ import { useUsage } from "../hooks/useUsage";
 import { useAuth } from "../hooks/useAuth";
 import { getPlanChangeType } from "../utils/planCompare";
 
+const EMPTY_PLANS = Object.freeze([]);
+
 /**
  * There is no payment gateway wired up yet, so plan changes split into two
  * flows here:
@@ -58,7 +60,7 @@ export default function Billing() {
   } = useMyPlanUpgradeRequest();
 
   const currentPlan = currentPlanData?.data;
-  const plans = catalogData?.data || [];
+  const plans = catalogData?.data || EMPTY_PLANS;
   const usage = usageData?.data;
   const pendingRequest = upgradeRequestData?.data?.pending || null;
   const requestHistory = upgradeRequestData?.data?.history || [];

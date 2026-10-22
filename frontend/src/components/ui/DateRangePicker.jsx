@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Calendar } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { Input } from "./Input";
@@ -31,22 +31,35 @@ export default function DateRangePicker({
 }) {
   const isCustom = value?.mode === "custom";
 
-  const [customOpen, setCustomOpen] = useState(isCustom);
-  const [draftStart, setDraftStart] = useState(toInputDate(value?.startDate));
-  const [draftEnd, setDraftEnd] = useState(toInputDate(value?.endDate));
-
-  // Keep the draft inputs in sync if the parent resets the range
-  // externally (e.g. switching monitors).
-  useEffect(() => {
-    setDraftStart(toInputDate(value?.startDate));
-    setDraftEnd(toInputDate(value?.endDate));
-    setCustomOpen(value?.mode === "custom");
-  }, [value?.mode, value?.startDate, value?.endDate]);
+  const rangeKey = `${value?.mode || ""}:${value?.window || ""}:${value?.startDate || ""}:${value?.endDate || ""}`;
+  const [draft, setDraft] = useState(() => ({
+    rangeKey,
+    start: toInputDate(value?.startDate),
+    end: toInputDate(value?.endDate),
+    customOpen: isCustom,
+  }));
+  const syncedDraft = draft.rangeKey === rangeKey;
+  const draftStart = syncedDraft ? draft.start : toInputDate(value?.startDate);
+  const draftEnd = syncedDraft ? draft.end : toInputDate(value?.endDate);
+  const customOpen = syncedDraft ? draft.customOpen : isCustom;
+  const updateDraft = (patch) =>
+    setDraft((current) => ({
+      ...(current.rangeKey === rangeKey
+        ? current
+        : {
+            rangeKey,
+            start: toInputDate(value?.startDate),
+            end: toInputDate(value?.endDate),
+            customOpen: isCustom,
+          }),
+      ...patch,
+      rangeKey,
+    }));
 
   const today = toInputDate(new Date());
 
   const handlePreset = (window) => {
-    setCustomOpen(false);
+    updateDraft({ customOpen: false });
     onChange({ mode: "preset", window });
   };
 
@@ -78,7 +91,7 @@ export default function DateRangePicker({
         ))}
         <button
           type="button"
-          onClick={() => setCustomOpen((v) => !v)}
+          onClick={() => updateDraft({ customOpen: !customOpen })}
           aria-pressed={isCustom}
           className={cn(
             "flex items-center gap-1 rounded-md px-3 py-1 text-[11px] font-medium transition-all",
@@ -97,7 +110,7 @@ export default function DateRangePicker({
             type="date"
             value={draftStart}
             max={draftEnd || today}
-            onChange={(e) => setDraftStart(e.target.value)}
+            onChange={(e) => updateDraft({ start: e.target.value })}
             aria-label="Range start date"
             className="h-7 w-36 text-xs"
           />
@@ -107,7 +120,7 @@ export default function DateRangePicker({
             value={draftEnd}
             min={draftStart}
             max={today}
-            onChange={(e) => setDraftEnd(e.target.value)}
+            onChange={(e) => updateDraft({ end: e.target.value })}
             aria-label="Range end date"
             className="h-7 w-36 text-xs"
           />

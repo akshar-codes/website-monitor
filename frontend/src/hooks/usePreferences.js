@@ -1,6 +1,6 @@
 import { useCallback, useContext, useState } from "react";
 import { toast } from "sonner";
-import { PreferencesContext } from "../context/PreferencesContext";
+import { PreferencesContext } from "../contexts/PreferencesContext";
 import * as preferencesApi from "../services/api/preferences";
 
 export function usePreferences() {

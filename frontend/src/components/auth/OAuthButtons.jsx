@@ -5,7 +5,13 @@ import { OAUTH_PROVIDERS } from "../../constants/oauthProviders";
 
 function GoogleIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" width={15} height={15} aria-hidden="true" {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      width={15}
+      height={15}
+      aria-hidden="true"
+      {...props}
+    >
       <path
         fill="#4285F4"
         d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"
@@ -44,7 +50,7 @@ export default function OAuthButtons({ disabled = false }) {
 
   const handleContinue = (providerId) => {
     setLoadingProvider(providerId);
-    window.location.href = `/api/auth/${providerId}`;
+    window.location.assign(`/api/auth/${providerId}`);
   };
 
   return (

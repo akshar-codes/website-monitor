@@ -1,9 +1,8 @@
-import { createContext, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { AuthContext } from "../contexts/AuthContext";
 import * as authApi from "../services/api/auth";
 import { ROLES } from "../constants/roles";
 import { PLANS } from "../constants/plans";
-
-export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -22,7 +21,8 @@ export function AuthProvider({ children }) {
 
   // Check for an existing session on first load.
   useEffect(() => {
-    fetchCurrentUser();
+    const request = setTimeout(fetchCurrentUser, 0);
+    return () => clearTimeout(request);
   }, [fetchCurrentUser]);
 
   // Dropped by the axios interceptor when any authenticated request comes

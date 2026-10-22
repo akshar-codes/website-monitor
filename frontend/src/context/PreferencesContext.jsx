@@ -1,15 +1,8 @@
-import {
-  createContext,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { PreferencesContext } from "../contexts/PreferencesContext";
 import { useAuth } from "../hooks/useAuth";
 import * as preferencesApi from "../services/api/preferences";
 import { THEMES } from "../constants/preferences";
-
-export const PreferencesContext = createContext(null);
 
 /**
  * Fetched ONCE at the app root — mirrors PermissionsContext's pattern —
@@ -72,7 +65,8 @@ export function PreferencesProvider({ children }) {
   }, [user, applyPreferences]);
 
   useEffect(() => {
-    loadPreferences();
+    const request = setTimeout(loadPreferences, 0);
+    return () => clearTimeout(request);
   }, [loadPreferences]);
 
   useEffect(() => {
