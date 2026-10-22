@@ -35,6 +35,11 @@ const incidentSchema = new mongoose.Schema(
       ref: "HealthCheck",
       default: null,
     },
+    recoveryCheck: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "HealthCheck",
+      default: null,
+    },
 
     // ── Timing ──
 
@@ -137,6 +142,11 @@ incidentSchema.index({ status: 1, startedAt: -1 });
 
 // Per-monitor active incidents (quick "is this monitor down?" check)
 incidentSchema.index({ monitor: 1, status: 1 });
+// At most one unresolved incident per monitor, including concurrent upserts.
+incidentSchema.index(
+  { monitor: 1 },
+  { unique: true, partialFilterExpression: { status: { $in: [INCIDENT_STATUS.ONGOING, INCIDENT_STATUS.INVESTIGATING, INCIDENT_STATUS.IDENTIFIED] } } },
+);
 
 // Severity filter (ops triage view)
 incidentSchema.index({ severity: 1, startedAt: -1 });

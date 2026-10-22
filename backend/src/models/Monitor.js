@@ -79,6 +79,12 @@ const monitorSchema = new mongoose.Schema(
       min: [0, "Consecutive failures cannot be negative"],
     },
     consecutiveSuccesses: { type: Number, default: 0, min: 0 },
+    lastIncidentCheckId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "HealthCheck",
+      default: null,
+      select: false,
+    },
 
     // ── Worker fields (SSL / domain monitoring) ──
     // Additive, optional fields — mirrors lastCheckedAt/nextCheckAt above

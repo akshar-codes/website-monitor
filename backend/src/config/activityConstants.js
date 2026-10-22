@@ -36,6 +36,8 @@ export const ACTIVITY_ACTIONS = Object.freeze({
 
   // ── Incident ──
   INCIDENT_STATUS_UPDATED: "incident_status_updated",
+  INCIDENT_AUTO_OPENED: "incident_auto_opened",
+  INCIDENT_AUTO_RESOLVED: "incident_auto_resolved",
 
   // ── Profile ──
   PROFILE_UPDATED: "profile_updated",

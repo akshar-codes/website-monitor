@@ -111,6 +111,7 @@ export const getIncidents = async (
     Incident.find(filter)
       .populate("monitor", MONITOR_POPULATE_FIELDS)
       .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
+      .populate("recoveryCheck", TRIGGER_CHECK_POPULATE_FIELDS)
       .sort({ startedAt: sortDirection })
       .skip(skip)
       .limit(limit)
@@ -137,6 +138,7 @@ export const getIncidentById = async (id, user) => {
   })
     .populate("monitor", MONITOR_POPULATE_FIELDS)
     .populate("triggerCheck", TRIGGER_CHECK_DETAIL_POPULATE_FIELDS)
+    .populate("recoveryCheck", TRIGGER_CHECK_DETAIL_POPULATE_FIELDS)
     .lean();
 
   if (!incident) {
@@ -200,23 +202,28 @@ export const updateIncidentStatus = async (
       },
     });
 
+  const changedAt = new Date();
+  const set = { status };
+  if (rootCause != null) set.rootCause = rootCause;
+  if (resolutionNotes != null) set.resolutionNotes = resolutionNotes;
   if (status === INCIDENT_STATUS.RESOLVED) {
-    const resolved = await Incident.resolve(id, { rootCause, resolutionNotes });
-    await logStatusChange();
-    return Incident.findById(resolved._id)
-      .populate("monitor", MONITOR_POPULATE_FIELDS)
-      .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
-      .lean();
+    set.endedAt = changedAt;
+    set.duration = Math.max(0, Math.round((changedAt - incident.startedAt) / 1000));
   }
-
-  incident.status = status;
-  if (rootCause != null) incident.rootCause = rootCause;
-  await incident.save();
+  const updatedIncident = await Incident.findOneAndUpdate(
+    { _id: id, status: previousStatus },
+    { $set: set, $push: { statusHistory: { status, changedAt } } },
+    { new: true },
+  );
+  if (!updatedIncident) {
+    throw ApiError.conflict("This incident changed while you were updating it. Refresh and try again.");
+  }
   await logStatusChange();
 
-  return Incident.findById(incident._id)
+  return Incident.findById(updatedIncident._id)
     .populate("monitor", MONITOR_POPULATE_FIELDS)
     .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
+    .populate("recoveryCheck", TRIGGER_CHECK_POPULATE_FIELDS)
     .lean();
 };
 

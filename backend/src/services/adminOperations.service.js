@@ -283,10 +283,14 @@ export const getAdminMonitorDetail = async (id, window) => {
       .sort({ startedAt: -1 })
       .limit(20)
       .select(
-        "startedAt endedAt duration status severity rootCause resolutionNotes statusHistory triggerCheck",
+        "startedAt endedAt duration status severity rootCause resolutionNotes statusHistory triggerCheck recoveryCheck",
       )
       .populate(
         "triggerCheck",
+        "status responseTime httpStatus failureReason checkedAt",
+      )
+      .populate(
+        "recoveryCheck",
         "status responseTime httpStatus failureReason checkedAt",
       )
       .lean(),
@@ -378,6 +382,10 @@ export const listAdminIncidents = async ({
         "triggerCheck",
         "status responseTime httpStatus failureReason checkedAt",
       )
+      .populate(
+        "recoveryCheck",
+        "status responseTime httpStatus failureReason checkedAt",
+      )
       .sort({ startedAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -407,6 +415,10 @@ export const getAdminIncidentDetail = async (id) => {
     })
     .populate(
       "triggerCheck",
+      "status responseTime httpStatus failureReason checkedAt",
+    )
+    .populate(
+      "recoveryCheck",
       "status responseTime httpStatus failureReason checkedAt",
     )
     .lean();
