@@ -21,6 +21,7 @@ import OverviewChart from "../features/dashboard/OverviewChart";
 import MonitorStatusGrid from "../features/dashboard/MonitorStatusGrid";
 import { useDashboardSummary } from "../hooks/useMonitors";
 import { formatResponseTime, formatUptime } from "../utils/format";
+import { usePreferences } from "../hooks/usePreferences";
 
 /**
  * The dashboard page is powered by a single aggregated request
@@ -31,7 +32,11 @@ import { formatResponseTime, formatUptime } from "../utils/format";
  * implementation used for the status grid and the multi-window chart.
  */
 export default function Dashboard() {
-  const { data, loading, error, refetch } = useDashboardSummary(30000);
+  const { preferences } = usePreferences();
+  const dashboardPrefs = preferences?.dashboard;
+  const { data, loading, error, refetch } = useDashboardSummary(
+    (dashboardPrefs?.autoRefreshInterval || 30) * 1000,
+  );
 
   const overview = data?.data?.overview;
   const monitorStatuses = data?.data?.monitorStatusList || [];
@@ -44,6 +49,41 @@ export default function Dashboard() {
   // Only true on the very first load — subsequent polling refreshes never
   // flash skeletons over data the user is already looking at.
   const isInitialLoad = loading && !data;
+  const defaultWidgetOrder = [
+    "quickActions",
+    "overviewChart",
+    "recentActivity",
+    "activeIncidents",
+    "monitorStatusGrid",
+  ];
+  const widgetOrder = dashboardPrefs?.widgetOrder || defaultWidgetOrder;
+  const visibleWidgets = widgetOrder.filter(
+    (key) =>
+      dashboardPrefs?.widgets?.[
+        `show${key[0].toUpperCase()}${key.slice(1)}`
+      ] !== false,
+  );
+  const widgetContent = {
+    quickActions: <QuickActions />,
+    overviewChart: (
+      <OverviewChart
+        data={chartData}
+        loading={isInitialLoad}
+        defaultWindow={dashboardPrefs?.defaultWindow || "24h"}
+      />
+    ),
+    recentActivity: <RecentActivity checks={checks} loading={isInitialLoad} />,
+    activeIncidents: (
+      <ActiveIncidents
+        incidents={incidentsList}
+        count={incidentCount}
+        loading={isInitialLoad}
+      />
+    ),
+    monitorStatusGrid: (
+      <MonitorStatusGrid monitors={monitorStatuses} loading={isInitialLoad} />
+    ),
+  };
 
   const kpiCards = useMemo(
     () => [
@@ -149,11 +189,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Quick actions */}
-      <div className="mb-6">
-        <QuickActions />
-      </div>
-
       {/* KPI Cards */}
       <div className="mb-6">
         <SectionLabel className="mb-3">Overview — System Status</SectionLabel>
@@ -196,29 +231,23 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Main chart — true system-wide response time & uptime, aggregated
-          server-side across every owned monitor for each time window. */}
-      <div className="mb-6">
-        <SectionLabel className="mb-3">Analytics</SectionLabel>
-        <OverviewChart data={chartData} loading={isInitialLoad} />
-      </div>
-
-      {/* Bottom split — activity + incidents (sourced from the same
-          overview payload, no separate requests). */}
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <RecentActivity checks={checks} loading={isInitialLoad} />
-        <ActiveIncidents
-          incidents={incidentsList}
-          count={incidentCount}
-          loading={isInitialLoad}
-        />
-      </div>
-
-      {/* Monitor status grid — computed server-side in one aggregation
-          instead of one request per visible monitor. */}
-      <div>
-        <SectionLabel className="mb-3">Monitor Status</SectionLabel>
-        <MonitorStatusGrid monitors={monitorStatuses} loading={isInitialLoad} />
+      <div className={dashboardPrefs?.compactMode ? "space-y-4" : "space-y-6"}>
+        {visibleWidgets.map((key) => (
+          <section
+            key={key}
+            className={
+              dashboardPrefs?.compactMode ? "dashboard-compact-section" : ""
+            }
+          >
+            {key === "overviewChart" && (
+              <SectionLabel className="mb-3">Analytics</SectionLabel>
+            )}
+            {key === "monitorStatusGrid" && (
+              <SectionLabel className="mb-3">Monitor Status</SectionLabel>
+            )}
+            {widgetContent[key]}
+          </section>
+        ))}
       </div>
     </PageContainer>
   );

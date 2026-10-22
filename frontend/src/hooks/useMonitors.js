@@ -11,7 +11,7 @@ export function useOverview(pollingInterval = 30000) {
 export function useDashboardSummary(pollingInterval = 30000) {
   return usePolling(
     () => dashboardApi.getDashboardSummary(),
-    [],
+    [pollingInterval],
     pollingInterval,
   );
 }
