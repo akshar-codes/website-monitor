@@ -8,6 +8,7 @@
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
 import { FAILURE_REASONS } from "../config/constants.js";
+import dns from "node:dns/promises";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -21,17 +22,53 @@ const singlePoll = async (url, timeout) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   const startTime = Date.now();
+  let dnsInfo = {
+    hostname: new URL(url).hostname,
+    addresses: [],
+    durationMs: null,
+    error: null,
+  };
+  try {
+    const dnsStart = Date.now();
+    const records = await dns.lookup(dnsInfo.hostname, { all: true });
+    dnsInfo = {
+      ...dnsInfo,
+      addresses: records.map(({ address, family }) => ({ address, family })),
+      durationMs: Date.now() - dnsStart,
+    };
+  } catch (error) {
+    dnsInfo.error = error.code || error.message;
+  }
 
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "WebsiteMonitor/1.0",
-        Accept: "application/json",
-      },
-      redirect: "follow",
-    });
+    const redirects = [];
+    let currentUrl = url;
+    let response;
+    for (let hop = 0; hop <= 10; hop++) {
+      response = await fetch(currentUrl, {
+        method: "GET",
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "WebsiteMonitor/1.0",
+          Accept: "application/json",
+        },
+        redirect: "manual",
+      });
+      if (
+        ![301, 302, 303, 307, 308].includes(response.status) ||
+        !response.headers.get("location")
+      )
+        break;
+      if (hop === 10) throw new Error("Too many redirects");
+      const nextUrl = new URL(response.headers.get("location"), currentUrl)
+        .href;
+      redirects.push({
+        url: currentUrl,
+        status: response.status,
+        location: nextUrl,
+      });
+      currentUrl = nextUrl;
+    }
 
     clearTimeout(timer);
     const responseTime = Date.now() - startTime;
@@ -61,6 +98,18 @@ const singlePoll = async (url, timeout) => {
       body,
       error: response.ok ? null : `HTTP ${httpStatus}`,
       failureReason,
+      diagnostics: {
+        finalUrl: response.url || currentUrl,
+        statusText: response.statusText,
+        headers: Object.fromEntries(
+          [...response.headers.entries()].filter(
+            ([name]) => name !== "set-cookie",
+          ),
+        ),
+        redirects,
+        dns: dnsInfo,
+        timing: { totalMs: responseTime, dnsMs: dnsInfo.durationMs },
+      },
     };
   } catch (error) {
     clearTimeout(timer);
@@ -90,6 +139,14 @@ const singlePoll = async (url, timeout) => {
       body: null,
       error: error.message,
       failureReason,
+      diagnostics: {
+        finalUrl: url,
+        headers: {},
+        redirects: [],
+        dns: dnsInfo,
+        timing: { totalMs: responseTime, dnsMs: dnsInfo.durationMs },
+        errorCode: error.code || error.cause?.code || error.name,
+      },
     };
   }
 };

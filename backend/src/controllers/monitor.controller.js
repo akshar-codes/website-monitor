@@ -44,6 +44,14 @@ export const getMonitorById = asyncHandler(async (req, res) => {
   sendSuccess(res, { data: monitor });
 });
 
+export const getMonitorDiagnostics = asyncHandler(async (req, res) => {
+  const diagnostics = await monitorService.getMonitorDiagnostics(
+    req.params.id,
+    req.user,
+  );
+  sendSuccess(res, { data: diagnostics });
+});
+
 /**
  * PUT /api/monitors/:id
  */

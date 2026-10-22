@@ -33,6 +33,7 @@ const processMonitor = async (monitor) => {
     httpStatus: pollResult.httpStatus,
     failureReason: classification.failureReason,
     rawResponse: pollResult.body,
+    diagnostics: pollResult.diagnostics,
     checkedAt: new Date(),
   });
 

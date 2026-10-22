@@ -1,4 +1,5 @@
 import Monitor from "../models/Monitor.js";
+import HealthCheck from "../models/HealthCheck.js";
 import ApiError from "../utils/ApiError.js";
 import { ROLES } from "../config/constants.js";
 import {
@@ -130,6 +131,50 @@ export const getMonitorById = async (id, user) => {
     throw ApiError.notFound(`Monitor not found with id: ${id}`);
   }
   return monitor;
+};
+
+const SECURITY_HEADERS = [
+  ["strict-transport-security", "Enforces HTTPS connections"],
+  ["content-security-policy", "Restricts permitted content sources"],
+  ["x-content-type-options", "Prevents MIME type sniffing"],
+  ["x-frame-options", "Helps prevent clickjacking"],
+  ["referrer-policy", "Controls referrer information"],
+  ["permissions-policy", "Restricts browser features"],
+];
+
+export const getMonitorDiagnostics = async (id, user) => {
+  const monitor = await getMonitorById(id, user);
+  const check = await HealthCheck.findOne({ monitor: monitor._id })
+    .sort({ checkedAt: -1 })
+    .select(
+      "status httpStatus responseTime failureReason checkedAt diagnostics",
+    )
+    .lean();
+  const headers = check?.diagnostics?.headers || {};
+  const securityHeaders = SECURITY_HEADERS.map(([name, purpose]) => ({
+    name,
+    purpose,
+    value: headers[name] ?? null,
+    present: Boolean(headers[name]),
+  }));
+  return {
+    monitor: { id: monitor.id, name: monitor.name, url: monitor.url },
+    checkedAt: check?.checkedAt ?? null,
+    http: check
+      ? {
+          status: check.httpStatus,
+          statusText: check.diagnostics?.statusText ?? null,
+          responseTimeMs: check.responseTime,
+          failureReason: check.failureReason,
+          finalUrl: check.diagnostics?.finalUrl ?? monitor.url,
+          timing: check.diagnostics?.timing ?? { totalMs: check.responseTime },
+        }
+      : null,
+    dns: check?.diagnostics?.dns ?? null,
+    headers,
+    securityHeaders,
+    redirects: check?.diagnostics?.redirects ?? [],
+  };
 };
 
 export const updateMonitor = async (id, data, user) => {

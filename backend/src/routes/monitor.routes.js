@@ -19,6 +19,7 @@ import {
   createMonitor,
   getMonitors,
   getMonitorById,
+  getMonitorDiagnostics,
   updateMonitor,
   deleteMonitor,
 } from "../controllers/monitor.controller.js";
@@ -34,6 +35,13 @@ import {
 } from "../validators/monitor.validator.js";
 
 const router = Router();
+
+router.get(
+  "/:id/diagnostics",
+  requirePermission("monitor:read"),
+  validateObjectId("id"),
+  getMonitorDiagnostics,
+);
 
 router
   .route("/")

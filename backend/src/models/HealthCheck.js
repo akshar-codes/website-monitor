@@ -69,6 +69,11 @@ const healthCheckSchema = new mongoose.Schema(
       default: null,
     },
 
+    diagnostics: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+
     // ── When the check was performed ──
     checkedAt: {
       type: Date,
