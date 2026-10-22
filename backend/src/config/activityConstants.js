@@ -1,18 +1,3 @@
-/**
- * Single source of truth for activity-log categories and actions.
- * Mirrors the pattern in config/constants.js (ROLES/PLANS) and
- * config/preferenceConstants.js — a flat enum object plus a derived
- * `_VALUES` array for Zod schemas and Mongoose enum validators.
- *
- * Activity records are NEVER created from client input (there is no
- * POST /api/activity endpoint) — they're written exclusively by
- * utils/activityLogger.js from trusted server-side call sites. That means
- * these enums only ever need to cover actions this codebase actually
- * logs; adding a new one is a two-step process:
- *   1. Add the action here (and to its category's action set below)
- *   2. Call logActivity(...) from the relevant service/controller
- */
-
 export const ACTIVITY_CATEGORIES = Object.freeze({
   AUTH: "auth",
   MONITOR: "monitor",
@@ -37,6 +22,7 @@ export const ACTIVITY_ACTIONS = Object.freeze({
   REGISTER: "register",
   EMAIL_VERIFIED: "email_verified",
   PASSWORD_RESET_COMPLETED: "password_reset_completed",
+  PASSWORD_CHANGED: "password_changed",
 
   // ── Session ──
   SESSION_REVOKED: "session_revoked",

@@ -58,4 +58,7 @@ export const verificationLimiter = createAuthRateLimiter();
  */
 export const passwordResetLimiter = createAuthRateLimiter();
 
+/** Rate limiter for authenticated password changes. */
+export const passwordChangeLimiter = createAuthRateLimiter();
+
 export default globalLimiter;

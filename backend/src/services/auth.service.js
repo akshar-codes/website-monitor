@@ -58,6 +58,56 @@ export const getUserById = async (id) => {
   return User.findById(id);
 };
 
+export const getSecuritySettings = async (userId) => {
+  const user = await User.findById(userId).select("+password +oauthAccounts");
+  if (!user) throw ApiError.notFound("User not found");
+  return {
+    hasPassword: Boolean(user.password),
+    providers: (user.oauthAccounts || []).map(({ provider }) => provider),
+  };
+};
+
+export const changePassword = async (userId, currentPassword, newPassword) => {
+  const user = await User.findById(userId).select(
+    "+password +oauthAccounts +passwordResetTokenHash +passwordResetExpires",
+  );
+  if (!user) throw ApiError.notFound("User not found");
+  if (!user.password) {
+    throw ApiError.badRequest(
+      "This account uses OAuth sign-in. Set a local password through the password reset flow.",
+      "OAUTH_ONLY_ACCOUNT",
+    );
+  }
+  if (!(await user.comparePassword(currentPassword))) {
+    throw ApiError.badRequest(
+      "Current password is incorrect",
+      "CURRENT_PASSWORD_INVALID",
+    );
+  }
+  if (await user.comparePassword(newPassword)) {
+    throw ApiError.badRequest(
+      "New password must be different from the current password",
+      "PASSWORD_UNCHANGED",
+    );
+  }
+
+  user.password = newPassword;
+  user.clearPasswordResetToken();
+  await user.save();
+  logger.info(`Password changed for user ${user._id}`);
+
+  try {
+    await sendPasswordChangedEmail(user);
+  } catch (error) {
+    logger.error(
+      `Failed to send password-changed notification to ${user.email}: ${error.message}`,
+      { stack: error.stack },
+    );
+  }
+
+  return user;
+};
+
 // ── Email verification ───────────────────────────────────────────────────────
 
 /**

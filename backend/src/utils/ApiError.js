@@ -16,8 +16,8 @@ class ApiError extends Error {
 
   // ── Convenience factory methods ──
 
-  static badRequest(message = "Bad request") {
-    return new ApiError(400, message);
+  static badRequest(message = "Bad request", code = null) {
+    return new ApiError(400, message, true, null, code);
   }
 
   static validation(errors, message) {

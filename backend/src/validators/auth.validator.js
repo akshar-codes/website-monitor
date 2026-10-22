@@ -19,6 +19,21 @@ const strongPasswordField = z
   .regex(/[0-9]/, "Include at least one number")
   .regex(/[^A-Za-z0-9]/, "Include at least one special character");
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    password: strongPasswordField,
+    confirmPassword: z.string().min(1, "Please confirm your new password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  })
+  .refine((data) => data.password !== data.currentPassword, {
+    message: "New password must be different from the current password",
+    path: ["password"],
+  });
+
 const rememberMeField = z.boolean().optional();
 
 export const registerSchema = z

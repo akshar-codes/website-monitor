@@ -27,6 +27,8 @@ import {
   logoutAll,
   logoutOtherSessions,
   listSessions,
+  getSecuritySettings,
+  changePassword,
   revokeSession,
   getMe,
   verifyEmail,
@@ -40,6 +42,7 @@ import {
   authLimiter,
   verificationLimiter,
   passwordResetLimiter,
+  passwordChangeLimiter,
 } from "../middlewares/rateLimiter.js";
 import {
   registerSchema,
@@ -48,6 +51,7 @@ import {
   resendVerificationSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  changePasswordSchema,
 } from "../validators/auth.validator.js";
 import oauthRoutes from "./oauth.routes.js";
 
@@ -94,6 +98,14 @@ router.post(
 router.post("/logout", isAuthenticated, logout);
 router.post("/logout-all", isAuthenticated, logoutAll);
 router.post("/logout-others", isAuthenticated, logoutOtherSessions);
+router.get("/security", isAuthenticated, getSecuritySettings);
+router.post(
+  "/change-password",
+  isAuthenticated,
+  passwordChangeLimiter,
+  validate(changePasswordSchema, "body"),
+  changePassword,
+);
 router.get("/sessions", isAuthenticated, listSessions);
 router.delete(
   "/sessions/:sessionId",

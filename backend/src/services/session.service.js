@@ -25,7 +25,7 @@ const toSessionSummary = (doc, currentSessionId) => {
  */
 export const listUserSessions = async (userId, currentSessionId) => {
   const docs = await getSessionsCollection()
-    .find({ "session.passport.user": userId })
+    .find({ "session.passport.user": userId, expires: { $gt: new Date() } })
     .sort({ expires: -1 })
     .toArray();
 

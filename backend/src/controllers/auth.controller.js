@@ -198,6 +198,43 @@ export const listSessions = asyncHandler(async (req, res) => {
   sendSuccess(res, { data: sessions });
 });
 
+export const getSecuritySettings = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user._id.toString();
+  const data = await authService.getSecuritySettings(userId);
+  sendSuccess(res, { data });
+});
+
+export const changePassword = asyncHandler(async (req, res, next) => {
+  const userId = req.user.id || req.user._id.toString();
+  await authService.changePassword(
+    userId,
+    req.body.currentPassword,
+    req.body.password,
+  );
+
+  // Invalidate every stored session before any secondary logging work so a
+  // logging failure cannot leave an old authenticated session usable.
+  await sessionService.destroyAllUserSessions(userId);
+
+  await logActivity({
+    userId,
+    category: ACTIVITY_CATEGORIES.AUTH,
+    action: ACTIVITY_ACTIONS.PASSWORD_CHANGED,
+    description: "Changed account password",
+    req,
+  });
+  req.logout((logoutError) => {
+    if (logoutError) return next(logoutError);
+    req.session.destroy((sessionError) => {
+      if (sessionError) return next(sessionError);
+      res.clearCookie(env.SESSION_NAME);
+      return sendSuccess(res, {
+        message: "Password changed. Sign in again with your new password.",
+      });
+    });
+  });
+});
+
 /**
  * DELETE /api/auth/sessions/:sessionId
  * Revokes a single other device's session.
