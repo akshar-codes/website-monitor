@@ -7,51 +7,86 @@ import { poll } from "./poller.js";
 import { classify } from "./classifier.js";
 import { handleIncident } from "./incidentManager.js";
 import { updateDailyStat } from "./aggregationManager.js";
+import { logActivity } from "../utils/activityLogger.js";
+import {
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_ACTIONS,
+} from "../config/activityConstants.js";
 
 let intervalId = null;
 let isRunning = false;
+const inFlightMonitorIds = new Set();
 
 // ─────────────────────────────────────────────
 // Per-monitor pipeline
 // ─────────────────────────────────────────────
 
-const processMonitor = async (monitor) => {
-  // 1. Poll the endpoint
-  const pollResult = await poll(monitor.url);
+const processMonitor = async (monitor, initiatedBy = null) => {
+  const id = String(monitor._id);
+  if (inFlightMonitorIds.has(id)) return null;
+  inFlightMonitorIds.add(id);
+  try {
+    // 1. Poll the endpoint
+    const pollResult = await poll(monitor.url);
 
-  // 2. Classify the raw result
-  const classification = classify(pollResult);
+    // 2. Classify the raw result
+    const classification = classify(pollResult);
 
-  // 3. Persist HealthCheck
-  const healthCheck = await HealthCheck.create({
-    monitor: monitor._id,
-    status: classification.status,
-    frontendStatus: classification.frontendStatus,
-    backendStatus: classification.backendStatus,
-    databaseStatus: classification.databaseStatus,
-    responseTime: pollResult.responseTime,
-    httpStatus: pollResult.httpStatus,
-    failureReason: classification.failureReason,
-    rawResponse: pollResult.body,
-    diagnostics: pollResult.diagnostics,
-    checkedAt: new Date(),
-  });
+    // 3. Persist HealthCheck
+    const healthCheck = await HealthCheck.create({
+      monitor: monitor._id,
+      status: classification.status,
+      frontendStatus: classification.frontendStatus,
+      backendStatus: classification.backendStatus,
+      databaseStatus: classification.databaseStatus,
+      responseTime: pollResult.responseTime,
+      httpStatus: pollResult.httpStatus,
+      failureReason: classification.failureReason,
+      rawResponse: pollResult.body,
+      diagnostics: pollResult.diagnostics,
+      checkedAt: new Date(),
+    });
 
-  // 4. Incident lifecycle
-  await handleIncident(monitor, healthCheck);
+    // 4. Incident lifecycle
+    await handleIncident(monitor, healthCheck);
 
-  // 5. Daily aggregation
-  await updateDailyStat(monitor, healthCheck);
+    // 5. Daily aggregation
+    await updateDailyStat(monitor, healthCheck);
 
-  // 6. Advance the monitor's schedule
-  await Monitor.findByIdAndUpdate(monitor._id, {
-    lastCheckedAt: new Date(),
-    nextCheckAt: new Date(Date.now() + monitor.interval * 1000),
-  });
+    // 6. Advance the monitor's schedule
+    await Monitor.findByIdAndUpdate(monitor._id, {
+      lastCheckedAt: new Date(),
+      nextCheckAt: new Date(Date.now() + monitor.interval * 1000),
+    });
 
-  logger.debug(
-    `Checked "${monitor.name}" — ${classification.status} (${pollResult.responseTime}ms)`,
-  );
+    if (initiatedBy) {
+      await logActivity({
+        userId: initiatedBy.id || initiatedBy._id,
+        category: ACTIVITY_CATEGORIES.ADMIN,
+        action: ACTIVITY_ACTIONS.ADMIN_MONITOR_CHECK_TRIGGERED,
+        description: `Triggered a manual health check for monitor "${monitor.name}"`,
+        entityType: "Monitor",
+        entityId: monitor._id,
+        metadata: {
+          targetOwner: String(monitor.owner),
+          status: classification.status,
+        },
+      });
+    }
+
+    logger.debug(
+      `Checked "${monitor.name}" — ${classification.status} (${pollResult.responseTime}ms)`,
+    );
+    return healthCheck;
+  } finally {
+    inFlightMonitorIds.delete(id);
+  }
+};
+
+export const runMonitorCheck = async (monitorId, initiatedBy) => {
+  const monitor = await Monitor.findById(monitorId);
+  if (!monitor) return null;
+  return processMonitor(monitor, initiatedBy);
 };
 
 // ─────────────────────────────────────────────

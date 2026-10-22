@@ -62,6 +62,8 @@ export const ACTIVITY_ACTIONS = Object.freeze({
   ADMIN_USER_DELETED: "admin_user_deleted",
   ADMIN_PLAN_UPGRADE_REQUEST_APPROVED: "admin_plan_upgrade_request_approved",
   ADMIN_PLAN_UPGRADE_REQUEST_REJECTED: "admin_plan_upgrade_request_rejected",
+  ADMIN_MONITOR_CHECK_TRIGGERED: "admin_monitor_check_triggered",
+  ADMIN_INCIDENT_RESOLVED: "admin_incident_resolved",
 });
 
 export const ACTIVITY_ACTION_VALUES = Object.freeze(

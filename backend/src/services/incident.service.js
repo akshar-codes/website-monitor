@@ -152,13 +152,13 @@ export const updateIncidentStatus = async (
   id,
   { status, rootCause, resolutionNotes },
   user,
+  { admin = false } = {},
 ) => {
-  const ownedIds = await getOwnedMonitorIds(user);
-
+  const ownedIds = admin ? null : await getOwnedMonitorIds(user);
   const incident = await Incident.findOne({
     _id: id,
-    monitor: { $in: ownedIds },
-  }).populate("monitor", MONITOR_POPULATE_FIELDS);
+    ...(admin ? {} : { monitor: { $in: ownedIds } }),
+  }).populate("monitor", admin ? "name url owner" : MONITOR_POPULATE_FIELDS);
   if (!incident) {
     throw ApiError.notFound(`Incident not found with id: ${id}`);
   }
@@ -178,12 +178,26 @@ export const updateIncidentStatus = async (
   const logStatusChange = () =>
     logActivity({
       userId: ownerId,
-      category: ACTIVITY_CATEGORIES.INCIDENT,
-      action: ACTIVITY_ACTIONS.INCIDENT_STATUS_UPDATED,
-      description: `Marked incident on "${monitorName}" as ${status}`,
+      category: admin
+        ? ACTIVITY_CATEGORIES.ADMIN
+        : ACTIVITY_CATEGORIES.INCIDENT,
+      action: admin
+        ? ACTIVITY_ACTIONS.ADMIN_INCIDENT_RESOLVED
+        : ACTIVITY_ACTIONS.INCIDENT_STATUS_UPDATED,
+      description: `${admin ? "Administrator resolved" : "Marked"} incident on "${monitorName}" as ${status}`,
       entityType: "Incident",
       entityId: incident._id,
-      metadata: { from: previousStatus, to: status },
+      metadata: {
+        from: previousStatus,
+        to: status,
+        ...(admin
+          ? {
+              targetOwner: String(incident.monitor?.owner || ""),
+              reason: resolutionNotes || null,
+              rootCause: rootCause || null,
+            }
+          : {}),
+      },
     });
 
   if (status === INCIDENT_STATUS.RESOLVED) {

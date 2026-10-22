@@ -21,6 +21,12 @@
 import { Router } from "express";
 import {
   getAdminDashboard,
+  getAdminMonitors,
+  getAdminMonitorDetails,
+  triggerAdminMonitorCheck,
+  getAdminIncidents,
+  getAdminIncidentDetails,
+  resolveAdminIncident,
   getUsers,
   getUserDetails,
   getPlanOverview,
@@ -36,6 +42,12 @@ import {
   rejectPlanUpgradeRequest,
 } from "../controllers/admin.controller.js";
 import { adminDashboardQuerySchema } from "../validators/adminDashboard.validator.js";
+import {
+  adminMonitorListSchema,
+  adminIncidentListSchema,
+  adminMonitorDetailSchema,
+  resolveAdminIncidentSchema,
+} from "../validators/adminOperations.validator.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
 import {
   listUsersSchema,
@@ -55,6 +67,34 @@ router.get(
   "/dashboard",
   validate(adminDashboardQuerySchema, "query"),
   getAdminDashboard,
+);
+router.get(
+  "/monitors",
+  validate(adminMonitorListSchema, "query"),
+  getAdminMonitors,
+);
+router.get(
+  "/monitors/:id",
+  validateObjectId("id"),
+  validate(adminMonitorDetailSchema, "query"),
+  getAdminMonitorDetails,
+);
+router.post(
+  "/monitors/:id/check",
+  validateObjectId("id"),
+  triggerAdminMonitorCheck,
+);
+router.get(
+  "/incidents",
+  validate(adminIncidentListSchema, "query"),
+  getAdminIncidents,
+);
+router.get("/incidents/:id", validateObjectId("id"), getAdminIncidentDetails);
+router.post(
+  "/incidents/:id/resolve",
+  validateObjectId("id"),
+  validate(resolveAdminIncidentSchema, "body"),
+  resolveAdminIncident,
 );
 
 router.get("/users", validate(listUsersSchema, "query"), getUsers);

@@ -1,5 +1,6 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import { getAdminDashboard as getAdminDashboardData } from "../services/adminDashboard.service.js";
+import * as adminOperationsService from "../services/adminOperations.service.js";
 import * as adminService from "../services/admin.service.js";
 import * as planUpgradeRequestService from "../services/planUpgradeRequest.service.js";
 import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
@@ -36,6 +37,61 @@ export const getAdminDashboard = asyncHandler(async (req, res) => {
   });
   sendSuccess(res, { data });
 });
+
+export const getAdminMonitors = asyncHandler(async (req, res) => {
+  const result = await adminOperationsService.listAdminMonitors(
+    req.validatedQuery,
+  );
+  sendPaginated(res, {
+    data: result.monitors,
+    page: result.page,
+    limit: req.validatedQuery.limit,
+    total: result.total,
+  });
+});
+export const getAdminMonitorDetails = asyncHandler(async (req, res) =>
+  sendSuccess(res, {
+    data: await adminOperationsService.getAdminMonitorDetail(
+      req.params.id,
+      req.validatedQuery.window,
+    ),
+  }),
+);
+export const triggerAdminMonitorCheck = asyncHandler(async (req, res) =>
+  sendSuccess(res, {
+    message: "Manual health check completed",
+    data: await adminOperationsService.runAdminMonitorCheck(
+      req.params.id,
+      req.user,
+    ),
+  }),
+);
+export const getAdminIncidents = asyncHandler(async (req, res) => {
+  const result = await adminOperationsService.listAdminIncidents(
+    req.validatedQuery,
+  );
+  sendPaginated(res, {
+    data: result.incidents,
+    page: result.page,
+    limit: req.validatedQuery.limit,
+    total: result.total,
+  });
+});
+export const getAdminIncidentDetails = asyncHandler(async (req, res) =>
+  sendSuccess(res, {
+    data: await adminOperationsService.getAdminIncidentDetail(req.params.id),
+  }),
+);
+export const resolveAdminIncident = asyncHandler(async (req, res) =>
+  sendSuccess(res, {
+    message: "Incident resolved",
+    data: await adminOperationsService.resolveAdminIncident(
+      req.params.id,
+      req.body,
+      req.user,
+    ),
+  }),
+);
 
 /**
  * PATCH /api/admin/users/:id/role
