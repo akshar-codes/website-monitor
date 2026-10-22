@@ -6,6 +6,7 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Bell,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "../utils/cn";
 
@@ -19,6 +20,7 @@ const sections = [
   },
   { label: "Security", path: "/settings/security", icon: ShieldCheck },
   { label: "Notifications", path: "/settings/notifications", icon: Bell },
+  { label: "API keys", path: "/settings/api-keys", icon: KeyRound },
 ];
 
 export default function SettingsLayout() {

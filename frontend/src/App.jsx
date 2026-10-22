@@ -25,6 +25,7 @@ import SettingsLayout from "./pages/SettingsLayout";
 import AccountSettings from "./pages/AccountSettings";
 import SecuritySettings from "./pages/SecuritySettings";
 import NotificationSettings from "./pages/NotificationSettings";
+import ApiKeysSettings from "./pages/ApiKeysSettings";
 import AdminUsers from "./pages/AdminUsers";
 import AdminPlanRequests from "./pages/AdminPlanRequests";
 import Unauthorized from "./pages/Unauthorized";
@@ -204,6 +205,7 @@ export default function App() {
                         path="notifications"
                         element={<NotificationSettings />}
                       />
+                      <Route path="api-keys" element={<ApiKeysSettings />} />
                     </Route>
 
                     {/* Reachable by any authenticated user regardless of role
