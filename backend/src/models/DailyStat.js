@@ -21,6 +21,7 @@ const dailyStatSchema = new mongoose.Schema(
       default: 0,
       min: [0, "Total checks cannot be negative"],
     },
+    scheduledChecks: { type: Number, default: 0, min: 0 },
 
     successfulChecks: {
       type: Number,
@@ -33,12 +34,18 @@ const dailyStatSchema = new mongoose.Schema(
       default: 0,
       min: [0, "Failed checks cannot be negative"],
     },
+    degradedChecks: { type: Number, default: 0, min: 0 },
+    unknownChecks: { type: Number, default: 0, min: 0 },
+    expectedChecks: { type: Number, default: 0, min: 0 },
+    coveragePercentage: { type: Number, default: 0, min: 0, max: 100 },
+    unobservedSeconds: { type: Number, default: 0, min: 0 },
+    lastCheckAt: { type: Date, default: null },
 
     // ── Derived percentages ──
 
     uptimePercentage: {
       type: Number,
-      default: 0,
+      default: null,
       min: [0, "Uptime percentage cannot be negative"],
       max: [100, "Uptime percentage cannot exceed 100"],
     },
@@ -70,6 +77,9 @@ const dailyStatSchema = new mongoose.Schema(
       default: 0,
       min: [0, "Downtime seconds cannot be negative"],
     },
+    // Estimated from failed samples × the interval in force at that check.
+    estimatedDowntimeSeconds: { type: Number, default: 0, min: 0 },
+    estimatedDegradedSeconds: { type: Number, default: 0, min: 0 },
 
     degradedSeconds: {
       type: Number,
@@ -148,7 +158,7 @@ dailyStatSchema.statics.calculateUptime = async function (
     },
   ]);
 
-  if (!result || result.totalChecks === 0) return 0;
+  if (!result || result.totalChecks === 0) return null;
   return parseFloat(
     ((result.successfulChecks / result.totalChecks) * 100).toFixed(2),
   );

@@ -43,6 +43,9 @@ const healthCheckSchema = new mongoose.Schema(
       required: [true, "Response time is required"],
       min: [0, "Response time cannot be negative"],
     },
+    /** Interval in force for this sample; preserves estimates after edits. */
+    intervalSeconds: { type: Number, min: 1, default: null },
+    scheduled: { type: Boolean, default: true },
 
     // ── HTTP status code from the polled endpoint ──
     httpStatus: {
@@ -169,7 +172,7 @@ healthCheckSchema.statics.uptimePercent = async function (
     },
   ]);
 
-  if (!result || result.total === 0) return 0;
+  if (!result || result.total === 0) return null;
   return parseFloat(((result.up / result.total) * 100).toFixed(2));
 };
 
