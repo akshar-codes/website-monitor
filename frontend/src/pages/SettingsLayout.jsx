@@ -4,6 +4,7 @@ import {
   UserRound,
   SlidersHorizontal,
   Settings as SettingsIcon,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "../utils/cn";
 
@@ -15,6 +16,7 @@ const sections = [
     path: "/settings/preferences",
     icon: SlidersHorizontal,
   },
+  { label: "Security", path: "/settings/security", icon: ShieldCheck },
 ];
 
 export default function SettingsLayout() {

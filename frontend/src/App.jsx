@@ -23,6 +23,7 @@ import Profile from "./pages/Profile";
 import Preferences from "./pages/Preferences";
 import SettingsLayout from "./pages/SettingsLayout";
 import AccountSettings from "./pages/AccountSettings";
+import SecuritySettings from "./pages/SecuritySettings";
 import AdminUsers from "./pages/AdminUsers";
 import AdminPlanRequests from "./pages/AdminPlanRequests";
 import Unauthorized from "./pages/Unauthorized";
@@ -197,6 +198,7 @@ export default function App() {
                       <Route path="account" element={<AccountSettings />} />
                       <Route path="profile" element={<Profile />} />
                       <Route path="preferences" element={<Preferences />} />
+                      <Route path="security" element={<SecuritySettings />} />
                     </Route>
 
                     {/* Reachable by any authenticated user regardless of role
