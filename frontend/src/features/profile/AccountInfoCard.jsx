@@ -1,7 +1,7 @@
 import { ShieldCheck, ShieldAlert, Mail, Calendar, Clock } from "lucide-react";
 import PlanBadge from "../../components/ui/PlanBadge";
 import { Skeleton } from "../../components/ui/Skeleton";
-import { formatDateTime } from "../../utils/format";
+import { formatDate, formatDateTime } from "../../utils/format";
 
 function InfoRow({ icon: Icon, label, value, extra }) {
   return (
@@ -62,7 +62,7 @@ export default function AccountInfoCard({ profile, loading }) {
         <InfoRow
           icon={Calendar}
           label="Member since"
-          value={formatDateTime(profile.createdAt, "MMM d, yyyy")}
+          value={formatDate(profile.createdAt)}
         />
 
         <InfoRow

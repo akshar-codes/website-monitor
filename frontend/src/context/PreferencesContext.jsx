@@ -32,7 +32,8 @@ export function PreferencesProvider({ children }) {
   const [preferences, setPreferences] = useState(null);
   const [loading, setLoading] = useState(!!user);
 
-  const applyTheme = useCallback((theme) => {
+  const applyPreferences = useCallback((prefs) => {
+    const theme = prefs?.theme;
     const resolved =
       theme === THEMES.SYSTEM
         ? window.matchMedia?.("(prefers-color-scheme: light)").matches
@@ -41,6 +42,14 @@ export function PreferencesProvider({ children }) {
         : theme || THEMES.DARK;
 
     document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.timezone = prefs?.timezone || "UTC";
+    document.documentElement.dataset.dateFormat =
+      prefs?.dateFormat || "MMM D, YYYY";
+    document.documentElement.dataset.timeFormat = prefs?.timeFormat || "12h";
+    document.documentElement.lang = prefs?.language || "en";
+    document.documentElement.dataset.compactMode = prefs?.dashboard?.compactMode
+      ? "true"
+      : "false";
   }, []);
 
   const loadPreferences = useCallback(async () => {
@@ -54,17 +63,25 @@ export function PreferencesProvider({ children }) {
     try {
       const { data } = await preferencesApi.getPreferences();
       setPreferences(data);
-      applyTheme(data?.theme);
+      applyPreferences(data);
     } catch {
       setPreferences(null);
     } finally {
       setLoading(false);
     }
-  }, [user, applyTheme]);
+  }, [user, applyPreferences]);
 
   useEffect(() => {
     loadPreferences();
   }, [loadPreferences]);
+
+  useEffect(() => {
+    if (preferences?.theme !== THEMES.SYSTEM || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+    const updateSystemTheme = () => applyPreferences(preferences);
+    media.addEventListener?.("change", updateSystemTheme);
+    return () => media.removeEventListener?.("change", updateSystemTheme);
+  }, [preferences, applyPreferences]);
 
   /**
    * Optimistically merges a server response (or partial patch) into the
@@ -75,11 +92,11 @@ export function PreferencesProvider({ children }) {
     (patch) => {
       setPreferences((prev) => {
         const next = { ...prev, ...patch };
-        if (patch?.theme) applyTheme(patch.theme);
+        applyPreferences(next);
         return next;
       });
     },
-    [applyTheme],
+    [applyPreferences],
   );
 
   const value = useMemo(
