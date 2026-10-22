@@ -22,6 +22,7 @@ import { Router } from "express";
 import {
   getAdminDashboard,
   getUsers,
+  getUserDetails,
   updateUserRole,
   updateUserPlan,
   suspendUser,
@@ -37,6 +38,7 @@ import {
   listUsersSchema,
   updateUserRoleSchema,
   updateUserPlanSchema,
+  userStatusReasonSchema,
 } from "../validators/admin.validator.js";
 import {
   listPlanUpgradeRequestsSchema,
@@ -53,6 +55,7 @@ router.get(
 );
 
 router.get("/users", validate(listUsersSchema, "query"), getUsers);
+router.get("/users/:id", validateObjectId("id"), getUserDetails);
 
 router.patch(
   "/users/:id/role",
@@ -68,9 +71,19 @@ router.patch(
   updateUserPlan,
 );
 
-router.post("/users/:id/suspend", validateObjectId("id"), suspendUser);
+router.post(
+  "/users/:id/suspend",
+  validateObjectId("id"),
+  validate(userStatusReasonSchema, "body"),
+  suspendUser,
+);
 
-router.post("/users/:id/reactivate", validateObjectId("id"), reactivateUser);
+router.post(
+  "/users/:id/reactivate",
+  validateObjectId("id"),
+  validate(userStatusReasonSchema, "body"),
+  reactivateUser,
+);
 
 router.delete("/users/:id", validateObjectId("id"), deleteUser);
 

@@ -12,18 +12,34 @@ export const USER_STATUS_FILTER_VALUES = Object.freeze(["active", "suspended"]);
 
 // ── List / search / filter users ──
 
-export const listUsersSchema = z.object({
-  page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
-  role: z.enum(ROLE_VALUES).optional(),
-  plan: z.enum(PLAN_VALUES).optional(),
-  status: z.enum(USER_STATUS_FILTER_VALUES).optional(),
-  search: z
-    .string()
-    .trim()
-    .max(120, "Search term cannot exceed 120 characters")
-    .optional(),
-});
+export const listUsersSchema = z
+  .object({
+    page: z.coerce.number().int().positive().optional().default(1),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+    role: z.enum(ROLE_VALUES).optional(),
+    plan: z.enum(PLAN_VALUES).optional(),
+    status: z.enum(USER_STATUS_FILTER_VALUES).optional(),
+    search: z
+      .string()
+      .trim()
+      .max(120, "Search term cannot exceed 120 characters")
+      .optional(),
+    registeredFrom: z.string().datetime({ offset: true }).optional(),
+    registeredTo: z.string().datetime({ offset: true }).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.registeredFrom &&
+      value.registeredTo &&
+      new Date(value.registeredFrom) > new Date(value.registeredTo)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["registeredFrom"],
+        message: "Registration start must be before end",
+      });
+    }
+  });
 
 // ── Update a user's role ──
 
@@ -32,6 +48,11 @@ export const updateUserRoleSchema = z.object({
     required_error: "Role is required",
     invalid_type_error: `Role must be one of: ${ROLE_VALUES.join(", ")}`,
   }),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const userStatusReasonSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
 });
 
 // ── Update a user's subscription plan ──

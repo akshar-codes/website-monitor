@@ -3,6 +3,7 @@ import ApiKey from "../models/ApiKey.js";
 import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import Incident from "../models/Incident.js";
+import Activity from "../models/Activity.js";
 import DailyStat from "../models/DailyStat.js";
 import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
@@ -21,13 +22,27 @@ const resolveActingUserId = (actingUser) =>
 
 // ── List / search / filter ──────────────────────────────────────────────────
 
-export const getUsers = async ({ page, limit, role, plan, status, search }) => {
+export const getUsers = async ({
+  page,
+  limit,
+  role,
+  plan,
+  status,
+  search,
+  registeredFrom,
+  registeredTo,
+}) => {
   const filter = {};
 
   if (role) filter.role = role;
   if (plan) filter.plan = plan;
   if (status === "active") filter.active = true;
   if (status === "suspended") filter.active = false;
+  if (registeredFrom || registeredTo)
+    filter.createdAt = {
+      ...(registeredFrom ? { $gte: new Date(registeredFrom) } : {}),
+      ...(registeredTo ? { $lte: new Date(registeredTo) } : {}),
+    };
 
   if (search) {
     const pattern = new RegExp(escapeRegExp(search), "i");
@@ -37,7 +52,14 @@ export const getUsers = async ({ page, limit, role, plan, status, search }) => {
   const skip = (page - 1) * limit;
 
   const [users, total] = await Promise.all([
-    User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    User.find(filter)
+      .select(
+        "name email role plan planStatus active createdAt avatarUrl emailVerifiedAt lastLoginAt",
+      )
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
     User.countDocuments(filter),
   ]);
 
@@ -46,6 +68,83 @@ export const getUsers = async ({ page, limit, role, plan, status, search }) => {
     total,
     page,
     totalPages: Math.ceil(total / limit) || 1,
+  };
+};
+
+export const getUserDetails = async (targetUserId) => {
+  const user = await User.findById(targetUserId)
+    .select(
+      "name email role plan planStatus active createdAt updatedAt avatarUrl emailVerifiedAt lastLoginAt",
+    )
+    .lean();
+  if (!user) throw ApiError.notFound(`User not found with id: ${targetUserId}`);
+  const [monitorUsage, recentActivity, incidents] = await Promise.all([
+    Monitor.aggregate([
+      { $match: { owner: user._id } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          active: { $sum: { $cond: ["$active", 1, 0] } },
+        },
+      },
+    ]),
+    Activity.find({ user: targetUserId })
+      .sort({ createdAt: -1 })
+      .limit(12)
+      .select("category action description entityType createdAt")
+      .lean(),
+    Incident.aggregate([
+      {
+        $lookup: {
+          from: Monitor.collection.name,
+          localField: "monitor",
+          foreignField: "_id",
+          as: "monitorDoc",
+        },
+      },
+      { $unwind: "$monitorDoc" },
+      { $match: { "monitorDoc.owner": user._id } },
+      { $sort: { startedAt: -1 } },
+      { $limit: 8 },
+      {
+        $project: {
+          startedAt: 1,
+          endedAt: 1,
+          status: 1,
+          severity: 1,
+          monitor: {
+            _id: "$monitorDoc._id",
+            name: "$monitorDoc.name",
+            url: "$monitorDoc.url",
+          },
+        },
+      },
+    ]),
+  ]);
+  return {
+    user,
+    monitorUsage: monitorUsage[0] || { total: 0, active: 0 },
+    recentActivity: recentActivity.map(
+      ({ _id, category, action, description, entityType, createdAt }) => ({
+        id: String(_id),
+        category,
+        action,
+        description,
+        entityType,
+        createdAt,
+      }),
+    ),
+    incidents: incidents.map(
+      ({ _id, monitor, startedAt, endedAt, status, severity }) => ({
+        id: String(_id),
+        monitor,
+        startedAt,
+        endedAt,
+        status,
+        severity,
+      }),
+    ),
   };
 };
 
@@ -61,7 +160,12 @@ export const getUsers = async ({ page, limit, role, plan, status, search }) => {
  *      application from ending up with zero admins and no way to promote
  *      a new one without direct database access.
  */
-export const updateUserRole = async (targetUserId, role, actingUser) => {
+export const updateUserRole = async (
+  targetUserId,
+  role,
+  actingUser,
+  reason,
+) => {
   const actingUserId = resolveActingUserId(actingUser);
 
   if (targetUserId === actingUserId) {
@@ -74,7 +178,10 @@ export const updateUserRole = async (targetUserId, role, actingUser) => {
   }
 
   if (user.role === ROLES.ADMIN && role !== ROLES.ADMIN) {
-    const adminCount = await User.countDocuments({ role: ROLES.ADMIN });
+    const adminCount = await User.countDocuments({
+      role: ROLES.ADMIN,
+      active: true,
+    });
     if (adminCount <= 1) {
       throw ApiError.badRequest(
         "Cannot remove the last remaining admin. Promote another user to admin first.",
@@ -93,10 +200,10 @@ export const updateUserRole = async (targetUserId, role, actingUser) => {
     userId: actingUserId,
     category: ACTIVITY_CATEGORIES.ADMIN,
     action: ACTIVITY_ACTIONS.ADMIN_USER_ROLE_CHANGED,
-    description: `Changed ${user.email}'s role from ${previousRole} to ${role}`,
+    description: `Changed ${user.email}'s role from ${previousRole} to ${role}: ${reason}`,
     entityType: "User",
     entityId: user._id,
-    metadata: { targetEmail: user.email, from: previousRole, to: role },
+    metadata: { targetEmail: user.email, from: previousRole, to: role, reason },
   });
 
   return user;
@@ -150,7 +257,7 @@ export const updateUserPlan = async (targetUserId, plan, actingUser) => {
  * takes effect on already-open devices rather than only on the next
  * login attempt.
  */
-export const suspendUser = async (targetUserId, actingUser) => {
+export const suspendUser = async (targetUserId, actingUser, reason) => {
   const actingUserId = resolveActingUserId(actingUser);
 
   if (targetUserId === actingUserId) {
@@ -191,10 +298,14 @@ export const suspendUser = async (targetUserId, actingUser) => {
     userId: actingUserId,
     category: ACTIVITY_CATEGORIES.ADMIN,
     action: ACTIVITY_ACTIONS.ADMIN_USER_SUSPENDED,
-    description: `Suspended account ${user.email}`,
+    description: `Suspended account ${user.email}: ${reason}`,
     entityType: "User",
     entityId: user._id,
-    metadata: { targetEmail: user.email, sessionsInvalidated: destroyedCount },
+    metadata: {
+      targetEmail: user.email,
+      sessionsInvalidated: destroyedCount,
+      reason,
+    },
   });
 
   return user;
@@ -203,7 +314,7 @@ export const suspendUser = async (targetUserId, actingUser) => {
 /**
  * Reactivates a previously suspended user account.
  */
-export const reactivateUser = async (targetUserId, actingUser) => {
+export const reactivateUser = async (targetUserId, actingUser, reason) => {
   const actingUserId = resolveActingUserId(actingUser);
 
   const user = await User.findById(targetUserId);
@@ -226,10 +337,10 @@ export const reactivateUser = async (targetUserId, actingUser) => {
     userId: actingUserId,
     category: ACTIVITY_CATEGORIES.ADMIN,
     action: ACTIVITY_ACTIONS.ADMIN_USER_REACTIVATED,
-    description: `Reactivated account ${user.email}`,
+    description: `Reactivated account ${user.email}: ${reason}`,
     entityType: "User",
     entityId: user._id,
-    metadata: { targetEmail: user.email },
+    metadata: { targetEmail: user.email, reason },
   });
 
   return user;
@@ -270,7 +381,11 @@ export const deleteUser = async (targetUserId, actingUser) => {
 
   if (user.role === ROLES.ADMIN) {
     const adminCount = await User.countDocuments({ role: ROLES.ADMIN });
-    if (adminCount <= 1) {
+    const activeAdminCount = await User.countDocuments({
+      role: ROLES.ADMIN,
+      active: true,
+    });
+    if (adminCount <= 1 || (user.active && activeAdminCount <= 1)) {
       throw ApiError.badRequest(
         "Cannot delete the last remaining admin. Promote another user to admin first.",
       );

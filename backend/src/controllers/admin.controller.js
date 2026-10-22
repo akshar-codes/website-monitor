@@ -23,6 +23,10 @@ export const getUsers = asyncHandler(async (req, res) => {
   });
 });
 
+export const getUserDetails = asyncHandler(async (req, res) => {
+  sendSuccess(res, { data: await adminService.getUserDetails(req.params.id) });
+});
+
 export const getAdminDashboard = asyncHandler(async (req, res) => {
   const { startDate, endDate } = req.validatedQuery;
   const data = await getAdminDashboardData({
@@ -41,11 +45,18 @@ export const updateUserRole = asyncHandler(async (req, res) => {
     req.params.id,
     req.body.role,
     req.user,
+    req.body.reason,
   );
 
   sendSuccess(res, {
     message: "User role updated successfully",
-    data: user,
+    data: {
+      id: String(user._id),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      active: user.active,
+    },
   });
 });
 
@@ -63,7 +74,17 @@ export const updateUserPlan = asyncHandler(async (req, res) => {
     message: `User's plan has been ${
       changeType === "upgrade" ? "upgraded" : "downgraded"
     } to ${req.body.plan}`,
-    data: { user, changeType },
+    data: {
+      user: {
+        id: String(user._id),
+        name: user.name,
+        email: user.email,
+        plan: user.plan,
+        role: user.role,
+        active: user.active,
+      },
+      changeType,
+    },
   });
 });
 
@@ -71,11 +92,20 @@ export const updateUserPlan = asyncHandler(async (req, res) => {
  * POST /api/admin/users/:id/suspend
  */
 export const suspendUser = asyncHandler(async (req, res) => {
-  const user = await adminService.suspendUser(req.params.id, req.user);
+  const user = await adminService.suspendUser(
+    req.params.id,
+    req.user,
+    req.body.reason,
+  );
 
   sendSuccess(res, {
     message: "User suspended successfully",
-    data: user,
+    data: {
+      id: String(user._id),
+      name: user.name,
+      email: user.email,
+      active: user.active,
+    },
   });
 });
 
@@ -83,11 +113,20 @@ export const suspendUser = asyncHandler(async (req, res) => {
  * POST /api/admin/users/:id/reactivate
  */
 export const reactivateUser = asyncHandler(async (req, res) => {
-  const user = await adminService.reactivateUser(req.params.id, req.user);
+  const user = await adminService.reactivateUser(
+    req.params.id,
+    req.user,
+    req.body.reason,
+  );
 
   sendSuccess(res, {
     message: "User reactivated successfully",
-    data: user,
+    data: {
+      id: String(user._id),
+      name: user.name,
+      email: user.email,
+      active: user.active,
+    },
   });
 });
 
