@@ -34,6 +34,10 @@ export default function UserFilters({
   statusFilter,
   onStatusFilterChange,
   totalCount,
+  registeredFrom,
+  registeredTo,
+  onRegisteredFromChange,
+  onRegisteredToChange,
 }) {
   const [localSearch, setLocalSearch] = useState(search);
 
@@ -113,6 +117,21 @@ export default function UserFilters({
           </option>
         ))}
       </Select>
+
+      <input
+        aria-label="Registered from"
+        type="date"
+        value={registeredFrom}
+        onChange={(e) => onRegisteredFromChange(e.target.value)}
+        className="rounded-md border border-border-default bg-bg-elevated px-2 py-2 text-xs text-text-secondary"
+      />
+      <input
+        aria-label="Registered to"
+        type="date"
+        value={registeredTo}
+        onChange={(e) => onRegisteredToChange(e.target.value)}
+        className="rounded-md border border-border-default bg-bg-elevated px-2 py-2 text-xs text-text-secondary"
+      />
 
       {totalCount != null && (
         <p className="ml-auto text-xs text-text-muted">

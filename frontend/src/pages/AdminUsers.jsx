@@ -31,6 +31,8 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
+  const [registeredFrom, setRegisteredFrom] = useState("");
+  const [registeredTo, setRegisteredTo] = useState("");
 
   // Every destructive/state-changing action goes through one of these
   // "pending" slots before it actually fires — each renders its own
@@ -47,8 +49,24 @@ export default function AdminUsers() {
     if (statusFilter !== "all") params.status = statusFilter;
     if (planFilter !== "all") params.plan = planFilter;
     if (search.trim()) params.search = search.trim();
+    if (registeredFrom)
+      params.registeredFrom = new Date(
+        `${registeredFrom}T00:00:00.000Z`,
+      ).toISOString();
+    if (registeredTo)
+      params.registeredTo = new Date(
+        `${registeredTo}T23:59:59.999Z`,
+      ).toISOString();
     return params;
-  }, [page, roleFilter, statusFilter, planFilter, search]);
+  }, [
+    page,
+    roleFilter,
+    statusFilter,
+    planFilter,
+    search,
+    registeredFrom,
+    registeredTo,
+  ]);
 
   const { data: usersData, loading, refetch } = useUserList(listParams);
   const users = useMemo(() => usersData?.data || [], [usersData]);
@@ -63,16 +81,21 @@ export default function AdminUsers() {
     refetch();
   };
 
-  const { updateRole, submitting: roleSubmitting } =
-    useUpdateUserRole(handleMutationSuccess);
-  const { updatePlan, submitting: planSubmitting } =
-    useUpdateUserPlan(handleMutationSuccess);
-  const { suspend, submitting: suspendSubmitting } =
-    useSuspendUser(handleMutationSuccess);
-  const { reactivate, submitting: reactivateSubmitting } =
-    useReactivateUser(handleMutationSuccess);
-  const { removeUser, submitting: deleteSubmitting } =
-    useDeleteUser(handleMutationSuccess);
+  const { updateRole, submitting: roleSubmitting } = useUpdateUserRole(
+    handleMutationSuccess,
+  );
+  const { updatePlan, submitting: planSubmitting } = useUpdateUserPlan(
+    handleMutationSuccess,
+  );
+  const { suspend, submitting: suspendSubmitting } = useSuspendUser(
+    handleMutationSuccess,
+  );
+  const { reactivate, submitting: reactivateSubmitting } = useReactivateUser(
+    handleMutationSuccess,
+  );
+  const { removeUser, submitting: deleteSubmitting } = useDeleteUser(
+    handleMutationSuccess,
+  );
 
   const handleSearchChange = (value) => {
     setSearch(value);
@@ -96,10 +119,13 @@ export default function AdminUsers() {
 
   const handleConfirmRoleChange = () => {
     if (!pendingRoleChange) return;
+    const reason = window.prompt("Reason for this role change (required):");
+    if (!reason?.trim()) return;
     updateRole(
       pendingRoleChange.user.id,
       pendingRoleChange.nextRole,
       pendingRoleChange.user.name,
+      reason.trim(),
     );
   };
 
@@ -110,12 +136,20 @@ export default function AdminUsers() {
 
   const handleConfirmSuspend = () => {
     if (!pendingSuspend) return;
-    suspend(pendingSuspend.id, pendingSuspend.name);
+    const reason = window.prompt(
+      "Reason for suspending this account (required):",
+    );
+    if (!reason?.trim()) return;
+    suspend(pendingSuspend.id, pendingSuspend.name, reason.trim());
   };
 
   const handleConfirmReactivate = () => {
     if (!pendingReactivate) return;
-    reactivate(pendingReactivate.id, pendingReactivate.name);
+    const reason = window.prompt(
+      "Reason for reactivating this account (required):",
+    );
+    if (!reason?.trim()) return;
+    reactivate(pendingReactivate.id, pendingReactivate.name, reason.trim());
   };
 
   const handleConfirmDelete = () => {
@@ -129,7 +163,12 @@ export default function AdminUsers() {
         title="Users"
         subtitle="Manage accounts, roles, subscription plans, and account status"
         actions={
-          <Button variant="secondary" size="sm" icon={RefreshCw} onClick={refetch}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
+            onClick={refetch}
+          >
             Refresh
           </Button>
         }
@@ -138,6 +177,16 @@ export default function AdminUsers() {
 
       <UserFilters
         search={search}
+        registeredFrom={registeredFrom}
+        registeredTo={registeredTo}
+        onRegisteredFromChange={(value) => {
+          setRegisteredFrom(value);
+          setPage(1);
+        }}
+        onRegisteredToChange={(value) => {
+          setRegisteredTo(value);
+          setPage(1);
+        }}
         onSearchChange={handleSearchChange}
         roleFilter={roleFilter}
         onRoleFilterChange={handleRoleFilterChange}

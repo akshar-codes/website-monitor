@@ -4,6 +4,7 @@ import UserActionMenu from "./UserActionMenu";
 import { formatDate } from "../../utils/format";
 import { ROLES } from "../../constants/roles";
 import { cn } from "../../utils/cn";
+import { Link } from "react-router-dom";
 
 function RoleBadge({ role }) {
   const isAdmin = role === ROLES.ADMIN;
@@ -55,7 +56,12 @@ export default function UserRow({
   return (
     <div className="grid grid-cols-[1fr_90px_100px_100px_120px_44px] items-center gap-3 border-b border-[#1a1a1d] px-5 py-4 transition-colors hover:bg-[#131315] last:border-0">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-white">{user.name}</p>
+        <Link
+          to={`/admin/users/${user.id}`}
+          className="truncate text-sm font-medium text-white hover:text-emerald-400"
+        >
+          {user.name}
+        </Link>
         <p className="truncate text-xs text-text-muted">{user.email}</p>
       </div>
 

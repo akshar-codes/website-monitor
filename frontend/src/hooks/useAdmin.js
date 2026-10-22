@@ -19,14 +19,18 @@ export function useUserList(params = {}) {
   return useQuery(() => adminApi.getUsers(params), [paramsKey]);
 }
 
+export function useAdminUser(userId) {
+  return useQuery(() => adminApi.getAdminUser(userId), [userId]);
+}
+
 export function useUpdateUserRole(onSuccess) {
   const [submitting, setSubmitting] = useState(false);
 
   const updateRole = useCallback(
-    async (userId, role, name) => {
+    async (userId, role, name, reason) => {
       setSubmitting(true);
       try {
-        await adminApi.updateUserRole(userId, role);
+        await adminApi.updateUserRole(userId, role, reason);
         toast.success(
           `${name ? `"${name}"'s` : "User"} role updated to ${role}`,
         );
@@ -71,10 +75,10 @@ export function useSuspendUser(onSuccess) {
   const [submitting, setSubmitting] = useState(false);
 
   const suspend = useCallback(
-    async (userId, name) => {
+    async (userId, name, reason) => {
       setSubmitting(true);
       try {
-        await adminApi.suspendUser(userId);
+        await adminApi.suspendUser(userId, reason);
         toast.success(`${name ? `"${name}"` : "User"} has been suspended`);
         onSuccess?.();
       } catch {
@@ -93,10 +97,10 @@ export function useReactivateUser(onSuccess) {
   const [submitting, setSubmitting] = useState(false);
 
   const reactivate = useCallback(
-    async (userId, name) => {
+    async (userId, name, reason) => {
       setSubmitting(true);
       try {
-        await adminApi.reactivateUser(userId);
+        await adminApi.reactivateUser(userId, reason);
         toast.success(`${name ? `"${name}"` : "User"} has been reactivated`);
         onSuccess?.();
       } catch {

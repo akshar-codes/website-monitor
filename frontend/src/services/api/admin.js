@@ -14,12 +14,18 @@ export async function getUsers(params = {}) {
   return data;
 }
 
+export async function getAdminUser(userId) {
+  const { data } = await apiClient.get(`/admin/users/${userId}`);
+  return data?.data;
+}
+
 /**
  * PATCH /api/admin/users/:id/role
  */
-export async function updateUserRole(userId, role) {
+export async function updateUserRole(userId, role, reason) {
   const { data } = await apiClient.patch(`/admin/users/${userId}/role`, {
     role,
+    reason,
   });
   return data;
 }
@@ -37,16 +43,20 @@ export async function updateUserPlan(userId, plan) {
 /**
  * POST /api/admin/users/:id/suspend
  */
-export async function suspendUser(userId) {
-  const { data } = await apiClient.post(`/admin/users/${userId}/suspend`);
+export async function suspendUser(userId, reason) {
+  const { data } = await apiClient.post(`/admin/users/${userId}/suspend`, {
+    reason,
+  });
   return data;
 }
 
 /**
  * POST /api/admin/users/:id/reactivate
  */
-export async function reactivateUser(userId) {
-  const { data } = await apiClient.post(`/admin/users/${userId}/reactivate`);
+export async function reactivateUser(userId, reason) {
+  const { data } = await apiClient.post(`/admin/users/${userId}/reactivate`, {
+    reason,
+  });
   return data;
 }
 

@@ -28,6 +28,7 @@ import NotificationSettings from "./pages/NotificationSettings";
 import ApiKeysSettings from "./pages/ApiKeysSettings";
 import AdminUsers from "./pages/AdminUsers";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminUserDetails from "./pages/AdminUserDetails";
 import AdminPlanRequests from "./pages/AdminPlanRequests";
 import Unauthorized from "./pages/Unauthorized";
 import UpgradeRequired from "./pages/UpgradeRequired";
@@ -229,6 +230,14 @@ export default function App() {
                         element={
                           <Suspense fallback={<PageFallback />}>
                             <AdminDashboard />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/admin/users/:id"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <AdminUserDetails />
                           </Suspense>
                         }
                       />
