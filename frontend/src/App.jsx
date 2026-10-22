@@ -21,6 +21,8 @@ import Billing from "./pages/Billing";
 import Activity from "./pages/Activity";
 import Profile from "./pages/Profile";
 import Preferences from "./pages/Preferences";
+import SettingsLayout from "./pages/SettingsLayout";
+import AccountSettings from "./pages/AccountSettings";
 import AdminUsers from "./pages/AdminUsers";
 import AdminPlanRequests from "./pages/AdminPlanRequests";
 import Unauthorized from "./pages/Unauthorized";
@@ -187,6 +189,15 @@ export default function App() {
                         </Suspense>
                       }
                     />
+                    <Route path="/settings" element={<SettingsLayout />}>
+                      <Route
+                        index
+                        element={<Navigate to="account" replace />}
+                      />
+                      <Route path="account" element={<AccountSettings />} />
+                      <Route path="profile" element={<Profile />} />
+                      <Route path="preferences" element={<Preferences />} />
+                    </Route>
 
                     {/* Reachable by any authenticated user regardless of role
                       or plan — these are where a denied access attempt lands. */}

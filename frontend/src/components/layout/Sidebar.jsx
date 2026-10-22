@@ -213,7 +213,7 @@ export default function Sidebar() {
         className={cn("border-t border-border-subtle px-2 py-3 space-y-0.5")}
       >
         <NavLink
-          to={ROUTES.PROFILE}
+          to={`${ROUTES.SETTINGS}/profile`}
           className={({ isActive }) =>
             cn(
               "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-bg-overlay",
@@ -261,7 +261,7 @@ export default function Sidebar() {
         </NavLink>
 
         <NavLink
-          to={ROUTES.PREFERENCES}
+          to={ROUTES.ACCOUNT_SETTINGS}
           className={({ isActive }) =>
             cn(
               "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-bg-overlay",
@@ -271,7 +271,7 @@ export default function Sidebar() {
           }
         >
           <SlidersHorizontal size={16} className="shrink-0" />
-          {!collapsed && <span className="truncate">Preferences</span>}
+          {!collapsed && <span className="truncate">Settings</span>}
         </NavLink>
 
         <button
