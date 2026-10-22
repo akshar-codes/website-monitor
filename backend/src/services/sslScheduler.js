@@ -18,9 +18,12 @@ import Monitor from "../models/Monitor.js";
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
 import { runAndPersistCheck } from "../services/ssl.service.js";
+import { consumeWithConcurrency } from "../workers/boundedWorkerPool.js";
 
 let intervalId = null;
 let isRunning = false;
+let tickPromise = null;
+let startupTimer = null;
 
 // ─────────────────────────────────────────────
 // Tick
@@ -35,29 +38,25 @@ const tick = async () => {
   isRunning = true;
 
   try {
-    const dueMonitors = await Monitor.findDueSsl();
-
-    if (dueMonitors.length === 0) return;
-
-    logger.debug(`SSL tick: ${dueMonitors.length} monitor(s) due`);
-
-    const results = await Promise.allSettled(
-      dueMonitors.map((m) => runAndPersistCheck(m)),
+    const dueMonitors = Monitor.findDueSsl()
+      .sort({ nextSslCheckAt: 1, _id: 1 })
+      .cursor({ batchSize: env.SSL_CHECK_CONCURRENCY });
+    const count = await consumeWithConcurrency(
+      dueMonitors,
+      env.SSL_CHECK_CONCURRENCY,
+      (monitor) => runAndPersistCheck(monitor),
+      (error, monitor) =>
+        logger.error("SSL monitor check failed", {
+          monitorId: String(monitor._id),
+          error: error.message,
+        }),
     );
-
-    for (let i = 0; i < results.length; i++) {
-      if (results[i].status === "rejected") {
-        logger.error(
-          `Failed SSL check for monitor "${dueMonitors[i].name}": ${
-            results[i].reason?.message || results[i].reason
-          }`,
-        );
-      }
-    }
+    logger.debug("SSL scheduler tick completed", { checksCompleted: count });
   } catch (error) {
     logger.error(`SSL scheduler tick failed: ${error.message}`);
   } finally {
     isRunning = false;
+    tickPromise = null;
   }
 };
 
@@ -75,12 +74,17 @@ export const start = () => {
   }
 
   const tickMs = env.SSL_CHECK_TICK_MS;
-  intervalId = setInterval(tick, tickMs);
+  intervalId = setInterval(() => {
+    if (!tickPromise) tickPromise = tick();
+  }, tickMs);
 
   // First tick fires shortly after startup, not immediately — gives the
   // health-check scheduler priority during the noisy startup window,
   // since SSL/domain data is never as time-sensitive as live uptime.
-  setTimeout(tick, 5_000);
+  startupTimer = setTimeout(() => {
+    if (!tickPromise) tickPromise = tick();
+  }, 5_000);
+  startupTimer.unref?.();
 
   logger.info(
     `SSL scheduler started — tick every ${tickMs / 1000}s, recheck interval ${
@@ -98,4 +102,7 @@ export const stop = () => {
     intervalId = null;
     logger.info("SSL scheduler stopped");
   }
+  if (startupTimer) clearTimeout(startupTimer);
+  startupTimer = null;
+  return tickPromise || Promise.resolve();
 };

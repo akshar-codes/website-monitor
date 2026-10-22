@@ -20,20 +20,76 @@ test("classifies a supported all-healthy response", () => {
 });
 
 test("classifies a failed component as down and a degraded component as degraded", () => {
-  assert.equal(classify({ ok: true, httpStatus: 200, body: { ...healthyBody, services: { ...healthyBody.services, backend: "down" } } }).status, HEALTH_STATUS.DOWN);
-  assert.equal(classify({ ok: true, httpStatus: 200, body: { ...healthyBody, services: { ...healthyBody.services, database: "slow" } } }).status, HEALTH_STATUS.DEGRADED);
+  assert.equal(
+    classify({
+      ok: true,
+      httpStatus: 200,
+      body: {
+        ...healthyBody,
+        services: { ...healthyBody.services, backend: "down" },
+      },
+    }).status,
+    HEALTH_STATUS.DOWN,
+  );
+  assert.equal(
+    classify({
+      ok: true,
+      httpStatus: 200,
+      body: {
+        ...healthyBody,
+        services: { ...healthyBody.services, database: "slow" },
+      },
+    }).status,
+    HEALTH_STATUS.DEGRADED,
+  );
 });
 
 test("classifies network failures, non-success HTTP responses, malformed JSON, and unexpected contracts", () => {
-  assert.equal(classify({ ok: false, httpStatus: null, failureReason: FAILURE_REASONS.TIMEOUT }).status, HEALTH_STATUS.DOWN);
-  assert.equal(classify({ ok: false, httpStatus: 503, failureReason: FAILURE_REASONS.HTTP_ERROR }).status, HEALTH_STATUS.DOWN);
-  assert.equal(classify({ ok: true, httpStatus: 200, body: null }).failureReason, FAILURE_REASONS.INVALID_JSON);
-  assert.equal(classify({ ok: true, httpStatus: 200, body: { status: "ok" } }).failureReason, FAILURE_REASONS.INVALID_CONTRACT);
+  assert.equal(
+    classify({
+      ok: false,
+      httpStatus: null,
+      failureReason: FAILURE_REASONS.TIMEOUT,
+    }).status,
+    HEALTH_STATUS.DOWN,
+  );
+  assert.equal(
+    classify({
+      ok: false,
+      httpStatus: 503,
+      failureReason: FAILURE_REASONS.HTTP_ERROR,
+    }).status,
+    HEALTH_STATUS.DOWN,
+  );
+  assert.equal(
+    classify({ ok: true, httpStatus: 200, body: null }).failureReason,
+    FAILURE_REASONS.INVALID_JSON,
+  );
+  assert.equal(
+    classify({ ok: true, httpStatus: 200, body: { status: "ok" } })
+      .failureReason,
+    FAILURE_REASONS.INVALID_CONTRACT,
+  );
 });
 
 test("public-address policy blocks local, private, link-local, metadata, and reserved ranges", () => {
-  for (const address of ["127.0.0.1", "10.0.0.1", "172.20.0.1", "192.168.1.1", "169.254.169.254", "100.100.100.200", "::1", "fc00::1", "fe80::1", "::ffff:127.0.0.1"]) {
-    assert.equal(isPublicAddress(address), false, `${address} should be blocked`);
+  for (const address of [
+    "127.0.0.1",
+    "10.0.0.1",
+    "172.20.0.1",
+    "192.168.1.1",
+    "169.254.169.254",
+    "100.100.100.200",
+    "::1",
+    "fc00::1",
+    "fe80::1",
+    "::ffff:127.0.0.1",
+  ]) {
+    assert.equal(
+      isPublicAddress(address),
+      false,
+      `${address} should be blocked`,
+    );
   }
   assert.equal(isPublicAddress("8.8.8.8"), true);
   assert.equal(isPublicAddress("2606:4700:4700::1111"), true);
@@ -50,9 +106,33 @@ test("poll enforces a total timeout while DNS resolution is pending", async () =
   const originalLookup = dns.lookup;
   dns.lookup = () => new Promise(() => {});
   try {
-    const result = await poll("http://health-check-timeout.example/", { timeout: 10, maxRetries: 0 });
+    const result = await poll("http://health-check-timeout.example/", {
+      timeout: 10,
+      maxRetries: 0,
+    });
     assert.equal(result.ok, false);
     assert.equal(result.failureReason, FAILURE_REASONS.TIMEOUT);
+  } finally {
+    dns.lookup = originalLookup;
+  }
+});
+
+test("poll retry count and exponential backoff stay within the total request budget", async () => {
+  const originalLookup = dns.lookup;
+  dns.lookup = () => new Promise(() => {});
+  const started = Date.now();
+  try {
+    const result = await poll("http://slow-dns.example/health", {
+      timeout: 50,
+      totalTimeout: 25,
+      maxRetries: 99,
+      retryDelay: 10,
+    });
+    assert.equal(result.failureReason, FAILURE_REASONS.TIMEOUT);
+    assert.ok(
+      Date.now() - started < 500,
+      "poll must not exceed its total budget materially",
+    );
   } finally {
     dns.lookup = originalLookup;
   }

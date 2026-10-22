@@ -142,7 +142,7 @@ monitorSchema.index({ owner: 1, url: 1 }, { unique: true });
 // by design; the polling worker has no concept of "the current user").
 monitorSchema.index({ active: 1 });
 monitorSchema.index({ active: 1, interval: 1 });
-monitorSchema.index({ active: 1, nextCheckAt: 1 });
+monitorSchema.index({ active: 1, nextCheckAt: 1, _id: 1 });
 
 // SSL scheduler's due-query hot path — mirrors the health-check indexes
 // above, scoped additionally to sslMonitoringEnabled so disabled
