@@ -64,6 +64,7 @@ export const ACTIVITY_ACTIONS = Object.freeze({
   ADMIN_PLAN_UPGRADE_REQUEST_REJECTED: "admin_plan_upgrade_request_rejected",
   ADMIN_MONITOR_CHECK_TRIGGERED: "admin_monitor_check_triggered",
   ADMIN_INCIDENT_RESOLVED: "admin_incident_resolved",
+  ADMIN_ACTION_FAILED: "admin_action_failed",
 });
 
 export const ACTIVITY_ACTION_VALUES = Object.freeze(

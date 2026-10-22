@@ -38,6 +38,8 @@ const activitySchema = new mongoose.Schema(
       maxlength: [500, "Description cannot exceed 500 characters"],
     },
 
+    outcome: { type: String, enum: ["success", "failure"], default: "success", index: true },
+
     entityType: {
       type: String,
       trim: true,
@@ -89,6 +91,9 @@ const activitySchema = new mongoose.Schema(
 // `user` and sorts by `createdAt desc`, with or without other filters).
 activitySchema.index({ user: 1, createdAt: -1 });
 activitySchema.index({ category: 1, createdAt: -1 });
+activitySchema.index({ category: 1, action: 1, createdAt: -1 });
+activitySchema.index({ entityType: 1, entityId: 1, createdAt: -1 });
+activitySchema.index({ entityId: 1, createdAt: -1 });
 
 // Category filter (e.g. "just monitor activity").
 activitySchema.index({ user: 1, category: 1, createdAt: -1 });

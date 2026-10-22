@@ -49,6 +49,9 @@ import {
   resolveAdminIncidentSchema,
 } from "../validators/adminOperations.validator.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
+import { captureFailedAdminOperations } from "../middlewares/adminAuditFailureCapture.js";
+import { listAdminAuditEvents, getAdminAuditEvent } from "../controllers/adminAudit.controller.js";
+import { adminAuditQuerySchema } from "../validators/adminAudit.validator.js";
 import {
   listUsersSchema,
   updateUserRoleSchema,
@@ -62,6 +65,10 @@ import {
 } from "../validators/planUpgradeRequest.validator.js";
 
 const router = Router();
+
+router.use(captureFailedAdminOperations);
+router.get("/audit-logs", validate(adminAuditQuerySchema, "query"), listAdminAuditEvents);
+router.get("/audit-logs/:id", validateObjectId("id"), getAdminAuditEvent);
 
 router.get(
   "/dashboard",

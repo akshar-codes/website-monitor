@@ -1,5 +1,6 @@
 import Activity from "../models/Activity.js";
 import logger from "./logger.js";
+import { redactActivityText, sanitizeActivityMetadata } from "./activityRedaction.js";
 
 /**
  * Reusable activity-logging entry point — the ONLY place Activity
@@ -33,6 +34,7 @@ export const logActivity = async ({
   entityType = null,
   entityId = null,
   metadata = null,
+  outcome = "success",
   req = null,
 }) => {
   if (!userId || !category || !action || !description) {
@@ -48,12 +50,15 @@ export const logActivity = async ({
       user: userId,
       category,
       action,
-      description,
+      description: redactActivityText(description),
+      outcome: outcome === "failure" ? "failure" : "success",
       entityType,
       entityId,
-      metadata,
-      ip: req?.ip || null,
-      userAgent: req?.headers?.["user-agent"] || null,
+      metadata: sanitizeActivityMetadata(metadata),
+      // Network/session fingerprints belong in the dedicated Session model;
+      // the activity trail keeps action context without duplicating them.
+      ip: null,
+      userAgent: null,
     });
   } catch (error) {
     // Never let an activity-log failure surface to the caller — it must
