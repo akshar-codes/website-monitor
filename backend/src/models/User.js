@@ -64,6 +64,8 @@ const planHistoryEntrySchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    reason: { type: String, trim: true, maxlength: 500, default: null },
+    expiresAt: { type: Date, default: null },
   },
   { _id: false },
 );
@@ -503,13 +505,17 @@ userSchema.methods.isAdmin = function () {
  * this, since it's `select: false` by default and would otherwise be
  * silently overwritten rather than appended to).
  */
-userSchema.methods.changePlan = function (newPlan, changedByUserId = null) {
+userSchema.methods.changePlan = function (
+  newPlan,
+  changedByUserId = null,
+  { reason = null, expiresAt = null } = {},
+) {
   const previousPlan = this.plan;
 
   this.plan = newPlan;
   this.planStatus = PLAN_STATUS.ACTIVE;
   this.planStartedAt = new Date();
-  this.planRenewsAt = null;
+  this.planRenewsAt = expiresAt;
   this.planCanceledAt = null;
   this.planExpiredAt = null;
 
@@ -522,6 +528,8 @@ userSchema.methods.changePlan = function (newPlan, changedByUserId = null) {
     to: newPlan,
     changedAt: new Date(),
     changedBy: changedByUserId,
+    reason,
+    expiresAt,
   });
 };
 

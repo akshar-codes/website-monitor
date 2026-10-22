@@ -49,7 +49,12 @@ export const getCurrentPlanForUser = (user) => {
  * exist for that integration. Until it lands, every plan change — upgrade
  * or downgrade — takes effect immediately.
  */
-export const changeUserPlan = async (userId, targetPlan, actingUser = null) => {
+export const changeUserPlan = async (
+  userId,
+  targetPlan,
+  actingUser = null,
+  { reason = null, expiresAt = null } = {},
+) => {
   const definition = getPlanDefinition(targetPlan);
   if (!definition) {
     throw ApiError.badRequest(`Unknown plan: ${targetPlan}`);
@@ -83,7 +88,10 @@ export const changeUserPlan = async (userId, targetPlan, actingUser = null) => {
     );
   }
 
-  user.changePlan(targetPlan, isSelfService ? null : actingUserId);
+  user.changePlan(targetPlan, isSelfService ? null : actingUserId, {
+    reason,
+    expiresAt,
+  });
   await user.save({ validateBeforeSave: false });
 
   logger.info(
@@ -107,7 +115,14 @@ export const changeUserPlan = async (userId, targetPlan, actingUser = null) => {
     description: isSelfService
       ? `${changeType === "upgrade" ? "Upgraded" : "Downgraded"} plan from ${previousPlan} to ${targetPlan}`
       : `Plan ${changeType === "upgrade" ? "upgraded" : "downgraded"} from ${previousPlan} to ${targetPlan} by an administrator`,
-    metadata: { from: previousPlan, to: targetPlan, changeType, isSelfService },
+    metadata: {
+      from: previousPlan,
+      to: targetPlan,
+      changeType,
+      isSelfService,
+      ...(reason ? { reason } : {}),
+      ...(expiresAt ? { expiresAt } : {}),
+    },
   });
 
   return { user, changeType };

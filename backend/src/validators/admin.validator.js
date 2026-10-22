@@ -57,9 +57,20 @@ export const userStatusReasonSchema = z.object({
 
 // ── Update a user's subscription plan ──
 
-export const updateUserPlanSchema = z.object({
-  plan: z.enum(PLAN_VALUES, {
-    required_error: "Plan is required",
-    invalid_type_error: `Plan must be one of: ${PLAN_VALUES.join(", ")}`,
-  }),
-});
+export const updateUserPlanSchema = z
+  .object({
+    plan: z.enum(PLAN_VALUES, {
+      required_error: "Plan is required",
+      invalid_type_error: `Plan must be one of: ${PLAN_VALUES.join(", ")}`,
+    }),
+    reason: z.string().trim().min(3).max(500),
+    expiresAt: z.string().datetime({ offset: true }).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.expiresAt && new Date(value.expiresAt) <= new Date())
+      ctx.addIssue({
+        code: "custom",
+        path: ["expiresAt"],
+        message: "Expiry must be in the future",
+      });
+  });

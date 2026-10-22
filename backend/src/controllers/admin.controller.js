@@ -68,6 +68,10 @@ export const updateUserPlan = asyncHandler(async (req, res) => {
     req.params.id,
     req.body.plan,
     req.user,
+    {
+      reason: req.body.reason,
+      expiresAt: req.body.expiresAt ? new Date(req.body.expiresAt) : null,
+    },
   );
 
   sendSuccess(res, {
@@ -87,6 +91,16 @@ export const updateUserPlan = asyncHandler(async (req, res) => {
     },
   });
 });
+
+export const getPlanOverview = asyncHandler(async (_req, res) =>
+  sendSuccess(res, { data: await adminService.getPlanOverview() }),
+);
+
+export const getUserPlanDetails = asyncHandler(async (req, res) =>
+  sendSuccess(res, {
+    data: await adminService.getUserPlanDetails(req.params.id),
+  }),
+);
 
 /**
  * POST /api/admin/users/:id/suspend
@@ -161,6 +175,13 @@ export const listPlanUpgradeRequests = asyncHandler(async (req, res) => {
   });
 });
 
+export const getPlanUpgradeRequest = asyncHandler(async (req, res) => {
+  const request = await planUpgradeRequestService.getRequestForAdmin(
+    req.params.id,
+  );
+  sendSuccess(res, { data: request });
+});
+
 /**
  * PATCH /api/admin/plan-upgrade-requests/:id/approve
  * Applies the requested plan change immediately and notifies the user by
@@ -170,7 +191,11 @@ export const approvePlanUpgradeRequest = asyncHandler(async (req, res) => {
   const { request } = await planUpgradeRequestService.approveRequest(
     req.params.id,
     req.user,
-    { grantedPlan: req.body.grantedPlan },
+    {
+      grantedPlan: req.body.grantedPlan,
+      reason: req.body.reason,
+      expiresAt: req.body.expiresAt ? new Date(req.body.expiresAt) : null,
+    },
   );
 
   sendSuccess(res, {

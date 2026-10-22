@@ -10,6 +10,8 @@ import logger from "../utils/logger.js";
 import { escapeRegExp } from "../utils/regex.js";
 import { ROLES } from "../config/constants.js";
 import { changeUserPlan as changePlanForUser } from "./plan.service.js";
+import { getUsageForUser } from "./usage.service.js";
+import { getPlanDefinition, getPublicPlanCatalog } from "../config/plans.js";
 import { destroyAllUserSessions } from "./session.service.js";
 import { logActivity } from "../utils/activityLogger.js";
 import {
@@ -221,14 +223,24 @@ export const updateUserRole = async (
  * admin-directed) and prevents an admin from granting themselves a plan
  * through a back door.
  */
-export const updateUserPlan = async (targetUserId, plan, actingUser) => {
+export const updateUserPlan = async (
+  targetUserId,
+  plan,
+  actingUser,
+  options = {},
+) => {
   const actingUserId = resolveActingUserId(actingUser);
 
   if (targetUserId === actingUserId) {
     throw ApiError.badRequest("Use the Billing page to change your own plan");
   }
 
-  const result = await changePlanForUser(targetUserId, plan, actingUser);
+  const result = await changePlanForUser(
+    targetUserId,
+    plan,
+    actingUser,
+    options,
+  );
 
   // plan.service.js already logs a PLAN-category entry on the target
   // user's own timeline; this additional ADMIN-category entry on the
@@ -238,13 +250,78 @@ export const updateUserPlan = async (targetUserId, plan, actingUser) => {
     userId: actingUserId,
     category: ACTIVITY_CATEGORIES.ADMIN,
     action: ACTIVITY_ACTIONS.ADMIN_USER_PLAN_CHANGED,
-    description: `Changed ${result.user.email}'s plan to ${plan}`,
+    description: `Changed ${result.user.email}'s plan from ${result.user.planHistory?.at(-1)?.from || "previous"} to ${plan}${options.reason ? `: ${options.reason}` : ""}`,
     entityType: "User",
     entityId: result.user._id,
-    metadata: { targetEmail: result.user.email, to: plan },
+    metadata: {
+      targetEmail: result.user.email,
+      from: result.user.planHistory?.at(-1)?.from || null,
+      to: plan,
+      reason: options.reason || null,
+      expiresAt: options.expiresAt || null,
+    },
   });
 
   return result;
+};
+
+export const getPlanOverview = async () => {
+  const grouped = await User.aggregate([
+    {
+      $group: {
+        _id: "$plan",
+        users: { $sum: 1 },
+        activeUsers: { $sum: { $cond: [{ $eq: ["$active", true] }, 1, 0] } },
+      },
+    },
+  ]);
+  const counts = Object.fromEntries(
+    grouped.map((item) => [
+      item._id,
+      { users: item.users, activeUsers: item.activeUsers },
+    ]),
+  );
+  return getPublicPlanCatalog().map((definition) => ({
+    ...definition,
+    ...(counts[definition.id] || { users: 0, activeUsers: 0 }),
+  }));
+};
+
+export const getUserPlanDetails = async (targetUserId) => {
+  const user = await User.findById(targetUserId).select(
+    "name email role plan planStatus planStartedAt planRenewsAt planCanceledAt planExpiredAt +planHistory",
+  );
+  if (!user) throw ApiError.notFound(`User not found with id: ${targetUserId}`);
+  const usage = await getUsageForUser(user);
+  return {
+    user: {
+      id: String(user._id),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+    plan: {
+      id: user.plan,
+      status: user.planStatus,
+      startedAt: user.planStartedAt,
+      expiresAt: user.planRenewsAt,
+      canceledAt: user.planCanceledAt,
+      expiredAt: user.planExpiredAt,
+      definition: getPlanDefinition(user.plan),
+    },
+    usage,
+    history: (user.planHistory || [])
+      .slice()
+      .reverse()
+      .map((entry) => ({
+        from: entry.from,
+        to: entry.to,
+        changedAt: entry.changedAt,
+        changedBy: entry.changedBy,
+        reason: entry.reason || null,
+        expiresAt: entry.expiresAt || null,
+      })),
+  };
 };
 
 // ── Status management (suspend / reactivate) ────────────────────────────────

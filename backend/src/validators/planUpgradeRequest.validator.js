@@ -23,13 +23,24 @@ export const listPlanUpgradeRequestsSchema = z.object({
 
 // ── Admin: approve ────────────────────────────────────────────────────────────
 
-export const approvePlanUpgradeRequestSchema = z.object({
-  grantedPlan: z
-    .enum(PLAN_VALUES, {
-      invalid_type_error: `Granted plan must be one of: ${PLAN_VALUES.join(", ")}`,
-    })
-    .optional(),
-});
+export const approvePlanUpgradeRequestSchema = z
+  .object({
+    grantedPlan: z
+      .enum(PLAN_VALUES, {
+        invalid_type_error: `Granted plan must be one of: ${PLAN_VALUES.join(", ")}`,
+      })
+      .optional(),
+    reason: z.string().trim().min(3).max(500),
+    expiresAt: z.string().datetime({ offset: true }).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.expiresAt && new Date(value.expiresAt) <= new Date())
+      ctx.addIssue({
+        code: "custom",
+        path: ["expiresAt"],
+        message: "Expiry must be in the future",
+      });
+  });
 
 // ── Admin: reject ─────────────────────────────────────────────────────────────
 
@@ -37,6 +48,6 @@ export const rejectPlanUpgradeRequestSchema = z.object({
   reason: z
     .string()
     .trim()
-    .max(500, "Reason cannot exceed 500 characters")
-    .optional(),
+    .min(3, "A rejection reason is required")
+    .max(500, "Reason cannot exceed 500 characters"),
 });

@@ -23,12 +23,15 @@ import {
   getAdminDashboard,
   getUsers,
   getUserDetails,
+  getPlanOverview,
+  getUserPlanDetails,
   updateUserRole,
   updateUserPlan,
   suspendUser,
   reactivateUser,
   deleteUser,
   listPlanUpgradeRequests,
+  getPlanUpgradeRequest,
   approvePlanUpgradeRequest,
   rejectPlanUpgradeRequest,
 } from "../controllers/admin.controller.js";
@@ -55,6 +58,8 @@ router.get(
 );
 
 router.get("/users", validate(listUsersSchema, "query"), getUsers);
+router.get("/plans/overview", getPlanOverview);
+router.get("/users/:id/plan", validateObjectId("id"), getUserPlanDetails);
 router.get("/users/:id", validateObjectId("id"), getUserDetails);
 
 router.patch(
@@ -93,6 +98,11 @@ router.get(
   "/plan-upgrade-requests",
   validate(listPlanUpgradeRequestsSchema, "query"),
   listPlanUpgradeRequests,
+);
+router.get(
+  "/plan-upgrade-requests/:id",
+  validateObjectId("id"),
+  getPlanUpgradeRequest,
 );
 
 router.patch(

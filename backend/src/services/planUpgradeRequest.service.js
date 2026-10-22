@@ -145,6 +145,18 @@ export const listRequestsForAdmin = async ({ page, limit, status }) => {
   };
 };
 
+export const getRequestForAdmin = async (requestId) => {
+  const request = await PlanUpgradeRequest.findById(requestId)
+    .populate("user", "name email role plan planStatus active")
+    .populate("reviewedBy", "name")
+    .lean();
+  if (!request)
+    throw ApiError.notFound(
+      `Plan upgrade request not found with id: ${requestId}`,
+    );
+  return request;
+};
+
 // ── Admin: approve ───────────────────────────────────────────────────────────
 
 /**
@@ -158,7 +170,11 @@ export const listRequestsForAdmin = async ({ page, limit, status }) => {
  * means this flow can never drift from the self-service upgrade/downgrade
  * path — there is exactly one place a user's plan is ever changed.
  */
-export const approveRequest = async (requestId, adminUser, { grantedPlan } = {}) => {
+export const approveRequest = async (
+  requestId,
+  adminUser,
+  { grantedPlan, reason, expiresAt } = {},
+) => {
   const request = await PlanUpgradeRequest.findById(requestId);
   if (!request) {
     throw ApiError.notFound(
@@ -175,11 +191,25 @@ export const approveRequest = async (requestId, adminUser, { grantedPlan } = {})
   const adminId = adminUser.id || adminUser._id.toString();
 
   const actualPlan = grantedPlan || request.requestedPlan;
+  const currentUser = await User.findById(request.user).select("plan");
+  if (!currentUser)
+    throw ApiError.notFound("The user for this request no longer exists");
+  if (currentUser.plan !== request.currentPlan) {
+    throw ApiError.conflict(
+      "The user's plan changed after this request was submitted. Review the current plan before approving.",
+    );
+  }
+  if (!isUpgrade(currentUser.plan, actualPlan)) {
+    throw ApiError.badRequest(
+      "An upgrade request can only grant a higher plan than the user's current plan.",
+    );
+  }
 
   const { user: updatedUser } = await changeUserPlan(
     request.user,
     actualPlan,
     adminUser,
+    { reason, expiresAt: expiresAt || null },
   );
 
   request.status = PLAN_UPGRADE_REQUEST_STATUS.APPROVED;
@@ -194,10 +224,17 @@ export const approveRequest = async (requestId, adminUser, { grantedPlan } = {})
     userId: adminId,
     category: ACTIVITY_CATEGORIES.ADMIN,
     action: ACTIVITY_ACTIONS.ADMIN_PLAN_UPGRADE_REQUEST_APPROVED,
-    description: `Approved ${updatedUser.email}'s upgrade request to ${actualPlan}${grantedPlan ? ' (overridden)' : ''}`,
+    description: `Approved ${updatedUser.email}'s upgrade request to ${actualPlan}${grantedPlan ? " (overridden)" : ""}: ${reason}`,
     entityType: "PlanUpgradeRequest",
     entityId: request._id,
-    metadata: { targetEmail: updatedUser.email, to: actualPlan, originalRequest: request.requestedPlan },
+    metadata: {
+      targetEmail: updatedUser.email,
+      from: request.currentPlan,
+      to: actualPlan,
+      originalRequest: request.requestedPlan,
+      reason,
+      expiresAt: expiresAt || null,
+    },
   });
 
   await logActivity({
@@ -226,10 +263,7 @@ export const approveRequest = async (requestId, adminUser, { grantedPlan } = {})
   });
 
   try {
-    await sendPlanUpgradeRequestApprovedEmail(
-      updatedUser,
-      actualPlan,
-    );
+    await sendPlanUpgradeRequestApprovedEmail(updatedUser, actualPlan);
   } catch (error) {
     logger.error(
       `Failed to send plan-upgrade-approved email to ${updatedUser.email}: ${error.message}`,
