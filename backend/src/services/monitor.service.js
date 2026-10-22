@@ -1,5 +1,7 @@
 import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
+import DailyStat from "../models/DailyStat.js";
+import Incident from "../models/Incident.js";
 import ApiError from "../utils/ApiError.js";
 import { ROLES } from "../config/constants.js";
 import {
@@ -239,13 +241,48 @@ export const updateMonitor = async (id, data, user) => {
   return monitor;
 };
 
+export const duplicateMonitor = async (id, data, user) => {
+  const source = await getMonitorById(id, user);
+  const ownerId = resolveOwnerId(user);
+  assertIntervalAllowedForPlan(user.plan, data.interval);
+  const existing = await Monitor.findOne({ owner: ownerId, url: data.url });
+  if (existing)
+    throw ApiError.conflict(`You already have a monitor for "${data.url}"`);
+  const monitor = await Monitor.create({
+    ...data,
+    owner: ownerId,
+    nextCheckAt: new Date(),
+  });
+  await logActivity({
+    userId: ownerId,
+    category: ACTIVITY_CATEGORIES.MONITOR,
+    action: ACTIVITY_ACTIONS.MONITOR_CREATED,
+    description: `Duplicated monitor "${source.name}" as "${monitor.name}"`,
+    entityType: "Monitor",
+    entityId: monitor._id,
+    metadata: {
+      url: monitor.url,
+      interval: monitor.interval,
+      duplicatedFrom: source._id,
+    },
+  });
+  return monitor;
+};
+
 export const deleteMonitor = async (id, user) => {
   const ownerId = resolveOwnerId(user);
 
-  const monitor = await Monitor.findOneAndDelete({ _id: id, owner: ownerId });
+  const monitor = await Monitor.findOne({ _id: id, owner: ownerId });
   if (!monitor) {
     throw ApiError.notFound(`Monitor not found with id: ${id}`);
   }
+
+  await Promise.all([
+    HealthCheck.deleteMany({ monitor: monitor._id }),
+    DailyStat.deleteMany({ monitor: monitor._id }),
+    Incident.deleteMany({ monitor: monitor._id }),
+  ]);
+  await monitor.deleteOne();
 
   await logActivity({
     userId: ownerId,

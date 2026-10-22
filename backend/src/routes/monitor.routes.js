@@ -20,6 +20,8 @@ import {
   getMonitors,
   getMonitorById,
   getMonitorDiagnostics,
+  manualHealthCheck,
+  duplicateMonitor,
   updateMonitor,
   deleteMonitor,
 } from "../controllers/monitor.controller.js";
@@ -41,6 +43,26 @@ router.get(
   requirePermission("monitor:read"),
   validateObjectId("id"),
   getMonitorDiagnostics,
+);
+
+router.post(
+  "/:id/check",
+  requirePermission("monitor:update"),
+  validateObjectId("id"),
+  manualHealthCheck,
+);
+
+router.post(
+  "/:id/duplicate",
+  requirePermission("monitor:create"),
+  requireWithinLimit({
+    limitFn: getMonitorLimit,
+    countFn: (req) => countOwnedMonitors(req.user),
+    resourceName: "monitor",
+  }),
+  validateObjectId("id"),
+  validate(createMonitorSchema, "body"),
+  duplicateMonitor,
 );
 
 router
