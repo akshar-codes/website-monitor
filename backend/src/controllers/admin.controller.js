@@ -1,4 +1,5 @@
 import asyncHandler from "../utils/asyncHandler.js";
+import { getAdminDashboard as getAdminDashboardData } from "../services/adminDashboard.service.js";
 import * as adminService from "../services/admin.service.js";
 import * as planUpgradeRequestService from "../services/planUpgradeRequest.service.js";
 import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
@@ -20,6 +21,16 @@ export const getUsers = asyncHandler(async (req, res) => {
     limit: query.limit,
     total: result.total,
   });
+});
+
+export const getAdminDashboard = asyncHandler(async (req, res) => {
+  const { startDate, endDate } = req.validatedQuery;
+  const data = await getAdminDashboardData({
+    startDate:
+      startDate || new Date((endDate || new Date()).getTime() - 30 * 86400000),
+    endDate: endDate || new Date(),
+  });
+  sendSuccess(res, { data });
 });
 
 /**
@@ -120,7 +131,7 @@ export const approvePlanUpgradeRequest = asyncHandler(async (req, res) => {
   const { request } = await planUpgradeRequestService.approveRequest(
     req.params.id,
     req.user,
-    { grantedPlan: req.body.grantedPlan }
+    { grantedPlan: req.body.grantedPlan },
   );
 
   sendSuccess(res, {

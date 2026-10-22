@@ -20,6 +20,7 @@
 
 import { Router } from "express";
 import {
+  getAdminDashboard,
   getUsers,
   updateUserRole,
   updateUserPlan,
@@ -30,6 +31,7 @@ import {
   approvePlanUpgradeRequest,
   rejectPlanUpgradeRequest,
 } from "../controllers/admin.controller.js";
+import { adminDashboardQuerySchema } from "../validators/adminDashboard.validator.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
 import {
   listUsersSchema,
@@ -43,6 +45,12 @@ import {
 } from "../validators/planUpgradeRequest.validator.js";
 
 const router = Router();
+
+router.get(
+  "/dashboard",
+  validate(adminDashboardQuerySchema, "query"),
+  getAdminDashboard,
+);
 
 router.get("/users", validate(listUsersSchema, "query"), getUsers);
 

@@ -88,6 +88,7 @@ const activitySchema = new mongoose.Schema(
 // Base timeline: "my activity, newest first" (every list call filters on
 // `user` and sorts by `createdAt desc`, with or without other filters).
 activitySchema.index({ user: 1, createdAt: -1 });
+activitySchema.index({ category: 1, createdAt: -1 });
 
 // Category filter (e.g. "just monitor activity").
 activitySchema.index({ user: 1, category: 1, createdAt: -1 });
