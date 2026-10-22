@@ -5,6 +5,7 @@ import { poll } from "../workers/poller.js";
 import { classify } from "../workers/classifier.js";
 import HealthCheck from "../models/HealthCheck.js";
 import Monitor from "../models/Monitor.js";
+import { randomUUID } from "node:crypto";
 
 // ── Controllers ──────────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ export const manualHealthCheck = asyncHandler(async (req, res) => {
   const result = await poll(monitor.url, { maxRetries: 0 });
   const classification = classify(result);
   const check = await HealthCheck.create({
+    executionKey: `manual:${randomUUID()}`,
     monitor: monitor._id,
     status: classification.status,
     frontendStatus: classification.frontendStatus,
@@ -69,7 +71,7 @@ export const manualHealthCheck = asyncHandler(async (req, res) => {
     responseTime: result.responseTime,
     httpStatus: result.httpStatus,
     failureReason: classification.failureReason,
-    rawResponse: result.body,
+    rawResponse: null,
     diagnostics: result.diagnostics,
     checkedAt: new Date(),
   });

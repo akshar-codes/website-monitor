@@ -22,6 +22,9 @@ const healthCheckSchema = new mongoose.Schema(
       required: [true, "Monitor reference is required"],
       index: true,
     },
+    // Prevent duplicate history rows if a scheduled pipeline retries after a
+    // transient persistence failure. Manual checks receive unique run IDs.
+    executionKey: { type: String, default: undefined, select: false },
 
     // ── Overall verdict ──
     status: {
@@ -113,6 +116,7 @@ healthCheckSchema.index({ monitor: 1, status: 1, checkedAt: -1 });
 
 // Response-time analytics (P95 / P99 charts)
 healthCheckSchema.index({ monitor: 1, responseTime: 1 });
+healthCheckSchema.index({ executionKey: 1 }, { unique: true, sparse: true });
 
 // ─────────────────────────────────────────────
 // Virtuals

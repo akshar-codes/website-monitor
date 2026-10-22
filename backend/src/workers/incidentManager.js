@@ -33,12 +33,11 @@ export const handleIncident = async (monitor, healthCheck) => {
  * Service recovered: reset consecutive failures and resolve any active incident.
  */
 const handleRecovery = async (monitor, healthCheck) => {
-  // Reset consecutive failures
-  if (monitor.consecutiveFailures > 0) {
-    await Monitor.findByIdAndUpdate(monitor._id, {
-      consecutiveFailures: 0,
-    });
-  }
+  const updatedMonitor = await Monitor.findByIdAndUpdate(monitor._id, {
+    $inc: { consecutiveSuccesses: 1 },
+    $set: { consecutiveFailures: 0 },
+  }, { new: true });
+  if ((updatedMonitor?.consecutiveSuccesses || 0) < env.CONSECUTIVE_SUCCESS_THRESHOLD) return;
 
   // Resolve active incident if one exists
   const activeIncident = await Incident.findActiveForMonitor(monitor._id);
@@ -74,11 +73,11 @@ const handleRecovery = async (monitor, healthCheck) => {
  * Service failed: increment counter and open an incident if threshold is met.
  */
 const handleFailure = async (monitor, healthCheck) => {
-  const newFailureCount = monitor.consecutiveFailures + 1;
-
-  await Monitor.findByIdAndUpdate(monitor._id, {
-    consecutiveFailures: newFailureCount,
-  });
+  const updatedMonitor = await Monitor.findByIdAndUpdate(monitor._id, {
+    $inc: { consecutiveFailures: 1 },
+    $set: { consecutiveSuccesses: 0 },
+  }, { new: true });
+  const newFailureCount = updatedMonitor?.consecutiveFailures || 1;
 
   const threshold = env.CONSECUTIVE_FAILURE_THRESHOLD;
 

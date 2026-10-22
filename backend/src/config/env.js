@@ -49,7 +49,8 @@ const envSchema = z.object({
   MONITOR_JOB_RETRY_DELAY_MS: z.coerce.number().int().positive().default(30_000),
   MONITOR_RETRY_COUNT: z.coerce.number().int().min(0).default(2),
   MONITOR_RETRY_DELAY: z.coerce.number().int().min(0).default(1_000),
-  CONSECUTIVE_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(3),
+  CONSECUTIVE_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(2),
+  CONSECUTIVE_SUCCESS_THRESHOLD: z.coerce.number().int().positive().default(2),
 
   // ── SSL / domain monitoring worker ──
   // Deliberately on its own, much slower cadence than the HTTP

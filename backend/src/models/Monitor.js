@@ -71,12 +71,14 @@ const monitorSchema = new mongoose.Schema(
     // Expired leases are reclaimable, so process restarts cannot strand jobs.
     checkLeaseToken: { type: String, default: null, select: false },
     checkLeaseUntil: { type: Date, default: null, select: false },
+    checkRetryAt: { type: Date, default: null, select: false },
 
     consecutiveFailures: {
       type: Number,
       default: 0,
       min: [0, "Consecutive failures cannot be negative"],
     },
+    consecutiveSuccesses: { type: Number, default: 0, min: 0 },
 
     // ── Worker fields (SSL / domain monitoring) ──
     // Additive, optional fields — mirrors lastCheckedAt/nextCheckAt above

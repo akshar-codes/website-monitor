@@ -24,19 +24,28 @@ const processMonitor = async (monitor, initiatedBy = null) => {
   try {
     const pollResult = await poll(monitor.url);
     const classification = classify(pollResult);
-    const healthCheck = await HealthCheck.create({
-      monitor: monitor._id,
-      status: classification.status,
-      frontendStatus: classification.frontendStatus,
-      backendStatus: classification.backendStatus,
-      databaseStatus: classification.databaseStatus,
-      responseTime: pollResult.responseTime,
-      httpStatus: pollResult.httpStatus,
-      failureReason: classification.failureReason,
-      rawResponse: pollResult.body,
-      diagnostics: pollResult.diagnostics,
-      checkedAt: new Date(),
-    });
+    const checkedAt = new Date();
+    const executionKey = initiatedBy
+      ? `manual:${randomUUID()}`
+      : `scheduled:${id}:${monitor.nextCheckAt ? new Date(monitor.nextCheckAt).toISOString() : "immediate"}`;
+    const healthCheck = await HealthCheck.findOneAndUpdate(
+      { executionKey },
+      { $setOnInsert: {
+        executionKey,
+        monitor: monitor._id,
+        status: classification.status,
+        frontendStatus: classification.frontendStatus,
+        backendStatus: classification.backendStatus,
+        databaseStatus: classification.databaseStatus,
+        responseTime: pollResult.responseTime,
+        httpStatus: pollResult.httpStatus,
+        failureReason: classification.failureReason,
+        rawResponse: null,
+        diagnostics: pollResult.diagnostics,
+        checkedAt,
+      } },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
     await handleIncident(monitor, healthCheck);
     await updateDailyStat(monitor, healthCheck);
     if (initiatedBy) {
@@ -83,10 +92,17 @@ const claimNextDueMonitor = async () => {
     {
       active: true,
       nextCheckAt: { $lte: now },
-      $or: [
-        { checkLeaseUntil: null },
-        { checkLeaseUntil: { $exists: false } },
-        { checkLeaseUntil: { $lte: now } },
+      $and: [
+        { $or: [
+          { checkLeaseUntil: null },
+          { checkLeaseUntil: { $exists: false } },
+          { checkLeaseUntil: { $lte: now } },
+        ] },
+        { $or: [
+          { checkRetryAt: null },
+          { checkRetryAt: { $exists: false } },
+          { checkRetryAt: { $lte: now } },
+        ] },
       ],
     },
     { $set: { checkLeaseToken: token, checkLeaseUntil: new Date(now.getTime() + env.MONITOR_JOB_LEASE_MS) } },
@@ -115,9 +131,13 @@ const runClaimedMonitor = async ({ monitor, token }) => {
       timeout.unref?.();
     });
     await Promise.race([work, deadline]);
+    const latest = await Monitor.findById(monitor._id).select("active interval").lean();
     await Monitor.updateOne(query, {
-      $set: { lastCheckedAt: new Date(), nextCheckAt: new Date(Date.now() + monitor.interval * 1000) },
-      $unset: { checkLeaseToken: 1, checkLeaseUntil: 1 },
+      $set: {
+        lastCheckedAt: new Date(),
+        ...(latest?.active ? { nextCheckAt: new Date(Date.now() + latest.interval * 1000) } : {}),
+      },
+      $unset: { checkLeaseToken: 1, checkLeaseUntil: 1, checkRetryAt: 1 },
     });
   } catch (error) {
     if (work && error.message === "Monitor job exceeded its timeout") {
@@ -127,7 +147,7 @@ const runClaimedMonitor = async ({ monitor, token }) => {
     }
     logger.error("Monitor job failed", { monitorId: id, monitorName: monitor.name, error: error.message });
     await Monitor.updateOne(query, {
-      $set: { nextCheckAt: new Date(Date.now() + env.MONITOR_JOB_RETRY_DELAY_MS) },
+      $set: { checkRetryAt: new Date(Date.now() + env.MONITOR_JOB_RETRY_DELAY_MS) },
       $unset: { checkLeaseToken: 1, checkLeaseUntil: 1 },
     });
   } finally {
