@@ -5,6 +5,19 @@ export async function getAdminDashboard(params = {}) {
   return data?.data;
 }
 
+export async function getAdminMonitors(params = {}) {
+  const { data } = await apiClient.get("/admin/monitors", { params });
+  return data;
+}
+export async function getAdminMonitor(id, params = {}) {
+  const { data } = await apiClient.get(`/admin/monitors/${id}`, { params });
+  return data?.data;
+}
+export async function checkAdminMonitor(id) {
+  const { data } = await apiClient.post(`/admin/monitors/${id}/check`);
+  return data?.data;
+}
+
 /**
  * GET /api/admin/users
  * Supports pagination plus optional { search, role, plan, status } filters.

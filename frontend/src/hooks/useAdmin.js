@@ -14,6 +14,33 @@ export function useAdminDashboard(params = {}) {
   };
 }
 
+export function useAdminMonitors(params = {}) {
+  const paramsKey = JSON.stringify(params);
+  return useQuery(() => adminApi.getAdminMonitors(params), [paramsKey]);
+}
+export function useAdminMonitor(id, window = "30d") {
+  return useQuery(() => adminApi.getAdminMonitor(id, { window }), [id, window]);
+}
+export function useAdminMonitorCheck(onSuccess) {
+  const [submitting, setSubmitting] = useState(false);
+  const check = useCallback(
+    async (id) => {
+      setSubmitting(true);
+      try {
+        const data = await adminApi.checkAdminMonitor(id);
+        toast.success("Manual check completed");
+        onSuccess?.(data);
+      } catch {
+        /* shared API interceptor reports request errors */
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [onSuccess],
+  );
+  return { check, submitting };
+}
+
 export function useUserList(params = {}) {
   const paramsKey = JSON.stringify(params);
   return useQuery(() => adminApi.getUsers(params), [paramsKey]);

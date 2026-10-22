@@ -30,6 +30,8 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUserDetails from "./pages/AdminUserDetails";
 import AdminPlans from "./pages/AdminPlans";
+import AdminMonitors from "./pages/AdminMonitors";
+import AdminMonitorDetails from "./pages/AdminMonitorDetails";
 import AdminPlanRequests from "./pages/AdminPlanRequests";
 import Unauthorized from "./pages/Unauthorized";
 import UpgradeRequired from "./pages/UpgradeRequired";
@@ -239,6 +241,22 @@ export default function App() {
                         element={
                           <Suspense fallback={<PageFallback />}>
                             <AdminPlans />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/admin/monitors"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <AdminMonitors />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/admin/monitors/:id"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <AdminMonitorDetails />
                           </Suspense>
                         }
                       />

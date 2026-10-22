@@ -88,6 +88,12 @@ const ADMIN_PLANS_NAV_ITEM = {
   icon: CreditCard,
 };
 
+const ADMIN_MONITORS_NAV_ITEM = {
+  label: "Monitor Oversight",
+  path: "/admin/monitors",
+  icon: Monitor,
+};
+
 const ADMIN_PLAN_REQUESTS_NAV_ITEM = {
   label: "Plan Requests",
   path: ROUTES.ADMIN_PLAN_REQUESTS,
@@ -162,6 +168,7 @@ export default function Sidebar() {
       ADMIN_DASHBOARD_NAV_ITEM,
       ADMIN_NAV_ITEM,
       ADMIN_PLANS_NAV_ITEM,
+      ADMIN_MONITORS_NAV_ITEM,
       ADMIN_PLAN_REQUESTS_NAV_ITEM,
     ].filter((item) => !item.permission || can(item.permission));
 
