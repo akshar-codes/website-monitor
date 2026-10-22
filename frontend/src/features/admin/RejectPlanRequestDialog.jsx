@@ -36,8 +36,8 @@ export default function RejectPlanRequestDialog({
       />
       <ModalBody>
         <FormField
-          label="Reason (optional)"
-          hint="Shared with the user in their notification and email."
+          label="Reason"
+          hint="Required for the audit trail and shared with the user."
         >
           <Textarea
             value={reason}
@@ -62,6 +62,7 @@ export default function RejectPlanRequestDialog({
           variant="danger"
           onClick={() => onConfirm(reason.trim() || undefined)}
           loading={loading}
+          disabled={loading || reason.trim().length < 3}
         >
           Reject request
         </Button>

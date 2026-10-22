@@ -19,6 +19,16 @@ export async function getAdminUser(userId) {
   return data?.data;
 }
 
+export async function getAdminUserPlan(userId) {
+  const { data } = await apiClient.get(`/admin/users/${userId}/plan`);
+  return data?.data;
+}
+
+export async function getAdminPlanOverview() {
+  const { data } = await apiClient.get("/admin/plans/overview");
+  return data?.data || [];
+}
+
 /**
  * PATCH /api/admin/users/:id/role
  */
@@ -33,9 +43,11 @@ export async function updateUserRole(userId, role, reason) {
 /**
  * PATCH /api/admin/users/:id/plan
  */
-export async function updateUserPlan(userId, plan) {
+export async function updateUserPlan(userId, plan, { reason, expiresAt } = {}) {
   const { data } = await apiClient.patch(`/admin/users/${userId}/plan`, {
     plan,
+    reason,
+    ...(expiresAt ? { expiresAt } : {}),
   });
   return data;
 }
@@ -83,10 +95,17 @@ export async function getPlanUpgradeRequests(params = {}) {
 /**
  * PATCH /api/admin/plan-upgrade-requests/:id/approve
  */
-export async function approvePlanUpgradeRequest(requestId, grantedPlan) {
+export async function approvePlanUpgradeRequest(
+  requestId,
+  { grantedPlan, reason, expiresAt } = {},
+) {
   const { data } = await apiClient.patch(
     `/admin/plan-upgrade-requests/${requestId}/approve`,
-    grantedPlan ? { grantedPlan } : {},
+    {
+      ...(grantedPlan ? { grantedPlan } : {}),
+      reason,
+      ...(expiresAt ? { expiresAt } : {}),
+    },
   );
   return data;
 }

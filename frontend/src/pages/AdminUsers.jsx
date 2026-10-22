@@ -129,9 +129,9 @@ export default function AdminUsers() {
     );
   };
 
-  const handleConfirmPlanChange = (plan) => {
+  const handleConfirmPlanChange = (plan, options) => {
     if (!pendingPlanChange) return;
-    updatePlan(pendingPlanChange.id, plan, pendingPlanChange.name);
+    updatePlan(pendingPlanChange.id, plan, pendingPlanChange.name, options);
   };
 
   const handleConfirmSuspend = () => {

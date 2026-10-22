@@ -23,6 +23,14 @@ export function useAdminUser(userId) {
   return useQuery(() => adminApi.getAdminUser(userId), [userId]);
 }
 
+export function useAdminUserPlan(userId) {
+  return useQuery(() => adminApi.getAdminUserPlan(userId), [userId]);
+}
+
+export function useAdminPlanOverview() {
+  return useQuery(() => adminApi.getAdminPlanOverview(), []);
+}
+
 export function useUpdateUserRole(onSuccess) {
   const [submitting, setSubmitting] = useState(false);
 
@@ -51,10 +59,14 @@ export function useUpdateUserPlan(onSuccess) {
   const [submitting, setSubmitting] = useState(false);
 
   const updatePlan = useCallback(
-    async (userId, plan, name) => {
+    async (userId, plan, name, options = {}) => {
       setSubmitting(true);
       try {
-        const { message } = await adminApi.updateUserPlan(userId, plan);
+        const { message } = await adminApi.updateUserPlan(
+          userId,
+          plan,
+          options,
+        );
         toast.success(
           message || `${name ? `"${name}"'s` : "User's"} plan updated`,
         );
@@ -148,12 +160,12 @@ export function useApprovePlanUpgradeRequest(onSuccess) {
   const [submittingId, setSubmittingId] = useState(null);
 
   const approve = useCallback(
-    async (requestId, grantedPlan) => {
+    async (requestId, { grantedPlan, reason, expiresAt }) => {
       setSubmittingId(requestId);
       try {
         const { message } = await adminApi.approvePlanUpgradeRequest(
           requestId,
-          grantedPlan,
+          { grantedPlan, reason, expiresAt },
         );
         toast.success(message || "Upgrade request approved");
         onSuccess?.();

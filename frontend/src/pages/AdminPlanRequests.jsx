@@ -50,7 +50,8 @@ export default function AdminPlanRequests() {
     return params;
   }, [page, statusFilter]);
 
-  const { data, loading, refetch } = usePlanUpgradeRequestList(listParams);
+  const { data, loading, error, refetch } =
+    usePlanUpgradeRequestList(listParams);
   const requests = data?.data || [];
   const pagination = data?.pagination;
 
@@ -60,19 +61,21 @@ export default function AdminPlanRequests() {
     refetch();
   };
 
-  const { approve, submittingId: approvingId } =
-    useApprovePlanUpgradeRequest(handleMutationSuccess);
-  const { reject, submittingId: rejectingId } =
-    useRejectPlanUpgradeRequest(handleMutationSuccess);
+  const { approve, submittingId: approvingId } = useApprovePlanUpgradeRequest(
+    handleMutationSuccess,
+  );
+  const { reject, submittingId: rejectingId } = useRejectPlanUpgradeRequest(
+    handleMutationSuccess,
+  );
 
   const changeStatusFilter = (value) => {
     setStatusFilter(value);
     setPage(1);
   };
 
-  const handleConfirmApprove = (grantedPlan) => {
+  const handleConfirmApprove = (options) => {
     if (!pendingApprove) return;
-    approve(getRequestId(pendingApprove), grantedPlan);
+    approve(getRequestId(pendingApprove), options);
   };
 
   const handleConfirmReject = (reason) => {
@@ -121,6 +124,18 @@ export default function AdminPlanRequests() {
           </p>
         )}
       </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-300"
+        >
+          Upgrade requests could not be loaded.{" "}
+          <button onClick={refetch} className="underline">
+            Retry
+          </button>
+        </div>
+      )}
 
       <div className="rounded-xl border border-border-subtle bg-bg-surface">
         <div className="grid grid-cols-[1fr_110px_130px_130px_100px_180px] items-center gap-3 border-b border-border-subtle px-5 py-3">

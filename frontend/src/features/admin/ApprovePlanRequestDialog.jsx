@@ -17,10 +17,14 @@ export default function ApprovePlanRequestDialog({
   loading = false,
 }) {
   const [grantedPlan, setGrantedPlan] = useState("");
+  const [reason, setReason] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
 
   useEffect(() => {
     if (open && targetRequest) {
       setGrantedPlan(targetRequest.requestedPlan);
+      setReason("");
+      setExpiresAt("");
     }
   }, [open, targetRequest]);
 
@@ -53,6 +57,23 @@ export default function ApprovePlanRequestDialog({
             ))}
           </Select>
         </FormField>
+        <FormField label="Administrative reason">
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={500}
+            className="w-full rounded-md border border-border-default bg-bg-elevated px-3 py-2 text-sm text-white"
+            placeholder="Required audit reason"
+          />
+        </FormField>
+        <FormField label="Expiry date (optional)">
+          <input
+            type="datetime-local"
+            value={expiresAt}
+            onChange={(e) => setExpiresAt(e.target.value)}
+            className="w-full rounded-md border border-border-default bg-bg-elevated px-3 py-2 text-sm text-white"
+          />
+        </FormField>
       </ModalBody>
       <ModalFooter>
         <Button
@@ -66,13 +87,19 @@ export default function ApprovePlanRequestDialog({
         <Button
           variant="primary"
           onClick={() =>
-            onConfirm(
-              grantedPlan === targetRequest?.requestedPlan
-                ? undefined
-                : grantedPlan,
-            )
+            onConfirm({
+              grantedPlan:
+                grantedPlan === targetRequest?.requestedPlan
+                  ? undefined
+                  : grantedPlan,
+              reason: reason.trim(),
+              expiresAt: expiresAt
+                ? new Date(expiresAt).toISOString()
+                : undefined,
+            })
           }
           loading={loading}
+          disabled={loading || reason.trim().length < 3}
         >
           Approve request
         </Button>
