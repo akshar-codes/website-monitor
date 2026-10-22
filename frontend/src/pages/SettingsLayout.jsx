@@ -5,6 +5,7 @@ import {
   SlidersHorizontal,
   Settings as SettingsIcon,
   ShieldCheck,
+  Bell,
 } from "lucide-react";
 import { cn } from "../utils/cn";
 
@@ -17,6 +18,7 @@ const sections = [
     icon: SlidersHorizontal,
   },
   { label: "Security", path: "/settings/security", icon: ShieldCheck },
+  { label: "Notifications", path: "/settings/notifications", icon: Bell },
 ];
 
 export default function SettingsLayout() {
@@ -34,7 +36,7 @@ export default function SettingsLayout() {
             Settings dashboard
           </h1>
           <p className="mt-1 text-sm text-text-muted">
-            Manage your account, profile, and preferences.
+            Manage your account, profile, security, and notifications.
           </p>
         </header>
         <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">

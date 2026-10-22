@@ -23,12 +23,32 @@ export function usePreferenceMutations() {
   const [submitting, setSubmitting] = useState(false);
   const [submittingDashboard, setSubmittingDashboard] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [submittingNotifications, setSubmittingNotifications] = useState(false);
+
+  const saveNotificationPreferences = useCallback(
+    async (payload) => {
+      setSubmittingNotifications(true);
+      try {
+        const { data, message } =
+          await preferencesApi.updateNotificationPreferences(payload);
+        updateLocal(data);
+        toast.success(message || "Notification settings saved");
+        return data;
+      } catch {
+        return null;
+      } finally {
+        setSubmittingNotifications(false);
+      }
+    },
+    [updateLocal],
+  );
 
   const savePreferences = useCallback(
     async (payload) => {
       setSubmitting(true);
       try {
-        const { data, message } = await preferencesApi.updatePreferences(payload);
+        const { data, message } =
+          await preferencesApi.updatePreferences(payload);
         updateLocal(data);
         toast.success(message || "Preferences saved");
         return data;
@@ -81,5 +101,7 @@ export function usePreferenceMutations() {
     submitting,
     submittingDashboard,
     resetting,
+    saveNotificationPreferences,
+    submittingNotifications,
   };
 }

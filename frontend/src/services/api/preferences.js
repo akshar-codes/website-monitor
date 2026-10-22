@@ -24,6 +24,11 @@ export async function updateDashboardPreferences(payload) {
   return data;
 }
 
+export async function updateNotificationPreferences(payload) {
+  const { data } = await apiClient.patch("/preferences/notifications", payload);
+  return data;
+}
+
 /**
  * POST /api/preferences/reset
  */
