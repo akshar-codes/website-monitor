@@ -48,7 +48,7 @@ const planHistoryEntrySchema = new mongoose.Schema(
     from: {
       type: String,
       enum: PLAN_VALUES,
-      default: null,
+      default: PLANS.FREE,
     },
     to: {
       type: String,
@@ -173,7 +173,11 @@ const userSchema = new mongoose.Schema(
     // per-tier definitions. Deliberately separate from `role` above.
     plan: {
       type: String,
-      required: [true, "Plan is required"],
+      required: false,
+      default: null,
+      set(value) {
+        return value === "" ? null : value;
+      },
       enum: {
         values: PLAN_VALUES,
         message: `Plan must be one of: ${PLAN_VALUES.join(", ")}`,
@@ -342,6 +346,14 @@ const userSchema = new mongoose.Schema(
         delete ret.__v;
         delete ret.password;
         delete ret.oauthAccounts;
+        if (ret.role === ROLES.ADMIN) {
+          ret.plan = null;
+          ret.planStatus = null;
+          ret.planStartedAt = null;
+          ret.planRenewsAt = null;
+          ret.planCanceledAt = null;
+          ret.planExpiredAt = null;
+        }
         return ret;
       },
     },

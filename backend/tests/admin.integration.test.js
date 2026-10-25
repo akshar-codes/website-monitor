@@ -267,14 +267,6 @@ test("administrative role and plan changes persist and record an audit event", a
   }));
   const activityStub = mock.method(Activity, "create", async () => ({}));
   try {
-    const changedRole = await adminService.updateUserRole(
-      testUserId,
-      "admin",
-      { id: adminId },
-      "Operations access approved",
-    );
-    assert.equal(changedRole.role, "admin");
-
     const changedPlan = await adminService.updateUserPlan(
       testUserId,
       "pro",
@@ -287,6 +279,15 @@ test("administrative role and plan changes persist and record an audit event", a
     assert.equal(changedPlan.user.plan, "pro");
     assert.equal(changedPlan.changeType, "upgrade");
     assert.equal(user.planHistory.at(-1).changedBy, adminId);
+
+    const changedRole = await adminService.updateUserRole(
+      testUserId,
+      "admin",
+      { id: adminId },
+      "Operations access approved",
+    );
+    assert.equal(changedRole.role, "admin");
+
     assert.equal(activityStub.mock.calls.length, 3);
     assert.ok(
       activityStub.mock.calls.some(

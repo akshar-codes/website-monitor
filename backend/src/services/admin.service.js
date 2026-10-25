@@ -65,8 +65,19 @@ export const getUsers = async ({
     User.countDocuments(filter),
   ]);
 
+  const monitorCounts = await Monitor.aggregate([
+    { $match: { owner: { $in: users.map((user) => user._id) } } },
+    { $group: { _id: "$owner", count: { $sum: 1 } } },
+  ]);
+  const monitorCountByOwner = new Map(
+    monitorCounts.map(({ _id, count }) => [String(_id), count]),
+  );
+
   return {
-    users,
+    users: users.map((user) => ({
+      ...user,
+      monitorCount: monitorCountByOwner.get(String(user._id)) || 0,
+    })),
     total,
     page,
     totalPages: Math.ceil(total / limit) || 1,
@@ -193,6 +204,20 @@ export const updateUserRole = async (
 
   const previousRole = user.role;
   user.role = role;
+  // Admin accounts are operations accounts and never carry a subscription.
+  // Restore the normal free tier when an admin role is removed.
+  if (role === ROLES.ADMIN) {
+    user.plan = null;
+    user.planStatus = null;
+    user.planStartedAt = null;
+    user.planRenewsAt = null;
+    user.planCanceledAt = null;
+    user.planExpiredAt = null;
+  } else if (previousRole === ROLES.ADMIN) {
+    user.plan = "free";
+    user.planStatus = "active";
+    user.planStartedAt = new Date();
+  }
   // Role is not part of the password/validation chain — skip full
   // document revalidation the same way other metadata-only updates do
   // (e.g. recordLogin) to avoid re-checking unrelated fields.
@@ -232,7 +257,18 @@ export const updateUserPlan = async (
   const actingUserId = resolveActingUserId(actingUser);
 
   if (targetUserId === actingUserId) {
-    throw ApiError.badRequest("Use the Billing page to change your own plan");
+    throw ApiError.badRequest(
+      actingUser.role === ROLES.ADMIN
+        ? "Admin accounts do not have subscription plans"
+        : "Use the Billing page to change your own plan",
+    );
+  }
+
+  const target = await User.findById(targetUserId).select("role");
+  if (!target)
+    throw ApiError.notFound(`User not found with id: ${targetUserId}`);
+  if (target.role === ROLES.ADMIN) {
+    throw ApiError.badRequest("Admin accounts do not have subscription plans");
   }
 
   const result = await changePlanForUser(
@@ -267,6 +303,7 @@ export const updateUserPlan = async (
 
 export const getPlanOverview = async () => {
   const grouped = await User.aggregate([
+    { $match: { role: { $ne: ROLES.ADMIN } } },
     {
       $group: {
         _id: "$plan",
@@ -287,11 +324,46 @@ export const getPlanOverview = async () => {
   }));
 };
 
+export const getPlanHistory = async () => {
+  const events = await Activity.find({
+    $or: [
+      { action: ACTIVITY_ACTIONS.ADMIN_PLAN_UPGRADE_REQUEST_APPROVED },
+      {
+        action: ACTIVITY_ACTIONS.PLAN_DOWNGRADED,
+        "metadata.reason": "subscription_expired",
+      },
+    ],
+  })
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(200)
+    .populate("user", "name email")
+    .lean();
+
+  return events.map((event) => ({
+    id: String(event._id),
+    type:
+      event.action === ACTIVITY_ACTIONS.ADMIN_PLAN_UPGRADE_REQUEST_APPROVED
+        ? "approval"
+        : "expiration",
+    user: {
+      name: event.user?.name || event.metadata?.targetEmail || "Unknown user",
+      email: event.metadata?.targetEmail || event.user?.email || "",
+    },
+    from: event.metadata?.from || null,
+    to: event.metadata?.to || null,
+    date: event.createdAt,
+    description: event.description,
+  }));
+};
+
 export const getUserPlanDetails = async (targetUserId) => {
   const user = await User.findById(targetUserId).select(
     "name email role plan planStatus planStartedAt planRenewsAt planCanceledAt planExpiredAt +planHistory",
   );
   if (!user) throw ApiError.notFound(`User not found with id: ${targetUserId}`);
+  if (user.role === ROLES.ADMIN) {
+    return { plan: null, usage: null, history: [] };
+  }
   const usage = await getUsageForUser(user);
   return {
     user: {

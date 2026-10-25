@@ -1,4 +1,4 @@
-import { HEALTH_STATUS, INCIDENT_STATUS } from "../config/constants.js";
+import { HEALTH_STATUS, INCIDENT_STATUS, ROLES } from "../config/constants.js";
 import User from "../models/User.js";
 import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
@@ -15,8 +15,9 @@ const ACTIVE_INCIDENTS = [
 export async function getAdminDashboard({ startDate, endDate }) {
   const range = { $gte: startDate, $lte: endDate };
   const [
-    users,
+    _users,
     planCounts,
+    monitorCountsByPlan,
     monitors,
     latestChecks,
     checks,
@@ -33,7 +34,23 @@ export async function getAdminDashboard({ startDate, endDate }) {
         },
       },
     ]),
-    User.aggregate([{ $group: { _id: "$plan", count: { $sum: 1 } } }]),
+    User.aggregate([
+      { $match: { role: { $ne: ROLES.ADMIN } } },
+      { $group: { _id: "$plan", count: { $sum: 1 } } },
+    ]),
+    Monitor.aggregate([
+      {
+        $lookup: {
+          from: User.collection.name,
+          localField: "owner",
+          foreignField: "_id",
+          as: "owner",
+        },
+      },
+      { $unwind: "$owner" },
+      { $match: { "owner.role": { $ne: ROLES.ADMIN } } },
+      { $group: { _id: "$owner.plan", count: { $sum: 1 } } },
+    ]),
     Monitor.aggregate([
       {
         $group: {
@@ -102,9 +119,6 @@ export async function getAdminDashboard({ startDate, endDate }) {
     0,
   );
   statusCounts.unknown += Math.max(0, monitorTotal - classified);
-  const planMap = Object.fromEntries(PLANS.map((plan) => [plan, 0]));
-  for (const item of planCounts)
-    if (Object.hasOwn(planMap, item._id)) planMap[item._id] = item.count;
   const checkStats = checks[0] || {
     total: 0,
     failed: 0,
@@ -114,10 +128,25 @@ export async function getAdminDashboard({ startDate, endDate }) {
   return {
     range: { startDate, endDate },
     users: {
-      total: users[0]?.total || 0,
-      active: users[0]?.active || 0,
-      byPlan: planMap,
-      registeredInRange: await User.countDocuments({ createdAt: range }),
+      total: await User.countDocuments({ role: { $ne: ROLES.ADMIN } }),
+      active: await User.countDocuments({
+        role: { $ne: ROLES.ADMIN },
+        active: true,
+      }),
+      byPlan: Object.fromEntries(
+        PLANS.map((plan) => [
+          plan,
+          {
+            users: planCounts.find((item) => item._id === plan)?.count || 0,
+            monitors:
+              monitorCountsByPlan.find((item) => item._id === plan)?.count || 0,
+          },
+        ]),
+      ),
+      registeredInRange: await User.countDocuments({
+        role: { $ne: ROLES.ADMIN },
+        createdAt: range,
+      }),
     },
     monitors: {
       total: monitorTotal,
