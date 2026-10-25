@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider } from "./context/AuthContext";
@@ -11,40 +11,40 @@ import RoleProtectedRoute from "./components/routing/RoleProtectedRoute";
 import BlockRoleRoute from "./components/routing/BlockRoleRoute";
 import AccessErrorListener from "./components/access/AccessErrorListener";
 import AppLayout from "./components/layout/AppLayout";
-import Dashboard from "./pages/Dashboard";
-import Monitors from "./pages/Monitors";
-import MonitorDetails from "./pages/MonitorDetails";
-import SslMonitoring from "./pages/SslMonitoring";
-import Insights from "./pages/Insights";
-import IncidentHistory from "./pages/IncidentHistory";
-import Billing from "./pages/Billing";
-import Activity from "./pages/Activity";
-import Profile from "./pages/Profile";
-import Preferences from "./pages/Preferences";
-import SettingsLayout from "./pages/SettingsLayout";
-import AccountSettings from "./pages/AccountSettings";
-import SecuritySettings from "./pages/SecuritySettings";
-import NotificationSettings from "./pages/NotificationSettings";
-import ApiKeysSettings from "./pages/ApiKeysSettings";
-import AdminUsers from "./pages/AdminUsers";
-import AdminDashboard from "./pages/AdminDashboard";
-import AdminUserDetails from "./pages/AdminUserDetails";
-import AdminPlans from "./pages/AdminPlans";
-import AdminPlanHistory from "./pages/AdminPlanHistory";
-import AdminMonitorDetails from "./pages/AdminMonitorDetails";
-import AdminMonitors from "./pages/AdminMonitors";
-import AdminIncidents from "./pages/AdminIncidents";
-import AdminIncidentDetails from "./pages/AdminIncidentDetails";
-import AdminAuditLogs from "./pages/AdminAuditLogs";
-import AdminPlanRequests from "./pages/AdminPlanRequests";
-import Unauthorized from "./pages/Unauthorized";
-import UpgradeRequired from "./pages/UpgradeRequired";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import VerifyEmail from "./pages/VerifyEmail";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import OAuthCallback from "./components/auth/OAuthCallback";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Monitors = lazy(() => import("./pages/Monitors"));
+const MonitorDetails = lazy(() => import("./pages/MonitorDetails"));
+const SslMonitoring = lazy(() => import("./pages/SslMonitoring"));
+const Insights = lazy(() => import("./pages/Insights"));
+const IncidentHistory = lazy(() => import("./pages/IncidentHistory"));
+const Billing = lazy(() => import("./pages/Billing"));
+const Activity = lazy(() => import("./pages/Activity"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Preferences = lazy(() => import("./pages/Preferences"));
+const SettingsLayout = lazy(() => import("./pages/SettingsLayout"));
+const AccountSettings = lazy(() => import("./pages/AccountSettings"));
+const SecuritySettings = lazy(() => import("./pages/SecuritySettings"));
+const NotificationSettings = lazy(() => import("./pages/NotificationSettings"));
+const ApiKeysSettings = lazy(() => import("./pages/ApiKeysSettings"));
+const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const AdminUserDetails = lazy(() => import("./pages/AdminUserDetails"));
+const AdminPlans = lazy(() => import("./pages/AdminPlans"));
+const AdminPlanHistory = lazy(() => import("./pages/AdminPlanHistory"));
+const AdminMonitorDetails = lazy(() => import("./pages/AdminMonitorDetails"));
+const AdminMonitors = lazy(() => import("./pages/AdminMonitors"));
+const AdminIncidents = lazy(() => import("./pages/AdminIncidents"));
+const AdminIncidentDetails = lazy(() => import("./pages/AdminIncidentDetails"));
+const AdminAuditLogs = lazy(() => import("./pages/AdminAuditLogs"));
+const AdminPlanRequests = lazy(() => import("./pages/AdminPlanRequests"));
+const Unauthorized = lazy(() => import("./pages/Unauthorized"));
+const UpgradeRequired = lazy(() => import("./pages/UpgradeRequired"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const OAuthCallback = lazy(() => import("./components/auth/OAuthCallback"));
 import { Skeleton } from "./components/ui/Skeleton";
 import { ROLES } from "./constants/roles";
 
@@ -94,6 +94,7 @@ export default function App() {
                 (with an upgrade CTA where relevant). Needs to live inside
                 <BrowserRouter> for useNavigate. */}
               <AccessErrorListener />
+              <Suspense fallback={<PageFallback />}>
               <Routes>
                 {/* Public — redirects to the dashboard if already logged in */}
                 <Route element={<GuestRoute />}>
@@ -335,6 +336,7 @@ export default function App() {
                 {/* Catch-all */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              </Suspense>
             </NotificationsProvider>
           </PreferencesProvider>
         </PermissionsProvider>

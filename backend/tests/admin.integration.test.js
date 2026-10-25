@@ -72,8 +72,8 @@ before(async () => {
         _id: id,
         role,
         active: true,
-        plan: "free",
-        planStatus: "active",
+        plan: role === "admin" ? null : "free",
+        planStatus: role === "admin" ? null : "active",
       };
     }
     next();
@@ -131,6 +131,7 @@ test("direct admin API requests require authentication and ADMIN role", async (t
   await t.test("all admin feature groups deny regular users", async () => {
     for (const path of [
       "/admin/plans/overview",
+      "/admin/plans/history",
       "/admin/monitors",
       "/admin/incidents",
       "/admin/audit-logs",
@@ -140,6 +141,17 @@ test("direct admin API requests require authentication and ADMIN role", async (t
       const response = await request(path, { role: "user" });
       assert.equal(response.status, 403, `${path} should reject regular users`);
     }
+  });
+
+  await t.test("administrators cannot create monitors", async () => {
+    const response = await request("/monitors", {
+      role: "admin",
+      userId: adminId,
+      method: "POST",
+      body: { name: "Admin monitor", url: "https://example.com" },
+    });
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).code, "PERMISSION_DENIED");
   });
 
   await t.test(
@@ -209,6 +221,11 @@ test("last active administrator cannot be demoted or suspended", async (t) => {
     _id: testUserId,
     role: "admin",
     active: true,
+    planStatus: "active",
+    planStartedAt: new Date("2026-01-01T00:00:00.000Z"),
+    planRenewsAt: new Date("2027-01-01T00:00:00.000Z"),
+    planCanceledAt: null,
+    planExpiredAt: null,
     save: mock.fn(async () => target),
   };
   const findStub = mock.method(User, "findById", async () => target);
@@ -266,6 +283,7 @@ test("administrative role and plan changes persist and record an audit event", a
     then: (resolve, reject) => Promise.resolve(user).then(resolve, reject),
   }));
   const activityStub = mock.method(Activity, "create", async () => ({}));
+  const adminCountStub = mock.method(User, "countDocuments", async () => 2);
   try {
     const changedPlan = await adminService.updateUserPlan(
       testUserId,
@@ -287,8 +305,23 @@ test("administrative role and plan changes persist and record an audit event", a
       "Operations access approved",
     );
     assert.equal(changedRole.role, "admin");
+    assert.equal(changedRole.plan, null);
+    assert.equal(changedRole.planStatus, null);
+    assert.equal(changedRole.planStartedAt, null);
+    assert.equal(changedRole.planRenewsAt, null);
 
-    assert.equal(activityStub.mock.calls.length, 3);
+    const demotedRole = await adminService.updateUserRole(
+      testUserId,
+      "user",
+      { id: adminId },
+      "Operations access removed",
+    );
+    assert.equal(demotedRole.role, "user");
+    assert.equal(demotedRole.plan, "free");
+    assert.equal(demotedRole.planStatus, "active");
+    assert.ok(demotedRole.planStartedAt instanceof Date);
+
+    assert.equal(activityStub.mock.calls.length, 4);
     assert.ok(
       activityStub.mock.calls.some(
         (call) => call.arguments[0].category === "admin",
@@ -296,6 +329,84 @@ test("administrative role and plan changes persist and record an audit event", a
     );
   } finally {
     mock.restoreAll();
+  }
+});
+
+test("admin plan history includes approved requests and actual expirations", async () => {
+  const approval = {
+    _id: "64b000000000000000000010",
+    action: "admin_plan_upgrade_request_approved",
+    description: "Approved user@example.com's request",
+    metadata: { targetEmail: "user@example.com", from: "free", to: "pro" },
+    createdAt: new Date("2026-05-01T00:00:00.000Z"),
+    user: { name: "Admin", email: "admin@example.com" },
+  };
+  const expiration = {
+    _id: "64b000000000000000000011",
+    action: "plan_downgraded",
+    description: "Subscription expired; plan changed from pro to Free",
+    metadata: { from: "pro", to: "free", reason: "subscription_expired" },
+    createdAt: new Date("2026-05-02T00:00:00.000Z"),
+    user: { name: "Expired User", email: "expired@example.com" },
+  };
+  let filter;
+  let sort;
+  let limit;
+  let population;
+  const query = {
+    sort(value) {
+      sort = value;
+      return this;
+    },
+    limit(value) {
+      limit = value;
+      return this;
+    },
+    populate(path, fields) {
+      population = { path, fields };
+      return this;
+    },
+    lean: async () => [approval, expiration],
+  };
+  const findStub = mock.method(Activity, "find", (value) => {
+    filter = value;
+    return query;
+  });
+
+  try {
+    const events = await adminService.getPlanHistory();
+    assert.deepEqual(filter.$or, [
+      { action: "admin_plan_upgrade_request_approved" },
+      {
+        action: "plan_downgraded",
+        "metadata.reason": "subscription_expired",
+      },
+    ]);
+    assert.deepEqual(sort, { createdAt: -1, _id: -1 });
+    assert.equal(limit, 200);
+    assert.deepEqual(population, { path: "user", fields: "name email" });
+    assert.deepEqual(events, [
+      {
+        id: approval._id,
+        type: "approval",
+        user: { name: "Admin", email: "user@example.com" },
+        from: "free",
+        to: "pro",
+        date: approval.createdAt,
+        description: approval.description,
+      },
+      {
+        id: expiration._id,
+        type: "expiration",
+        user: { name: "Expired User", email: "expired@example.com" },
+        from: "pro",
+        to: "free",
+        date: expiration.createdAt,
+        description: expiration.description,
+      },
+    ]);
+  } finally {
+    findStub.mock.restore();
   }
 });
 
