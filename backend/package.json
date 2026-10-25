@@ -11,6 +11,7 @@
     "dev": "npx -y nodemon src/server.js",
     "migrate:monitor-owners": "node scripts/migrateMonitorOwners.js",
     "reconcile:daily-stats": "node scripts/reconcileDailyStats.js",
+    "optimize:monitor-storage": "node scripts/optimizeMonitorStorage.js",
     "test": "node --test --test-isolation=none"
   },
   "keywords": [],

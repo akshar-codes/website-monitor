@@ -1,15 +1,20 @@
 import HealthCheck from "../models/HealthCheck.js";
 import Incident from "../models/Incident.js";
+import DailyStat from "../models/DailyStat.js";
 import env from "../config/env.js";
+import { pruneExcessResponseSnapshots } from "../services/healthResponseRetention.service.js";
+
+let checkRetentionCursor = null;
 
 /**
- * Delete a bounded page of old checks while preserving all samples referenced
- * by incident records. DailyStat is an independent aggregate and is retained.
- * Diagnostics have a shorter, independent retention window.
+ * Delete bounded pages of expired checks and daily aggregates while preserving
+ * samples referenced by incidents. Response snapshots are capped separately
+ * at ten per monitor; diagnostics have a shorter retention window.
  */
 export const runRetentionPass = async (deps = {}) => {
   const checks = deps.HealthCheck || HealthCheck;
   const incidents = deps.Incident || Incident;
+  const dailyStats = deps.DailyStat || DailyStat;
   const now = deps.now || new Date();
   const batchSize = deps.batchSize || env.MONITOR_RETENTION_BATCH_SIZE;
   const checkCutoff = new Date(
@@ -22,7 +27,7 @@ export const runRetentionPass = async (deps = {}) => {
   const diagnosticRows = await checks
     .find({
       checkedAt: { $lt: diagnosticCutoff },
-      $or: [{ diagnostics: { $ne: null } }, { rawResponse: { $ne: null } }],
+      diagnostics: { $ne: null },
     })
     .select("_id")
     .sort({ checkedAt: 1 })
@@ -31,18 +36,63 @@ export const runRetentionPass = async (deps = {}) => {
   if (diagnosticRows.length) {
     await checks.updateMany(
       { _id: { $in: diagnosticRows.map(({ _id }) => _id) } },
-      { $unset: { diagnostics: 1, rawResponse: 1 } },
+      { $unset: { diagnostics: 1 } },
     );
   }
 
-  const candidates = await checks
-    .find({ checkedAt: { $lt: checkCutoff } })
+  const responseSnapshotsPruned = await pruneExcessResponseSnapshots(
+    checks,
+    batchSize,
+  );
+
+  const dailyStatCutoff = new Date(
+    now.getTime() - env.MONITOR_RETENTION_DAYS * 86_400_000,
+  );
+  const expiredDailyRows = await dailyStats
+    .find({ date: { $lt: dailyStatCutoff } })
     .select("_id")
-    .sort({ checkedAt: 1 })
+    .sort({ date: 1, _id: 1 })
     .limit(batchSize)
     .lean();
+  const dailyStatsDeleted = expiredDailyRows.length
+    ? (
+        await dailyStats.deleteMany({
+          _id: { $in: expiredDailyRows.map(({ _id }) => _id) },
+          date: { $lt: dailyStatCutoff },
+        })
+      ).deletedCount || 0
+    : 0;
+
+  const candidateFilter = { checkedAt: { $lt: checkCutoff } };
+  if (checkRetentionCursor) {
+    candidateFilter.$or = [
+      { checkedAt: { $gt: checkRetentionCursor.checkedAt } },
+      {
+        checkedAt: checkRetentionCursor.checkedAt,
+        _id: { $gt: checkRetentionCursor.id },
+      },
+    ];
+  }
+  const candidates = await checks
+    .find(candidateFilter)
+    .select("_id checkedAt")
+    .sort({ checkedAt: 1, _id: 1 })
+    .limit(batchSize)
+    .lean();
+  checkRetentionCursor =
+    candidates.length === batchSize
+      ? {
+          checkedAt: candidates.at(-1).checkedAt,
+          id: candidates.at(-1)._id,
+        }
+      : null;
   if (!candidates.length) {
-    return { diagnosticsRedacted: diagnosticRows.length, checksDeleted: 0 };
+    return {
+      diagnosticsRedacted: diagnosticRows.length,
+      responseSnapshotsPruned,
+      dailyStatsDeleted,
+      checksDeleted: 0,
+    };
   }
 
   const ids = candidates.map(({ _id }) => _id);
@@ -67,6 +117,8 @@ export const runRetentionPass = async (deps = {}) => {
 
   return {
     diagnosticsRedacted: diagnosticRows.length,
+    responseSnapshotsPruned,
+    dailyStatsDeleted,
     checksDeleted: deleted.deletedCount || 0,
     checksProtected: protectedIds.size,
   };

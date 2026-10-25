@@ -8,6 +8,7 @@ import Monitor from "../models/Monitor.js";
 import { randomUUID } from "node:crypto";
 import { updateDailyStat } from "../workers/aggregationManager.js";
 import { createHealthResponseSnapshot } from "../utils/healthResponseSnapshot.js";
+import { pruneMonitorResponseSnapshots } from "../services/healthResponseRetention.service.js";
 
 // ── Controllers ──────────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ export const manualHealthCheck = asyncHandler(async (req, res) => {
   const monitor = await monitorService.getMonitorById(req.params.id, req.user);
   const result = await poll(monitor.url, { maxRetries: 0 });
   const classification = classify(result);
+  const responseSnapshot = createHealthResponseSnapshot(result.body);
   const check = await HealthCheck.create({
     executionKey: `manual:${randomUUID()}`,
     monitor: monitor._id,
@@ -75,10 +77,11 @@ export const manualHealthCheck = asyncHandler(async (req, res) => {
     scheduled: false,
     httpStatus: result.httpStatus,
     failureReason: classification.failureReason,
-    rawResponse: createHealthResponseSnapshot(result.body),
+    ...(responseSnapshot ? { rawResponse: responseSnapshot } : {}),
     diagnostics: result.diagnostics,
     checkedAt: new Date(),
   });
+  await pruneMonitorResponseSnapshots(monitor._id);
   await updateDailyStat(monitor, check);
   await Monitor.findByIdAndUpdate(monitor._id, {
     lastCheckedAt: check.checkedAt,

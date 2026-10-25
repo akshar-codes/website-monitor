@@ -4,7 +4,7 @@
 
 The monitoring workers run in the API process after MongoDB connects. The application needs a reachable shared MongoDB database. No Redis service or other queue is required. All API replicas may run the scheduler: they atomically claim due monitor documents with MongoDB `findOneAndUpdate` leases. A crashed worker's lease expires and another scheduler can reclaim the job. Each instance's HTTP worker limit is `MONITOR_JOB_CONCURRENCY`; total cluster concurrency is that value multiplied by the number of API instances. SSL/domain checks use a separate bounded pool controlled by `SSL_CHECK_CONCURRENCY`.
 
-Create the configured MongoDB indexes before production traffic (Mongoose model index creation, or an equivalent deployment migration). The scheduler depends on the `active`, `nextCheckAt`, and `_id` monitor index; health history depends on monitor/timestamp and timestamp indexes; incident reference indexes accelerate retention protection.
+Create the configured MongoDB indexes before production traffic (Mongoose model index creation, or an equivalent deployment migration). The scheduler depends on the `active`, `nextCheckAt`, and `_id` monitor index; health history depends on monitor/timestamp and timestamp indexes; incident reference indexes accelerate retention protection. After deploying the health-check index change to an existing database, run `npm run optimize:monitor-storage` from `backend/` to create the replacement compound index before dropping its redundant predecessor indexes.
 
 Required application settings remain those in `.env.example`, especially `MONGO_URI`, `COOKIE_SECRET`, `SESSION_SECRET`, `CORS_ORIGIN`, `CLIENT_URL`, and SMTP settings. Monitoring worker settings and defaults:
 
@@ -27,7 +27,7 @@ Required application settings remain those in `.env.example`, especially `MONGO_
 | `CONSECUTIVE_FAILURE_THRESHOLD`   |             2 | Failures before opening an incident.                                                                                  |
 | `CONSECUTIVE_SUCCESS_THRESHOLD`   |             2 | Healthy checks before resolving an incident.                                                                          |
 
-`MONITOR_RETENTION_DAYS` defaults to 365 days for raw HealthCheck rows. `MONITOR_DIAGNOSTIC_RETENTION_DAYS` defaults to 30 days for diagnostics and response payloads. `MONITOR_RETENTION_BATCH_SIZE` bounds each cleanup pass (default 500), and `MONITOR_MAINTENANCE_INTERVAL_MS` sets the pass cadence (default one hour). Checks referenced by an incident's trigger or recovery reference are never deleted. DailyStat buckets are retained when raw checks expire. Retention therefore limits history-level drill-down while keeping daily aggregate history.
+`MONITOR_RETENTION_DAYS` defaults to 365 days for HealthCheck rows and DailyStat buckets. `MONITOR_DIAGNOSTIC_RETENTION_DAYS` defaults to 30 days for diagnostics. Response snapshots contain only the health-contract fields and are retained on each monitor's ten newest checks; the hourly maintenance pass also prunes older snapshots left by previous releases. `MONITOR_RETENTION_BATCH_SIZE` bounds cleanup work (default 500 checks/aggregates per pass, up to 100 monitors for response cleanup), and `MONITOR_MAINTENANCE_INTERVAL_MS` sets the pass cadence (default one hour). Checks referenced by an incident's trigger or recovery reference are protected from deletion.
 
 ## Scheduling and lifecycle
 

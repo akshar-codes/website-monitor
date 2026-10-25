@@ -20,7 +20,6 @@ const healthCheckSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Monitor",
       required: [true, "Monitor reference is required"],
-      index: true,
     },
     // Prevent duplicate history rows if a scheduled pipeline retries after a
     // transient persistence failure. Manual checks receive unique run IDs.
@@ -69,10 +68,10 @@ const healthCheckSchema = new mongoose.Schema(
       default: null,
     },
 
-    // ── Raw payload from the monitored endpoint ──
+    // ── Small, bounded health-contract snapshot (kept only on ten recent checks) ──
     rawResponse: {
       type: mongoose.Schema.Types.Mixed,
-      default: null,
+      default: undefined,
     },
 
     diagnostics: {
@@ -96,6 +95,7 @@ const healthCheckSchema = new mongoose.Schema(
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
+        delete ret.rawResponse;
         return ret;
       },
     },
@@ -108,8 +108,9 @@ const healthCheckSchema = new mongoose.Schema(
 // Indexes — tuned for dashboard query patterns
 // ─────────────────────────────────────────────
 
-// Latest checks for a specific monitor (timeline view)
-healthCheckSchema.index({ monitor: 1, checkedAt: -1 });
+// Latest checks for a monitor and response snapshot cleanup. This compound
+// index also serves monitor-only lookups, so no separate monitor index is needed.
+healthCheckSchema.index({ monitor: 1, checkedAt: -1, _id: -1 });
 
 // Filter by status across all monitors (incident dashboard)
 healthCheckSchema.index({ status: 1, checkedAt: -1 });

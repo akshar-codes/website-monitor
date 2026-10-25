@@ -10,6 +10,7 @@ import { updateDailyStat } from "./aggregationManager.js";
 import { runRetentionPass } from "./retentionManager.js";
 import { logActivity } from "../utils/activityLogger.js";
 import { createHealthResponseSnapshot } from "../utils/healthResponseSnapshot.js";
+import { pruneMonitorResponseSnapshots } from "../services/healthResponseRetention.service.js";
 import {
   ACTIVITY_CATEGORIES,
   ACTIVITY_ACTIONS,
@@ -61,6 +62,7 @@ const processMonitor = async (
       }
     }
     const classification = classify(pollResult);
+    const responseSnapshot = createHealthResponseSnapshot(pollResult.body);
     const checkedAt = new Date();
     const executionKey = initiatedBy
       ? `manual:${randomUUID()}`
@@ -80,7 +82,7 @@ const processMonitor = async (
           scheduled: true,
           httpStatus: pollResult.httpStatus,
           failureReason: classification.failureReason,
-          rawResponse: createHealthResponseSnapshot(pollResult.body),
+          ...(responseSnapshot ? { rawResponse: responseSnapshot } : {}),
           diagnostics: pollResult.diagnostics,
           checkedAt,
         },
@@ -91,6 +93,7 @@ const processMonitor = async (
         setDefaultsOnInsert: true,
       },
     );
+    await pruneMonitorResponseSnapshots(monitor._id);
     await handleIncident(monitor, healthCheck);
     await updateDailyStat(monitor, healthCheck);
     if (initiatedBy) {
