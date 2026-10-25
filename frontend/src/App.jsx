@@ -30,8 +30,9 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUserDetails from "./pages/AdminUserDetails";
 import AdminPlans from "./pages/AdminPlans";
-import AdminMonitors from "./pages/AdminMonitors";
+import AdminPlanHistory from "./pages/AdminPlanHistory";
 import AdminMonitorDetails from "./pages/AdminMonitorDetails";
+import AdminMonitors from "./pages/AdminMonitors";
 import AdminIncidents from "./pages/AdminIncidents";
 import AdminIncidentDetails from "./pages/AdminIncidentDetails";
 import AdminAuditLogs from "./pages/AdminAuditLogs";
@@ -82,6 +83,7 @@ export default function App() {
                   classNames: {
                     success: "!text-emerald-400",
                     error: "!text-red-400",
+                    warning: "!text-amber-400",
                   },
                 }}
                 richColors
@@ -114,18 +116,24 @@ export default function App() {
                 {/* Requires an authenticated session */}
                 <Route element={<ProtectedRoute />}>
                   <Route element={<AppLayout />}>
+                    {/* End-user only routes — blocked for administrators (redirects to /admin) */}
                     <Route
-                      path="/"
                       element={
-                        <Suspense fallback={<PageFallback />}>
-                          <Dashboard />
-                        </Suspense>
+                        <BlockRoleRoute
+                          blockedRoles={[ROLES.ADMIN]}
+                          redirectTo="/admin"
+                        />
                       }
-                    />
-
-                    <Route
-                      element={<BlockRoleRoute blockedRoles={[ROLES.ADMIN]} />}
                     >
+                      <Route
+                        path="/"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <Dashboard />
+                          </Suspense>
+                        }
+                      />
+
                       <Route
                         path="/monitors"
                         element={
@@ -150,32 +158,33 @@ export default function App() {
                           </Suspense>
                         }
                       />
+
+                      <Route
+                        path="/insights"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <Insights />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/incidents"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <IncidentHistory />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/billing"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <Billing />
+                          </Suspense>
+                        }
+                      />
                     </Route>
 
-                    <Route
-                      path="/insights"
-                      element={
-                        <Suspense fallback={<PageFallback />}>
-                          <Insights />
-                        </Suspense>
-                      }
-                    />
-                    <Route
-                      path="/incidents"
-                      element={
-                        <Suspense fallback={<PageFallback />}>
-                          <IncidentHistory />
-                        </Suspense>
-                      }
-                    />
-                    <Route
-                      path="/billing"
-                      element={
-                        <Suspense fallback={<PageFallback />}>
-                          <Billing />
-                        </Suspense>
-                      }
-                    />
                     <Route
                       path="/activity"
                       element={
@@ -244,6 +253,14 @@ export default function App() {
                         element={
                           <Suspense fallback={<PageFallback />}>
                             <AdminPlans />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/admin/plan-history"
+                        element={
+                          <Suspense fallback={<PageFallback />}>
+                            <AdminPlanHistory />
                           </Suspense>
                         }
                       />

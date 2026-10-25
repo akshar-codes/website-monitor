@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import useAuthForm from "../hooks/useAuthForm";
 import { ROUTES } from "../constants/routes";
+import { ROLES } from "../constants/roles";
 import { mapAuthError, getAuthErrorCode } from "../utils/AuthErrors";
 import AuthLayout from "../components/auth/AuthLayout";
 import LoginMarketingPanel from "../components/auth/LoginMarketingPanel";
@@ -48,8 +49,14 @@ export default function Login() {
 
     setSubmitting(true);
     try {
-      await login(values.email.trim(), values.password, rememberMe);
-      const redirectTo = location.state?.from?.pathname || ROUTES.DASHBOARD;
+      const data = await login(
+        values.email.trim(),
+        values.password,
+        rememberMe,
+      );
+      const defaultDest =
+        data?.role === ROLES.ADMIN ? "/admin" : ROUTES.DASHBOARD;
+      const redirectTo = location.state?.from?.pathname || defaultDest;
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setApiError(mapAuthError(err, "login"));

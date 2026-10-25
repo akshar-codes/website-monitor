@@ -90,7 +90,7 @@ export function AuthProvider({ children }) {
     // Same pattern for the subscription plan — part of the same user
     // document, exposed directly so components don't need to guard
     // against a missing/undefined value on a not-yet-loaded user.
-    plan: user?.plan || PLANS.FREE,
+    plan: user?.role === ROLES.ADMIN ? null : user?.plan || PLANS.FREE,
     login,
     register,
     logout,

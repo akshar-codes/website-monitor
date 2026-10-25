@@ -2,6 +2,8 @@ import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import DowntimeStatsCards from "../insights/DowntimeStatsCards";
 import { useDowntimeStats } from "../../hooks/useInsights";
+import { useAuth } from "../../hooks/useAuth";
+import { PLANS } from "../../constants/plans";
 import { formatDuration } from "../../utils/format";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { cn } from "../../utils/cn";
@@ -34,7 +36,9 @@ function WindowSelector({ value, onChange }) {
 }
 
 export default function DowntimeSummary() {
-  const [window, setWindow] = useState("30d");
+  const { plan } = useAuth();
+  const defaultWindow = plan === PLANS.FREE ? "7d" : "30d";
+  const [window, setWindow] = useState(defaultWindow);
   const { data, loading } = useDowntimeStats({ window });
   const stats = data?.data;
 

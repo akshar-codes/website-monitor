@@ -24,9 +24,14 @@ import {
   useUpdateIncidentStatus,
 } from "../hooks/useIncidents";
 import { useUsage } from "../hooks/useUsage";
+import { useAuth } from "../hooks/useAuth";
+import { PLANS } from "../constants/plans";
 import { cn } from "../utils/cn";
 
 export default function IncidentHistory() {
+  const { plan } = useAuth();
+  const defaultWindow = plan === PLANS.FREE ? "7d" : "30d";
+
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState("all");
@@ -34,7 +39,7 @@ export default function IncidentHistory() {
   const [order, setOrder] = useState("desc");
   const [dateRange, setDateRange] = useState({
     mode: "preset",
-    window: "30d",
+    window: defaultWindow,
   });
   const [viewMode, setViewMode] = useState("timeline"); // "timeline" | "cards"
   const [selectedIncidentId, setSelectedIncidentId] = useState(null);

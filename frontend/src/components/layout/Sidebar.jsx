@@ -6,6 +6,7 @@ import {
   BarChart3,
   AlertTriangle,
   CreditCard,
+  Clock3,
   Activity as ActivityIcon,
   History,
   ChevronLeft,
@@ -27,8 +28,8 @@ import ConfirmDialog from "../ui/ConfirmDialog";
 import PlanBadge from "../ui/PlanBadge";
 import UpgradePrompt from "../../features/plans/UpgradePrompt";
 
-const MONITORS_PATH = "/monitors";
-const SSL_PATH = ROUTES.SSL_MONITORING;
+const MONITORS_PATH = ROUTES.MONITORS || "/monitors";
+const SSL_PATH = ROUTES.SSL_MONITORING || "/ssl";
 
 const BASE_NAV_ITEMS = [
   {
@@ -75,11 +76,17 @@ const ADMIN_NAV_ITEM = {
   icon: ShieldCheck,
   permission: "user:read",
 };
+const ADMIN_MONITORS_NAV_ITEM = {
+  label: "Monitor Oversight",
+  path: "/admin/monitors",
+  icon: Monitor,
+};
 
 const ADMIN_DASHBOARD_NAV_ITEM = {
   label: "Admin Overview",
   path: "/admin",
   icon: LayoutDashboard,
+  end: true,
 };
 
 const ADMIN_PLANS_NAV_ITEM = {
@@ -87,12 +94,12 @@ const ADMIN_PLANS_NAV_ITEM = {
   path: "/admin/plans",
   icon: CreditCard,
 };
-
-const ADMIN_MONITORS_NAV_ITEM = {
-  label: "Monitor Oversight",
-  path: "/admin/monitors",
-  icon: Monitor,
+const ADMIN_PLAN_HISTORY_NAV_ITEM = {
+  label: "Plan History",
+  path: "/admin/plan-history",
+  icon: Clock3,
 };
+
 const ADMIN_INCIDENTS_NAV_ITEM = {
   label: "Incident Oversight",
   path: "/admin/incidents",
@@ -164,28 +171,23 @@ export default function Sidebar() {
   const navigate = useNavigate();
 
   const navItems = useMemo(() => {
-    // Admin accounts are management-only and never own monitors (see
-    // backend/src/config/permissions.js) — Monitors and SSL Monitoring
-    // are both meaningless for them, so both are hidden alongside each
-    // other rather than only the Monitors link.
-    const base = isAdmin
-      ? BASE_NAV_ITEMS.filter(
-          (item) => item.path !== MONITORS_PATH && item.path !== SSL_PATH,
-        )
-      : BASE_NAV_ITEMS;
+    // Admin accounts have a dedicated management navigation surface.
+    // They cannot own or add personal monitors and do not have end-user billing.
+    if (isAdmin) {
+      return [
+        ADMIN_DASHBOARD_NAV_ITEM,
+        ADMIN_NAV_ITEM,
+        ADMIN_MONITORS_NAV_ITEM,
+        ADMIN_PLANS_NAV_ITEM,
+        ADMIN_PLAN_HISTORY_NAV_ITEM,
+        ADMIN_INCIDENTS_NAV_ITEM,
+        ADMIN_AUDIT_NAV_ITEM,
+        ADMIN_PLAN_REQUESTS_NAV_ITEM,
+      ].filter((item) => !item.permission || can(item.permission));
+    }
 
-    const adminItems = [
-      ADMIN_DASHBOARD_NAV_ITEM,
-      ADMIN_NAV_ITEM,
-      ADMIN_PLANS_NAV_ITEM,
-      ADMIN_MONITORS_NAV_ITEM,
-      ADMIN_INCIDENTS_NAV_ITEM,
-      ADMIN_AUDIT_NAV_ITEM,
-      ADMIN_PLAN_REQUESTS_NAV_ITEM,
-    ].filter((item) => !item.permission || can(item.permission));
-
-    return [...base, ...adminItems];
-  }, [can, isAdmin]);
+    return BASE_NAV_ITEMS;
+  }, [isAdmin, can]);
 
   const handleLogout = async () => {
     try {
@@ -283,12 +285,18 @@ export default function Sidebar() {
                 <p className="truncate text-[10px] text-text-muted">
                   {user?.email || ""}
                 </p>
-                <PlanBadge
-                  plan={plan}
-                  size="sm"
-                  showIcon={false}
-                  className="shrink-0 px-1.5 py-0"
-                />
+                {!isAdmin ? (
+                  <PlanBadge
+                    plan={plan}
+                    size="sm"
+                    showIcon={false}
+                    className="shrink-0 px-1.5 py-0"
+                  />
+                ) : (
+                  <span className="shrink-0 rounded-full border border-zinc-700 bg-zinc-800/80 px-1.5 py-0 text-[9px] font-medium text-zinc-400">
+                    N/A
+                  </span>
+                )}
               </div>
             </div>
           )}

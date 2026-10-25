@@ -12,6 +12,8 @@ import UptimeTrendChart from "../features/insights/UptimeTrendChart";
 import ResponseTimeTrendChart from "../features/insights/ResponseTimeTrendChart";
 import { useDowntimeStats, useIncidentList } from "../hooks/useInsights";
 import { useQuery } from "../hooks/useQuery";
+import { useAuth } from "../hooks/useAuth";
+import { PLANS } from "../constants/plans";
 import * as monitorsApi from "../services/api/monitors";
 import * as dashboardApi from "../services/api/dashboard";
 import { formatUptime } from "../utils/format";
@@ -137,7 +139,9 @@ function useStatusDistribution() {
 }
 
 export default function Insights() {
-  const [statsWindow, setStatsWindow] = useState("30d");
+  const { plan } = useAuth();
+  const defaultWindow = plan === PLANS.FREE ? "7d" : "30d";
+  const [statsWindow, setStatsWindow] = useState(defaultWindow);
   const [chartWindow, setChartWindow] = useState("7d");
 
   const {
