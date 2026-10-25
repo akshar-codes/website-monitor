@@ -12,7 +12,7 @@ import { PLANS } from "../../constants/plans";
 const PLAN_OPTIONS = [
   { value: PLANS.FREE, label: "Free" },
   { value: PLANS.PRO, label: "Pro" },
-  { value: PLANS.UNLIMITED, label: "Unlimited" },
+  { value: PLANS.UNLIMITED, label: "Enterprise" },
 ];
 
 export default function ChangePlanDialog({

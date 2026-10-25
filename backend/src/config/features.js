@@ -17,7 +17,7 @@ export const FEATURES = Object.freeze({
 });
 
 const FEATURE_CHECKS = Object.freeze({
-  // More than a single team seat — Pro (5) and Unlimited (null = no cap).
+  // More than a single team seat — Pro (5) and Enterprise (null = no cap).
   [FEATURES.TEAM_ACCESS]: (plan) => {
     const definition = getPlanDefinition(plan);
     if (!definition) return false;

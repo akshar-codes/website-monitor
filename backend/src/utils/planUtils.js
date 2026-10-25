@@ -27,8 +27,10 @@ export const getChangeType = (fromPlan, toPlan) => {
 };
 
 /** `null` return means the plan has no monitor cap. */
-export const getMonitorLimit = (plan) =>
-  getPlanDefinition(plan)?.limits.maxMonitors ?? 0;
+export const getMonitorLimit = (plan) => {
+  const definition = getPlanDefinition(plan);
+  return definition ? definition.limits.maxMonitors : 0;
+};
 
 export const hasUnlimitedMonitors = (plan) => getMonitorLimit(plan) === null;
 
@@ -41,11 +43,7 @@ export const getMinCheckInterval = (plan) =>
  * a smaller interval means more frequent polling, so the requested
  * interval must be >= the plan's floor.
  *
- * Not currently wired into monitor creation: Monitor documents in this
- * codebase are global (no `owner` field), so there is no per-user monitor
- * set to enforce a limit against yet. This helper is exported so that
- * check is a one-line addition once monitors become user-scoped, rather
- * than a redesign of the plan system.
+ * Used by monitor creation and updates to enforce each plan's interval floor.
  */
 export const isIntervalAllowedForPlan = (plan, intervalSeconds) =>
   intervalSeconds >= getMinCheckInterval(plan);

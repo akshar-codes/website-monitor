@@ -3,7 +3,7 @@
     "node": "24.16.0"
   },
   "name": "website-monitor",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Website monitoring service backend",
   "main": "src/server.js",
   "scripts": {

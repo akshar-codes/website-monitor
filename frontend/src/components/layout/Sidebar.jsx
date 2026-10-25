@@ -362,7 +362,7 @@ export default function Sidebar() {
 
         {/* Version */}
         {!collapsed && (
-          <p className="px-3 pt-2 text-[11px] text-text-disabled">v1.0.0</p>
+          <p className="px-3 pt-2 text-[11px] text-text-disabled">v2.0.0</p>
         )}
       </div>
 

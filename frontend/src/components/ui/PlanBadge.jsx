@@ -18,7 +18,7 @@ const PLAN_CONFIG = {
     border: "border-blue-500/20",
   },
   [PLANS.UNLIMITED]: {
-    label: "Unlimited",
+    label: "Enterprise",
     icon: Crown,
     bg: "bg-emerald-500/10",
     text: "text-emerald-400",

@@ -48,7 +48,7 @@ export default function UpgradePrompt({
           You&apos;re on the Free plan
         </p>
         <p className="text-xs text-text-muted">
-          Upgrade to Pro or Unlimited for more monitors, faster checks, and
+          Upgrade to Pro or Enterprise for more monitors, faster checks, and
           longer data retention.
         </p>
       </div>

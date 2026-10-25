@@ -197,7 +197,7 @@ export default function ApiKeysSettings() {
           <Card>
             <h2 className="font-semibold text-white">API keys require Pro</h2>
             <p className="mt-1 text-sm text-text-muted">
-              Upgrade to Pro or Unlimited to create API keys. Administrative
+              Upgrade to Pro or Enterprise to create API keys. Administrative
               accounts cannot create personal keys.
             </p>
           </Card>

@@ -21,7 +21,7 @@ const PLAN_FILTERS = [
   { label: "All plans", value: "all" },
   { label: "Free", value: PLANS.FREE },
   { label: "Pro", value: PLANS.PRO },
-  { label: "Unlimited", value: PLANS.UNLIMITED },
+  { label: "Enterprise", value: PLANS.UNLIMITED },
 ];
 
 export default function UserFilters({

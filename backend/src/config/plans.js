@@ -62,8 +62,8 @@ export const PLAN_DEFINITIONS = Object.freeze({
 
   [PLANS.UNLIMITED]: Object.freeze({
     id: PLANS.UNLIMITED,
-    name: "Unlimited",
-    tagline: "Unlimited monitors and the fastest checks available.",
+    name: "Enterprise",
+    tagline: "For organizations that need room to grow and priority support.",
     rank: 2,
     price: Object.freeze({ monthly: 49, yearly: 490, currency: "USD" }),
     limits: Object.freeze({
@@ -85,7 +85,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
 /** Returns the definition for a plan id, or `null` if it isn't recognised. */
 export const getPlanDefinition = (plan) => PLAN_DEFINITIONS[plan] || null;
 
-/** Full catalog, ordered by rank (Free → Pro → Unlimited). */
+/** Full catalog, ordered by rank (Free → Pro → Enterprise). */
 export const getPublicPlanCatalog = () =>
   Object.values(PLAN_DEFINITIONS)
     .slice()

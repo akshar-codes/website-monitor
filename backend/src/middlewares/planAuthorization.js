@@ -30,7 +30,7 @@ export const requirePlan =
 /**
  * Requires the authenticated user's plan rank to be at least that of
  * `minimumPlan` (see config/plans.js for rank ordering — Free < Pro <
- * Unlimited). This is the middleware most routes should reach for, since
+ * Enterprise). This is the middleware most routes should reach for, since
  * plan tiers are additive by design.
  */
 export const requireMinPlan = (minimumPlan) => (req, _res, next) => {

@@ -39,7 +39,7 @@ export const createApiKey = async (user, { name, expiresInDays }) => {
   if (activeCount >= KEY_LIMITS[user.plan]) {
     if (user.plan === PLANS.PRO) {
       throw ApiError.upgradeRequired(
-        `Your Pro plan allows up to ${KEY_LIMITS[user.plan]} active API keys. Upgrade to Unlimited for more.`,
+        `Your Pro plan allows up to ${KEY_LIMITS[user.plan]} active API keys. Upgrade to Enterprise for more.`,
         PLANS.UNLIMITED,
       );
     }
