@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   RefreshCw,
   Users,
@@ -40,15 +41,24 @@ function StatCard({ label, value, icon: Icon, detail }) {
 
 export default function AdminDashboard() {
   const [days, setDays] = useState(30);
-  const endDate = new Date();
-  const startDate = new Date(endDate.getTime() - days * 86400000);
-  const params = {
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-  };
+  // Keep the query key stable across renders. Recomputing `new Date()` here
+  // changed the ISO strings on every render, causing useQuery to refetch
+  // after every response and quickly exhaust the API rate limit.
+  const params = useMemo(() => {
+    const endDate = new Date();
+    const startDate = new Date(endDate.getTime() - days * 86400000);
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    };
+  }, [days]);
   const { data, loading, error, refetch } = useAdminDashboard(params);
   const usersByPlan = Object.entries(data?.users?.byPlan || {}).map(
-    ([name, value]) => ({ name, value }),
+    ([name, stats]) => ({
+      name,
+      users: stats.users || 0,
+      monitors: stats.monitors || 0,
+    }),
   );
   const statuses = Object.entries(data?.monitors?.statuses || {});
   const hasRows =
@@ -136,12 +146,12 @@ export default function AdminDashboard() {
             <h2 className="text-sm font-semibold text-white">Users by plan</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="h-48">
-                {usersByPlan.some((x) => x.value) ? (
+                {usersByPlan.some((x) => x.users) ? (
                   <ResponsiveContainer>
                     <PieChart>
                       <Pie
                         data={usersByPlan}
-                        dataKey="value"
+                        dataKey="users"
                         nameKey="name"
                         innerRadius={48}
                         outerRadius={76}
@@ -171,9 +181,10 @@ export default function AdminDashboard() {
               </div>
               <div className="flex flex-col justify-center gap-3">
                 {usersByPlan.map((p, i) => (
-                  <div
+                  <Link
                     key={p.name}
-                    className="flex items-center justify-between text-sm"
+                    to={`/admin/users?plan=${p.name.toLowerCase()}`}
+                    className="flex items-center justify-between text-sm rounded-lg px-2 py-1.5 transition-colors hover:bg-zinc-800/60"
                   >
                     <span className="flex items-center gap-2 capitalize text-zinc-400">
                       <i
@@ -182,8 +193,18 @@ export default function AdminDashboard() {
                       />
                       {p.name}
                     </span>
-                    <b className="text-white">{p.value}</b>
-                  </div>
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-right">
+                        <b className="text-white">{p.users}</b>
+                        <small className="ml-2 text-zinc-500">
+                          users · {p.monitors} monitors
+                        </small>
+                      </span>
+                      <span className="text-xs text-zinc-500 hover:text-emerald-400">
+                        view &rarr;
+                      </span>
+                    </span>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -223,7 +244,9 @@ export default function AdminDashboard() {
                   <div>
                     <p className="text-sm text-zinc-200">{u.name}</p>
                     <p className="mt-0.5 text-xs text-zinc-500">
-                      {u.role} · {u.plan}
+                      {u.role === "admin"
+                        ? "Admin access"
+                        : `${u.role} · ${u.plan}`}
                     </p>
                   </div>
                   <time className="text-xs text-zinc-500">

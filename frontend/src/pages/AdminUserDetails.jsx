@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -10,14 +11,34 @@ import PageContainer from "../components/layout/PageContainer";
 import PageHeader from "../components/layout/PageHeader";
 import Button from "../components/ui/Button";
 import EmptyState from "../components/ui/EmptyState";
-import { useAdminUser, useAdminUserPlan } from "../hooks/useAdmin";
+import ChangePlanDialog from "../features/admin/ChangePlanDialog";
+import {
+  useAdminUser,
+  useAdminUserPlan,
+  useAdminMonitors,
+  useUpdateUserPlan,
+} from "../hooks/useAdmin";
+import { ROLES } from "../constants/roles";
 
 const panel = "rounded-xl border border-border-subtle bg-bg-surface p-5";
 export default function AdminUserDetails() {
   const { id } = useParams();
   const { data, loading, error, refetch } = useAdminUser(id);
   const planQuery = useAdminUserPlan(id);
+  const monitorsQuery = useAdminMonitors({ ownerId: id, page: 1, limit: 100 });
   const user = data?.user;
+  const monitors = monitorsQuery.data?.data || [];
+
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const { updatePlan, submitting: planSubmitting } = useUpdateUserPlan(() => {
+    setPlanDialogOpen(false);
+    refetch();
+    planQuery.refetch();
+  });
+
+  const handleConfirmPlanChange = async ({ plan, reason }) => {
+    await updatePlan(user.id, plan, reason);
+  };
   return (
     <PageContainer>
       <PageHeader
@@ -70,8 +91,10 @@ export default function AdminUserDetails() {
                 </h2>
                 <p className="text-sm text-zinc-300">{user.email}</p>
                 <p className="mt-2 text-sm capitalize text-zinc-400">
-                  {user.role} · {user.plan} ·{" "}
-                  {user.active ? "Active" : "Suspended"}
+                  {user.role === ROLES.ADMIN
+                    ? "Admin access"
+                    : `${user.role} · ${user.plan}`}{" "}
+                  · {user.active ? "Active" : "Suspended"}
                 </p>
                 <p className="mt-2 text-xs text-zinc-500">
                   Joined {new Date(user.createdAt).toLocaleString()}
@@ -125,6 +148,62 @@ export default function AdminUserDetails() {
               </section>
             </div>
             <section className={`${panel} mt-4`}>
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-white">Monitors</h2>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {monitorsQuery.data?.pagination?.total ??
+                      data.monitorUsage.total}{" "}
+                    total · {data.monitorUsage.active} active
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={monitorsQuery.refetch}
+                >
+                  Refresh
+                </Button>
+              </div>
+              {monitorsQuery.error ? (
+                <p role="alert" className="text-sm text-red-300">
+                  Could not load this user’s monitors.{" "}
+                  <button onClick={monitorsQuery.refetch} className="underline">
+                    Retry
+                  </button>
+                </p>
+              ) : monitorsQuery.loading && !monitorsQuery.data ? (
+                <div className="h-20 animate-pulse rounded-lg bg-zinc-900/70" />
+              ) : monitors.length ? (
+                <div className="divide-y divide-zinc-800">
+                  {monitors.map((monitor) => (
+                    <Link
+                      key={monitor.id}
+                      to={`/admin/monitors/${monitor.id}`}
+                      className="flex items-center justify-between gap-4 py-3 hover:text-emerald-300"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-zinc-200">
+                          {monitor.name}
+                        </span>
+                        <span className="block truncate text-xs text-zinc-500">
+                          {monitor.url}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs text-zinc-400">
+                        {monitor.latestCheck?.status || "Pending"} ·{" "}
+                        {monitor.active ? "Active" : "Paused"}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-500">
+                  This user has no monitors.
+                </p>
+              )}
+            </section>
+            <section className={`${panel} mt-4`}>
               <h2 className="mb-3 text-sm font-semibold text-white">
                 Recent account activity
               </h2>
@@ -145,7 +224,7 @@ export default function AdminUserDetails() {
                 />
               )}
             </section>
-            {planQuery.error && (
+            {user.role !== ROLES.ADMIN && planQuery.error && (
               <p role="alert" className="mt-4 text-sm text-red-300">
                 Plan details could not be loaded.{" "}
                 <button onClick={planQuery.refetch} className="underline">
@@ -153,11 +232,20 @@ export default function AdminUserDetails() {
                 </button>
               </p>
             )}
-            {planQuery.data && (
+            {user.role !== ROLES.ADMIN && planQuery.data && (
               <section className={`${panel} mt-4`}>
-                <h2 className="mb-4 text-sm font-semibold text-white">
-                  Subscription details
-                </h2>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-white">
+                    Subscription details
+                  </h2>
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => setPlanDialogOpen(true)}
+                  >
+                    Change plan
+                  </Button>
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <p className="text-xs text-zinc-500">Current plan</p>
@@ -228,6 +316,15 @@ export default function AdminUserDetails() {
             )}
           </>
         )
+      )}
+      {user && (
+        <ChangePlanDialog
+          open={planDialogOpen}
+          onClose={() => setPlanDialogOpen(false)}
+          onConfirm={handleConfirmPlanChange}
+          targetUser={user}
+          loading={planSubmitting}
+        />
       )}
     </PageContainer>
   );

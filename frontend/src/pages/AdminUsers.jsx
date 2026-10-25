@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Users, RefreshCw } from "lucide-react";
 import PageContainer from "../components/layout/PageContainer";
 import PageHeader from "../components/layout/PageHeader";
@@ -21,16 +22,27 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import { ROLES } from "../constants/roles";
 
-const COLUMN_HEADERS = ["User", "Role", "Plan", "Status", "Joined", ""];
+const COLUMN_HEADERS = [
+  "User",
+  "Role",
+  "Access / plan",
+  "Monitors",
+  "Status",
+  "Joined",
+  "",
+];
 
 export default function AdminUsers() {
   const { user: currentUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [planFilter, setPlanFilter] = useState("all");
+  const [planFilter, setPlanFilter] = useState(
+    searchParams.get("plan") || "all",
+  );
   const [registeredFrom, setRegisteredFrom] = useState("");
   const [registeredTo, setRegisteredTo] = useState("");
 
@@ -115,6 +127,13 @@ export default function AdminUsers() {
   const handlePlanFilterChange = (value) => {
     setPlanFilter(value);
     setPage(1);
+    const updated = new URLSearchParams(searchParams);
+    if (value === "all") {
+      updated.delete("plan");
+    } else {
+      updated.set("plan", value);
+    }
+    setSearchParams(updated, { replace: true });
   };
 
   const handleConfirmRoleChange = () => {
@@ -199,7 +218,7 @@ export default function AdminUsers() {
 
       {/* Table */}
       <div className="rounded-xl border border-border-subtle bg-bg-surface">
-        <div className="grid grid-cols-[1fr_90px_100px_100px_120px_44px] items-center gap-3 border-b border-border-subtle px-5 py-3">
+        <div className="grid grid-cols-[minmax(140px,1fr)_90px_90px_100px_100px_120px_44px] items-center gap-3 border-b border-border-subtle px-5 py-3">
           {COLUMN_HEADERS.map((h, i) => (
             <p
               key={i}

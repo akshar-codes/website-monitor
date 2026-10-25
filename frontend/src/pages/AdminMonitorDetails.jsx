@@ -49,11 +49,15 @@ export default function AdminMonitorDetails() {
         className="mb-4"
       />
       <Link
-        to="/admin/monitors"
+        to={
+          monitor?.owner?.id
+            ? `/admin/users/${monitor.owner.id}`
+            : "/admin/users"
+        }
         className="mb-4 inline-flex items-center gap-2 text-sm text-emerald-400"
       >
         <ArrowLeft size={15} />
-        Back to monitor oversight
+        Back to user monitors
       </Link>
       {error && (
         <div
@@ -84,8 +88,10 @@ export default function AdminMonitorDetails() {
                   {monitor.owner?.name} · {monitor.owner?.email}
                 </p>
                 <p className="mt-1 text-xs capitalize text-zinc-500">
-                  {monitor.owner?.plan} plan ·{" "}
-                  {monitor.active ? "Enabled" : "Paused"}
+                  {monitor.owner?.role === "admin"
+                    ? "Admin access"
+                    : `${monitor.owner?.plan} plan`}{" "}
+                  · {monitor.active ? "Enabled" : "Paused"}
                 </p>
                 <p className="mt-3 text-sm text-zinc-400">
                   Every {monitor.interval}s · SSL{" "}

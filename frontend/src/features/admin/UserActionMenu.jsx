@@ -67,16 +67,18 @@ export default function UserActionMenu({
               {nextRole === ROLES.ADMIN ? "Make admin" : "Remove admin"}
             </button>
 
-            <button
-              onClick={() => {
-                close();
-                onRequestPlanChange(targetUser);
-              }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-white"
-            >
-              <CreditCard size={13} />
-              Change plan
-            </button>
+            {targetUser.role !== ROLES.ADMIN && (
+              <button
+                onClick={() => {
+                  close();
+                  onRequestPlanChange(targetUser);
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-white"
+              >
+                <CreditCard size={13} />
+                Change plan
+              </button>
+            )}
 
             <div className="my-1 h-px bg-bg-subtle" />
 

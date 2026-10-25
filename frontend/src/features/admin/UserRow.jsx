@@ -54,7 +54,7 @@ export default function UserRow({
   onRequestDelete,
 }) {
   return (
-    <div className="grid grid-cols-[1fr_90px_100px_100px_120px_44px] items-center gap-3 border-b border-[#1a1a1d] px-5 py-4 transition-colors hover:bg-[#131315] last:border-0">
+    <div className="grid grid-cols-[minmax(140px,1fr)_90px_90px_100px_100px_120px_44px] items-center gap-3 border-b border-[#1a1a1d] px-5 py-4 transition-colors hover:bg-[#131315] last:border-0">
       <div className="min-w-0">
         <Link
           to={`/admin/users/${user.id}`}
@@ -70,8 +70,14 @@ export default function UserRow({
       </div>
 
       <div>
-        <PlanBadge plan={user.plan} size="sm" />
+        {user.role === ROLES.ADMIN ? (
+          <span className="text-xs text-emerald-400">Admin access</span>
+        ) : (
+          <PlanBadge plan={user.plan} size="sm" />
+        )}
       </div>
+
+      <div className="text-sm text-zinc-300">{user.monitorCount ?? 0}</div>
 
       <div>
         <UserStatusBadge active={user.active} />
