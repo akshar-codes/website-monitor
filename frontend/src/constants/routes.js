@@ -10,6 +10,7 @@ export const ROUTES = Object.freeze({
   DASHBOARD: "/",
   MONITORS: "/monitors",
   MONITOR_DETAILS: "/monitors/:id",
+  SSL_MONITORING: "/ssl",
   INSIGHTS: "/insights",
   INCIDENTS: "/incidents",
   BILLING: "/billing",

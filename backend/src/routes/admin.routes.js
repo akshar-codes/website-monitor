@@ -30,6 +30,7 @@ import {
   getUsers,
   getUserDetails,
   getPlanOverview,
+  getPlanHistory,
   getUserPlanDetails,
   updateUserRole,
   updateUserPlan,
@@ -113,6 +114,7 @@ router.post(
 
 router.get("/users", validate(listUsersSchema, "query"), getUsers);
 router.get("/plans/overview", getPlanOverview);
+router.get("/plans/history", getPlanHistory);
 router.get("/users/:id/plan", validateObjectId("id"), getUserPlanDetails);
 router.get("/users/:id", validateObjectId("id"), getUserDetails);
 

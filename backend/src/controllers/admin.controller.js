@@ -152,6 +152,10 @@ export const getPlanOverview = asyncHandler(async (_req, res) =>
   sendSuccess(res, { data: await adminService.getPlanOverview() }),
 );
 
+export const getPlanHistory = asyncHandler(async (_req, res) =>
+  sendSuccess(res, { data: await adminService.getPlanHistory() }),
+);
+
 export const getUserPlanDetails = asyncHandler(async (req, res) =>
   sendSuccess(res, {
     data: await adminService.getUserPlanDetails(req.params.id),

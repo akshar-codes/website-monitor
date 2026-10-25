@@ -66,6 +66,11 @@ export async function getAdminPlanOverview() {
   return data?.data || [];
 }
 
+export async function getAdminPlanHistory() {
+  const { data } = await apiClient.get("/admin/plans/history");
+  return data?.data || [];
+}
+
 /**
  * PATCH /api/admin/users/:id/role
  */

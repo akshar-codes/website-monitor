@@ -91,6 +91,10 @@ export function useAdminPlanOverview() {
   return useQuery(() => adminApi.getAdminPlanOverview(), []);
 }
 
+export function useAdminPlanHistory() {
+  return useQuery(() => adminApi.getAdminPlanHistory(), []);
+}
+
 export function useUpdateUserRole(onSuccess) {
   const [submitting, setSubmitting] = useState(false);
 
