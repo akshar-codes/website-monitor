@@ -17,6 +17,8 @@ export function useQuery(fetchFn, deps = [], options = {}) {
   }, [fetchFn]);
 
   const isMountedRef = useRef(true);
+  const inFlightRef = useRef(new Map());
+  const requestKey = JSON.stringify(deps);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -25,28 +27,36 @@ export function useQuery(fetchFn, deps = [], options = {}) {
     };
   }, []);
 
-  const execute = useCallback(async () => {
+  const execute = useCallback(() => {
+    if (inFlightRef.current.has(requestKey)) {
+      return inFlightRef.current.get(requestKey);
+    }
+
     setLoading(true);
     setError(null);
-
-    try {
-      const result = await fetchFnRef.current();
-      if (isMountedRef.current) {
-        setData(result);
-        onSuccess?.(result);
+    const request = (async () => {
+      try {
+        const result = await fetchFnRef.current();
+        if (isMountedRef.current) {
+          setData(result);
+          onSuccess?.(result);
+        }
+      } catch (err) {
+        if (isMountedRef.current) {
+          setError(err);
+          onError?.(err);
+        }
+      } finally {
+        if (isMountedRef.current) setLoading(false);
+        if (inFlightRef.current.get(requestKey) === request) {
+          inFlightRef.current.delete(requestKey);
+        }
       }
-    } catch (err) {
-      if (isMountedRef.current) {
-        setError(err);
-        onError?.(err);
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
-    }
+    })();
+    inFlightRef.current.set(requestKey, request);
+    return request;
     // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/use-memo
-  }, deps);
+  }, [...deps, requestKey]);
 
   useEffect(() => {
     if (immediate) {
@@ -66,8 +76,15 @@ export function usePolling(fetchFn, deps = [], intervalMs = 30000) {
   const { refetch } = result;
 
   useEffect(() => {
-    const id = setInterval(refetch, intervalMs);
-    return () => clearInterval(id);
+    const poll = () => {
+      if (document.visibilityState === "visible") refetch();
+    };
+    const id = setInterval(poll, intervalMs);
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", poll);
+    };
   }, [refetch, intervalMs]);
 
   return result;

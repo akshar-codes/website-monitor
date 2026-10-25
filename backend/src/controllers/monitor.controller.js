@@ -7,6 +7,7 @@ import HealthCheck from "../models/HealthCheck.js";
 import Monitor from "../models/Monitor.js";
 import { randomUUID } from "node:crypto";
 import { updateDailyStat } from "../workers/aggregationManager.js";
+import { createHealthResponseSnapshot } from "../utils/healthResponseSnapshot.js";
 
 // ── Controllers ──────────────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ export const manualHealthCheck = asyncHandler(async (req, res) => {
     scheduled: false,
     httpStatus: result.httpStatus,
     failureReason: classification.failureReason,
-    rawResponse: null,
+    rawResponse: createHealthResponseSnapshot(result.body),
     diagnostics: result.diagnostics,
     checkedAt: new Date(),
   });

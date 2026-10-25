@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import * as notificationsApi from "../services/api/notifications";
 
 const DROPDOWN_LIMIT = 8;
-const POLL_INTERVAL_MS = 45000;
+const POLL_INTERVAL_MS = 120000;
 
 /**
  * Fetched once at the app root — mirrors PermissionsContext /
@@ -27,6 +27,7 @@ export function NotificationsProvider({ children }) {
   const [loading, setLoading] = useState(!!user);
 
   const pollRef = useRef(null);
+  const requestInFlightRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!user) {
@@ -36,6 +37,9 @@ export function NotificationsProvider({ children }) {
       setLoading(false);
       return;
     }
+
+    if (requestInFlightRef.current) return;
+    requestInFlightRef.current = true;
 
     try {
       const [summaryRes, listRes] = await Promise.all([
@@ -50,6 +54,7 @@ export function NotificationsProvider({ children }) {
       // Silent — the bell simply shows stale data until the next poll;
       // the axios interceptor already toasts network-level failures.
     } finally {
+      requestInFlightRef.current = false;
       setLoading(false);
     }
   }, [user]);
@@ -59,10 +64,15 @@ export function NotificationsProvider({ children }) {
 
     if (!user) return () => clearTimeout(initialLoad);
 
-    pollRef.current = setInterval(load, POLL_INTERVAL_MS);
+    const poll = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", poll);
     return () => {
       clearTimeout(initialLoad);
       clearInterval(pollRef.current);
+      document.removeEventListener("visibilitychange", poll);
     };
   }, [user, load]);
 

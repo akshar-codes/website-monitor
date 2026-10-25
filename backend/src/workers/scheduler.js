@@ -9,6 +9,7 @@ import { handleIncident } from "./incidentManager.js";
 import { updateDailyStat } from "./aggregationManager.js";
 import { runRetentionPass } from "./retentionManager.js";
 import { logActivity } from "../utils/activityLogger.js";
+import { createHealthResponseSnapshot } from "../utils/healthResponseSnapshot.js";
 import {
   ACTIVITY_CATEGORIES,
   ACTIVITY_ACTIONS,
@@ -79,7 +80,7 @@ const processMonitor = async (
           scheduled: true,
           httpStatus: pollResult.httpStatus,
           failureReason: classification.failureReason,
-          rawResponse: null,
+          rawResponse: createHealthResponseSnapshot(pollResult.body),
           diagnostics: pollResult.diagnostics,
           checkedAt,
         },

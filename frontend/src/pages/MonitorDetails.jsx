@@ -20,9 +20,12 @@ import MonitorRecentChecks from "../features/monitorDetails/MonitorRecentChecks"
 import MonitorSslPanel from "../features/monitorDetails/MonitorSslPanel";
 import MonitorAnalytics from "../features/monitorDetails/MonitorAnalytics";
 import MonitorDiagnostics from "../features/monitorDetails/MonitorDiagnostics";
+import ExpectedResponseHistory from "../features/monitorDetails/ExpectedResponseHistory";
+import RestrictedFeature from "../components/access/RestrictedFeature";
 import { useMonitorDetails, useMonitorMutations } from "../hooks/useMonitors";
 import { useUsage } from "../hooks/useUsage";
 import { ROUTES } from "../constants/routes";
+import { FEATURES } from "../constants/features";
 import { formatRelative } from "../utils/format";
 
 const WINDOWS = [
@@ -202,6 +205,18 @@ export default function MonitorDetails() {
       <div className="mb-6">
         <SectionLabel className="mb-3">Diagnostics</SectionLabel>
         <MonitorDiagnostics monitorId={id} />
+      </div>
+
+      <div className="mb-6">
+        <SectionLabel className="mb-3">Response history</SectionLabel>
+        <RestrictedFeature
+          feature={FEATURES.RESPONSE_INSPECTION}
+          title="Response history is available on Pro"
+          description="Compare the expected health response with recent endpoint responses from your last 10 checks."
+          onUpgradeClick={() => navigate(ROUTES.BILLING)}
+        >
+          <ExpectedResponseHistory checks={details?.recentChecks || []} />
+        </RestrictedFeature>
       </div>
 
       {/* Analytics & performance insights — custom date-range reporting,

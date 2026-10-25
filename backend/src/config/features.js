@@ -13,6 +13,7 @@ export const FEATURES = Object.freeze({
   EXTENDED_RETENTION: "extendedRetention",
   UNLIMITED_MONITORS: "unlimitedMonitors",
   FAST_POLLING: "fastPolling",
+  RESPONSE_INSPECTION: "responseInspection",
 });
 
 const FEATURE_CHECKS = Object.freeze({
@@ -36,6 +37,12 @@ const FEATURE_CHECKS = Object.freeze({
   [FEATURES.FAST_POLLING]: (plan) => {
     const definition = getPlanDefinition(plan);
     return !!definition && definition.limits.minCheckIntervalSeconds < 300;
+  },
+
+  // Inspecting saved endpoint response data is available from Pro upward.
+  [FEATURES.RESPONSE_INSPECTION]: (plan) => {
+    const definition = getPlanDefinition(plan);
+    return !!definition && definition.rank >= 1;
   },
 });
 

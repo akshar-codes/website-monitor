@@ -33,6 +33,7 @@ const envSchema = z
     // ── Rate limiting ──
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+    API_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
 
     // ── Redis (reserved for a future background-queue integration) ──
     REDIS_HOST: z.string().default("127.0.0.1"),

@@ -11,6 +11,7 @@ export const FEATURES = Object.freeze({
   EXTENDED_RETENTION: "extendedRetention",
   UNLIMITED_MONITORS: "unlimitedMonitors",
   FAST_POLLING: "fastPolling",
+  RESPONSE_INSPECTION: "responseInspection",
 });
 
 /**
@@ -30,6 +31,8 @@ export function planHasFeature(planDefinition, featureKey) {
       return limits.maxMonitors === null;
     case FEATURES.FAST_POLLING:
       return limits.minCheckIntervalSeconds < 300;
+    case FEATURES.RESPONSE_INSPECTION:
+      return planDefinition.rank >= 1;
     default:
       return false;
   }

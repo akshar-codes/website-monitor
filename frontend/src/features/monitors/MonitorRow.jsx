@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   MoreHorizontal,
   Edit2,
@@ -48,7 +48,13 @@ function ActionMenu({ monitor, onEdit, onToggle, onDelete, onDuplicate }) {
 
       {open && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div
+            className="fixed inset-0 z-10"
+            onClick={(event) => {
+              event.stopPropagation();
+              setOpen(false);
+            }}
+          />
           <div className="absolute right-0 top-8 z-20 w-44 rounded-xl border border-border-default bg-bg-elevated py-1 shadow-2xl">
             <Can permission="monitor:update">
               <button
@@ -113,6 +119,7 @@ export default function MonitorRow({
   onToggle,
   onDuplicate,
 }) {
+  const navigate = useNavigate();
   const status = monitor.active ? stats?.currentStatus || "unknown" : "paused";
 
   const uptime = stats?.uptime?.percentage;
@@ -120,7 +127,13 @@ export default function MonitorRow({
   const detailsPath = monitorDetailsPath(monitor.id || monitor._id);
 
   return (
-    <div className="grid grid-cols-[1fr_100px_100px_90px_90px_100px_40px] items-center gap-3 border-b border-[#1a1a1d] px-5 py-4 transition-colors hover:bg-[#131315] last:border-0">
+    <div
+      onClick={(event) => {
+        if (event.target.closest("a, button")) return;
+        navigate(detailsPath);
+      }}
+      className="grid cursor-pointer grid-cols-[1fr_100px_100px_90px_90px_100px_40px] items-center gap-3 border-b border-[#1a1a1d] px-5 py-4 transition-colors hover:bg-[#131315] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500/50 last:border-0"
+    >
       {/* Name + URL */}
       <div className="min-w-0">
         <div className="flex items-center gap-2">

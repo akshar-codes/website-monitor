@@ -21,6 +21,7 @@ import {
 } from "../utils/dateUtils.js";
 import { getOwnedMonitorIds } from "./monitor.service.js";
 import { getPlanDefinition } from "../config/plans.js";
+import { FEATURES, hasFeature } from "../config/features.js";
 
 const resolveOwnerObjectId = (user) =>
   new mongoose.Types.ObjectId(user.id || user._id);
@@ -645,13 +646,34 @@ export const getMonitorChartData = async (monitorId, { window }, user) => {
 // ── Per-monitor details (aggregated) ─────────────────────────────────────────
 
 export const getMonitorDetails = async (monitorId, { window }, user) => {
+  const canInspectResponses = hasFeature(
+    user?.plan,
+    FEATURES.RESPONSE_INSPECTION,
+  );
   const [stats, chartData] = await Promise.all([
     getMonitorStats(monitorId, { window }, user),
     getMonitorChartData(monitorId, { window }, user),
   ]);
+  const responseHistory = canInspectResponses
+    ? await HealthCheck.find({ monitor: monitorId })
+        .select("rawResponse checkedAt")
+        .sort({ checkedAt: -1 })
+        .limit(10)
+        .lean()
+    : [];
+
+  const responseByCheckId = new Map(
+    responseHistory.map((check) => [String(check._id), check.rawResponse]),
+  );
 
   return {
     ...stats,
+    ...(canInspectResponses && {
+      recentChecks: stats.recentChecks.map((check) => ({
+        ...check,
+        rawResponse: responseByCheckId.get(String(check._id)) ?? null,
+      })),
+    }),
     chart: {
       window: chartData.window,
       dataPoints: chartData.dataPoints,

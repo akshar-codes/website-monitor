@@ -7,6 +7,6 @@ import * as usageApi from "../services/api/usage";
  * flags. Backs the usage dashboard, the remaining-monitor indicator on
  * the Monitors page, and every upgrade prompt.
  */
-export function useUsage(pollingInterval = 60000) {
+export function useUsage(pollingInterval = 300000) {
   return usePolling(() => usageApi.getUsage(), [], pollingInterval);
 }

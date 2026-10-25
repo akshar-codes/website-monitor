@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import env from "../config/env.js";
 import { sendError } from "../utils/apiResponse.js";
 
@@ -15,7 +15,9 @@ const rateLimitHandler = (_req, res) => {
  */
 const globalLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.RATE_LIMIT_MAX,
+  limit: (req) => (req.user ? env.API_RATE_LIMIT_MAX : env.RATE_LIMIT_MAX),
+  keyGenerator: (req) =>
+    req.user?.id || req.user?._id?.toString() || ipKeyGenerator(req.ip),
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,

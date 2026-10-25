@@ -39,9 +39,6 @@ app.use(compression());
 // ── Request logging ──
 app.use(requestLogger);
 
-// ── Rate limiting ──
-app.use(globalLimiter);
-
 // ── Static file serving ──
 // Locally-stored profile avatars (see middlewares/uploadAvatar.js and
 // services/profile.service.js). Mounted ahead of body parsing/sessions
@@ -62,6 +59,10 @@ app.use(cookieParser(env.COOKIE_SECRET));
 app.use(session(sessionConfig));
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Apply the API budget after session deserialization so authenticated
+// customers receive independent quotas instead of sharing one IP bucket.
+app.use("/api", globalLimiter);
 
 // ── Input sanitisation ──
 app.use(sanitizeRequest);
