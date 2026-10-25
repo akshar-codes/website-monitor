@@ -152,9 +152,12 @@ export const runAndPersistCheck = async (monitor) => {
   const info = await SslInfo.getOrCreateForMonitor(monitor._id, hostname);
   const previousSslStatus = info.status;
   const previousDomainStatus = info.domain?.status || null;
+  const port = Number(new URL(monitor.url).port) || 443;
 
-  const { certResult, domainResult, cert, domain } =
-    await performSslCheck(hostname);
+  const { certResult, domainResult, cert, domain } = await performSslCheck(
+    hostname,
+    port,
+  );
 
   info.hostname = hostname;
   info.status = cert.status;

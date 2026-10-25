@@ -303,9 +303,9 @@ export const classifyDomainStatus = (domainResult, now = new Date()) => {
  * versa) — the two are independent data sources with independent
  * failure modes.
  */
-export const performSslCheck = async (hostname) => {
+export const performSslCheck = async (hostname, port = 443) => {
   const [certResult, domainResult] = await Promise.all([
-    checkCertificate(hostname),
+    checkCertificate(hostname, port),
     checkDomain(hostname),
   ]);
 
