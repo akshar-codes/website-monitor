@@ -74,9 +74,10 @@ export const getUsers = async ({
   );
 
   return {
-    users: users.map((user) => ({
+    users: users.map(({ _id, ...user }) => ({
       ...user,
-      monitorCount: monitorCountByOwner.get(String(user._id)) || 0,
+      id: String(_id),
+      monitorCount: monitorCountByOwner.get(String(_id)) || 0,
     })),
     total,
     page,
@@ -135,8 +136,9 @@ export const getUserDetails = async (targetUserId) => {
       },
     ]),
   ]);
+  const { _id, ...userData } = user;
   return {
-    user,
+    user: { ...userData, id: String(_id) },
     monitorUsage: monitorUsage[0] || { total: 0, active: 0 },
     recentActivity: recentActivity.map(
       ({ _id, category, action, description, entityType, createdAt }) => ({

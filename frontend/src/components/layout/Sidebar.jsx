@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -27,6 +27,7 @@ import { PLANS } from "../../constants/plans";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import PlanBadge from "../ui/PlanBadge";
 import UpgradePrompt from "../../features/plans/UpgradePrompt";
+import { getPlanUpgradeRequests } from "../../services/api/admin";
 
 const MONITORS_PATH = ROUTES.MONITORS || "/monitors";
 const SSL_PATH = ROUTES.SSL_MONITORING || "/ssl";
@@ -151,6 +152,18 @@ function NavItem({ item, collapsed }) {
             )}
           />
           {!collapsed && <span className="truncate">{item.label}</span>}
+          {item.pendingCount > 0 && (
+            <span
+              aria-label={`${item.pendingCount} pending plan upgrade requests`}
+              className={cn(
+                "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white",
+                collapsed &&
+                  "absolute -right-0.5 -top-1 h-4 min-w-4 px-0.5 text-[9px]",
+              )}
+            >
+              {item.pendingCount > 99 ? "99+" : item.pendingCount}
+            </span>
+          )}
           {collapsed && (
             <span className="pointer-events-none absolute left-full ml-2 hidden whitespace-nowrap rounded-md bg-bg-elevated border border-border-default px-2 py-1 text-xs text-white shadow-lg group-hover:block z-50">
               {item.label}
@@ -169,6 +182,36 @@ export default function Sidebar() {
   const { user, isAdmin, plan, logout, logoutAll } = useAuth();
   const { can } = usePermissions();
   const navigate = useNavigate();
+  const [pendingPlanRequestCount, setPendingPlanRequestCount] = useState(0);
+  const canManagePlanRequests = Boolean(
+    isAdmin && can("plan-upgrade-request:manage"),
+  );
+
+  useEffect(() => {
+    if (!canManagePlanRequests) {
+      return undefined;
+    }
+
+    let mounted = true;
+    const refreshCount = () => {
+      getPlanUpgradeRequests({ status: "pending", page: 1, limit: 1 })
+        .then((result) => {
+          if (mounted) {
+            setPendingPlanRequestCount(result?.pagination?.total || 0);
+          }
+        })
+        .catch(() => {});
+    };
+
+    refreshCount();
+    const intervalId = window.setInterval(refreshCount, 30_000);
+    window.addEventListener("admin:plan-requests-changed", refreshCount);
+    return () => {
+      mounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("admin:plan-requests-changed", refreshCount);
+    };
+  }, [canManagePlanRequests]);
 
   const navItems = useMemo(() => {
     // Admin accounts have a dedicated management navigation surface.
@@ -182,12 +225,15 @@ export default function Sidebar() {
         ADMIN_PLAN_HISTORY_NAV_ITEM,
         ADMIN_INCIDENTS_NAV_ITEM,
         ADMIN_AUDIT_NAV_ITEM,
-        ADMIN_PLAN_REQUESTS_NAV_ITEM,
+        {
+          ...ADMIN_PLAN_REQUESTS_NAV_ITEM,
+          pendingCount: canManagePlanRequests ? pendingPlanRequestCount : 0,
+        },
       ].filter((item) => !item.permission || can(item.permission));
     }
 
     return BASE_NAV_ITEMS;
-  }, [isAdmin, can]);
+  }, [isAdmin, can, canManagePlanRequests, pendingPlanRequestCount]);
 
   const handleLogout = async () => {
     try {

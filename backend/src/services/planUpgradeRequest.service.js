@@ -2,11 +2,14 @@ import PlanUpgradeRequest from "../models/PlanUpgradeRequest.js";
 import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
-import { PLAN_UPGRADE_REQUEST_STATUS } from "../config/constants.js";
+import { PLAN_UPGRADE_REQUEST_STATUS, ROLES } from "../config/constants.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { isUpgrade } from "../utils/planUtils.js";
 import { changeUserPlan } from "./plan.service.js";
-import { createNotification } from "./notification.service.js";
+import {
+  createNotification,
+  createNotificationForUsers,
+} from "./notification.service.js";
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_PRIORITIES,
@@ -14,6 +17,7 @@ import {
 import {
   sendPlanUpgradeRequestApprovedEmail,
   sendPlanUpgradeRequestRejectedEmail,
+  sendPlanUpgradeRequestSubmittedEmail,
 } from "./email.service.js";
 import { logActivity } from "../utils/activityLogger.js";
 import {
@@ -86,6 +90,54 @@ export const createUpgradeRequest = async (user, requestedPlan) => {
   logger.info(
     `Plan upgrade request ${request._id} created by user ${userId}: ${user.plan} -> ${requestedPlan}`,
   );
+
+  try {
+    const admins = await User.find({ role: ROLES.ADMIN, active: true })
+      .select("name email")
+      .lean();
+
+    await createNotificationForUsers(
+      admins.map((admin) => admin._id),
+      {
+        type: NOTIFICATION_TYPES.PLAN_UPGRADE_REQUEST_SUBMITTED,
+        title: "New plan upgrade request",
+        message: `${user.name || user.email} requested an upgrade from ${user.plan} to ${requestedPlan}.`,
+        priority: NOTIFICATION_PRIORITIES.HIGH,
+        link: "/admin/plan-requests",
+        relatedResource: {
+          resourceType: "PlanUpgradeRequest",
+          resourceId: request._id,
+        },
+      },
+    );
+
+    void Promise.allSettled(
+      admins.map((admin) =>
+        sendPlanUpgradeRequestSubmittedEmail(
+          admin,
+          user,
+          user.plan,
+          requestedPlan,
+        ),
+      ),
+    ).then((emailResults) => {
+      emailResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          logger.error(
+            `Failed to email admin ${admins[index].email} about plan upgrade request ${request._id}: ${result.reason.message}`,
+            { stack: result.reason.stack },
+          );
+        }
+      });
+    });
+  } catch (error) {
+    // The request is already persisted. Notification delivery failures must
+    // not make the user believe their submission failed.
+    logger.error(
+      `Failed to notify admins about plan upgrade request ${request._id}: ${error.message}`,
+      { stack: error.stack },
+    );
+  }
 
   return request;
 };

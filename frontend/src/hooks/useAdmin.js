@@ -231,6 +231,7 @@ export function useApprovePlanUpgradeRequest(onSuccess) {
           requestId,
           { grantedPlan, reason, expiresAt },
         );
+        window.dispatchEvent(new Event("admin:plan-requests-changed"));
         toast.success(message || "Upgrade request approved");
         onSuccess?.();
       } catch {
@@ -256,6 +257,7 @@ export function useRejectPlanUpgradeRequest(onSuccess) {
           requestId,
           reason,
         );
+        window.dispatchEvent(new Event("admin:plan-requests-changed"));
         toast.success(message || "Upgrade request rejected");
         onSuccess?.();
       } catch {

@@ -34,6 +34,7 @@ const alertPreferenceKey = (type) => {
     [
       "plan_upgraded",
       "plan_downgraded",
+      "plan_upgrade_request_submitted",
       "plan_upgrade_request_approved",
       "plan_upgrade_request_rejected",
       "usage_limit_reached",

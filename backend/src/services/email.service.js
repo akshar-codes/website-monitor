@@ -6,6 +6,7 @@ import { buildPasswordResetEmail } from "../utils/email/templates/passwordResetE
 import { buildPasswordChangedEmail } from "../utils/email/templates/passwordChangedEmail.js";
 import { buildPlanUpgradeApprovedEmail } from "../utils/email/templates/planUpgradeApprovedEmail.js";
 import { buildPlanUpgradeRejectedEmail } from "../utils/email/templates/planUpgradeRejectedEmail.js";
+import { buildPlanUpgradeRequestSubmittedEmail } from "../utils/email/templates/planUpgradeRequestSubmittedEmail.js";
 
 const sendMail = async ({ to, subject, html, text }) => {
   const transporter = getTransporter();
@@ -117,6 +118,27 @@ export const sendPlanUpgradeRequestRejectedEmail = async (
   await sendMail({ to: user.email, subject, html, text });
 
   logger.info(`Plan-upgrade-rejected email sent to ${user.email}`);
+};
+
+/** Notifies an administrator that a new plan upgrade request is awaiting review. */
+export const sendPlanUpgradeRequestSubmittedEmail = async (
+  admin,
+  requester,
+  currentPlan,
+  requestedPlan,
+) => {
+  const requestsUrl = `${env.CLIENT_URL}/admin/plan-requests`;
+  const { subject, html, text } = buildPlanUpgradeRequestSubmittedEmail({
+    adminName: admin.name,
+    requesterName: requester.name,
+    requesterEmail: requester.email,
+    currentPlan,
+    requestedPlan,
+    requestsUrl,
+  });
+
+  await sendMail({ to: admin.email, subject, html, text });
+  logger.info(`Plan-upgrade-request email sent to admin ${admin.email}`);
 };
 
 const escapeEmailText = (value = "") =>
