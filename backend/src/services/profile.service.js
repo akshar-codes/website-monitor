@@ -139,13 +139,17 @@ export const deleteAccount = async (userId, confirmationEmail) => {
 // ── Update profile ───────────────────────────────────────────────────────────
 
 export const updateProfile = async (userId, data) => {
-  const user = await User.findById(userId);
+  // Use a field-level update instead of document.save(). The password and
+  // OAuth identities are intentionally excluded from this query by default;
+  // document.save() would run the account password invariant against those
+  // unselected fields and reject an otherwise valid profile edit.
+  const user = await User.findByIdAndUpdate(userId, data, {
+    new: true,
+    runValidators: true,
+  });
   if (!user) {
     throw ApiError.notFound("User not found");
   }
-
-  Object.assign(user, data);
-  await user.save();
 
   logger.info(`Profile updated for user ${user._id}`);
 

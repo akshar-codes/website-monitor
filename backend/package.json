@@ -43,6 +43,6 @@
   },
   "allowScripts": {
     "msgpackr-extract@3.0.4": true,
-    "bcrypt@5.1.1": true
+    "bcrypt@6.0.0": true
   }
 }

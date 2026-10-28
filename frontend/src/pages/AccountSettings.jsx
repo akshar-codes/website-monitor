@@ -19,12 +19,20 @@ import * as accountApi from "../services/api/account";
 
 const accountSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(120),
-  bio: z.string().max(500).optional(),
-  location: z.string().max(120).optional(),
+  bio: z
+    .string()
+    .trim()
+    .max(500, "Bio cannot exceed 500 characters")
+    .optional(),
+  location: z
+    .string()
+    .trim()
+    .max(120, "Location cannot exceed 120 characters")
+    .optional(),
   website: z
     .string()
     .trim()
-    .max(200)
+    .max(200, "Website URL cannot exceed 200 characters")
     .refine((value) => {
       if (!value) return true;
       try {
@@ -32,11 +40,12 @@ const accountSchema = z.object({
       } catch {
         return false;
       }
-    }, "Use a valid HTTP or HTTPS URL")
+    }, "Website must be a valid HTTP or HTTPS URL")
     .optional(),
   phone: z
     .string()
-    .max(30)
+    .trim()
+    .max(30, "Phone number cannot exceed 30 characters")
     .regex(/^[+]?([\d\s\-().]*)$/, "Enter a valid phone number")
     .optional(),
 });
@@ -148,7 +157,7 @@ export default function AccountSettings() {
             Update the information associated with your account.
           </p>
         </div>
-        <form onSubmit={handleSubmit(onSave)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSave)} className="space-y-4" noValidate>
           <FormField label="Full name" required error={errors.name?.message}>
             <Input
               {...register("name")}
