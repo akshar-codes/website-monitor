@@ -1,13 +1,4 @@
 import { useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import Button from "../components/ui/Button";
-import SectionLabel from "../components/ui/SectionLabel";
-import Pagination from "../components/ui/Pagination";
-import ActivityFilters from "../features/activity/ActivityFilters";
-import ActivityTimeline from "../features/activity/ActivityTimeline";
-import RecentActivitySummary from "../features/activity/RecentActivitySummary";
 import { useActivityList, useActivitySummary } from "../hooks/useActivity";
 
 export default function Activity() {
@@ -57,57 +48,5 @@ export default function Activity() {
     refetchSummary();
   };
 
-  return (
-    <PageContainer>
-      <PageHeader
-        title="Activity"
-        subtitle="A complete history of actions taken on your account"
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={RefreshCw}
-            onClick={handleRefresh}
-          >
-            Refresh
-          </Button>
-        }
-        className="mb-6"
-      />
-
-      <div className="mb-6">
-        <SectionLabel className="mb-3">Overview</SectionLabel>
-        <RecentActivitySummary summary={summary} loading={summaryLoading} />
-      </div>
-
-      <div>
-        <SectionLabel className="mb-3">Full history</SectionLabel>
-
-        <ActivityFilters
-          search={search}
-          onSearchChange={handleSearchChange}
-          categoryFilter={categoryFilter}
-          onCategoryFilterChange={handleCategoryFilterChange}
-          windowFilter={windowFilter}
-          onWindowFilterChange={handleWindowFilterChange}
-          totalCount={pagination?.total}
-        />
-
-        <ActivityTimeline
-          activities={activities}
-          loading={loading}
-          hasActiveFilters={hasActiveFilters}
-        />
-
-        {pagination && pagination.totalPages > 1 && (
-          <Pagination
-            page={pagination.page}
-            totalPages={pagination.totalPages}
-            onPageChange={setPage}
-            className="mt-4"
-          />
-        )}
-      </div>
-    </PageContainer>
-  );
+  return null;
 }

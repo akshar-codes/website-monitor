@@ -1,11 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
-import AuthLayout from "../components/auth/AuthLayout";
-import LoginMarketingPanel from "../components/auth/LoginMarketingPanel";
-import VerificationStatusCard from "../components/auth/VerificationStatusCard";
-import ResendVerificationForm from "../components/auth/ResendVerificationForm";
-import Button from "../components/ui/Button";
 import { ROUTES } from "../constants/routes";
 import { mapAuthError } from "../utils/AuthErrors";
 import * as authApi from "../services/api/auth";
@@ -49,44 +43,5 @@ export default function VerifyEmail() {
     })();
   }, [token]);
 
-  return (
-    <AuthLayout animKey="verify-email" marketingPanel={<LoginMarketingPanel />}>
-      {status === "missing" && (
-        <VerificationStatusCard
-          status="failed"
-          title="Verification link incomplete"
-          message="No verification token was found in this link. Enter your email below to request a new one."
-        >
-          <ResendVerificationForm />
-        </VerificationStatusCard>
-      )}
-
-      {status === "pending" && (
-        <VerificationStatusCard
-          status="pending"
-          message="Hang tight while we confirm your email address."
-        />
-      )}
-
-      {status === "success" && (
-        <VerificationStatusCard status="success" message={message}>
-          <Button
-            variant="primary"
-            size="lg"
-            className="w-full"
-            iconRight={ArrowRight}
-            onClick={() => navigate(ROUTES.LOGIN, { replace: true })}
-          >
-            Continue to sign in
-          </Button>
-        </VerificationStatusCard>
-      )}
-
-      {status === "failed" && (
-        <VerificationStatusCard status="failed" message={message}>
-          <ResendVerificationForm />
-        </VerificationStatusCard>
-      )}
-    </AuthLayout>
-  );
+  return null;
 }
