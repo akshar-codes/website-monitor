@@ -4,7 +4,8 @@ import {
   useApprovePlanUpgradeRequest,
   useRejectPlanUpgradeRequest,
 } from "../hooks/useAdmin";
-import { cn } from "../utils/cn";
+import { Page, Panel, Button, Status } from "../components/ui/Primitives";
+import { Check, X, RefreshCw } from "lucide-react";
 
 const STATUS_FILTERS = [
   { label: "Pending", value: "pending" },
@@ -72,5 +73,192 @@ export default function AdminPlanRequests() {
     reject(getRequestId(pendingReject), reason);
   };
 
-  return null;
+  return (
+    <Page
+      title="Upgrade requests"
+      description="Review customer requests for access to higher plan tiers."
+      eyebrow="ADMIN · BILLING"
+      actions={
+        <Button variant="secondary" onClick={refetch}>
+          <RefreshCw size={14} /> Refresh
+        </Button>
+      }
+    >
+      <Panel
+        title="Plan upgrade queue"
+        subtitle={`${requests.length} requests on this page`}
+      >
+        <div className="filter-pills">
+          {STATUS_FILTERS.map((item) => (
+            <button
+              className={statusFilter === item.value ? "active" : ""}
+              key={item.value}
+              onClick={() => changeStatusFilter(item.value)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        {error && (
+          <div className="sw-notice error">Could not load requests.</div>
+        )}
+        {loading ? (
+          <div className="sw-loading">Loading requests…</div>
+        ) : (
+          <div className="sw-table-wrap">
+            <table className="sw-table">
+              <thead>
+                <tr>
+                  {COLUMN_HEADERS.map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((request) => {
+                  const id = getRequestId(request);
+                  return (
+                    <tr key={id}>
+                      <td>
+                        <b>
+                          {request.user?.name ||
+                            request.user?.email ||
+                            "Customer"}
+                        </b>
+                        <small className="table-secondary">
+                          {request.user?.email}
+                        </small>
+                      </td>
+                      <td>
+                        {request.currentPlan || request.user?.plan || "—"}
+                      </td>
+                      <td>
+                        <b>{request.requestedPlan}</b>
+                        {request.message && (
+                          <small className="table-secondary">
+                            {request.message}
+                          </small>
+                        )}
+                      </td>
+                      <td>
+                        {request.createdAt
+                          ? new Date(request.createdAt).toLocaleString()
+                          : "—"}
+                      </td>
+                      <td>
+                        <Status value={request.status} />
+                      </td>
+                      <td>
+                        {request.status === "pending" && (
+                          <div className="row-actions">
+                            <button
+                              title="Approve"
+                              onClick={() => setPendingApprove(request)}
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button
+                              title="Reject"
+                              onClick={() => setPendingReject(request)}
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!requests.length && (
+                  <tr>
+                    <td colSpan="6" className="table-empty">
+                      No requests in this queue.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {pagination && (
+          <div className="pagination-bar">
+            <span>
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <div>
+              <Button
+                variant="secondary"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={page >= pagination.totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </Panel>
+      {(pendingApprove || pendingReject) && (
+        <div className="modal-backdrop">
+          <section className="form-modal">
+            <h2>
+              {pendingApprove
+                ? "Approve upgrade request?"
+                : "Reject upgrade request?"}
+            </h2>
+            <p className="muted-copy">
+              {pendingApprove
+                ? `Grant ${pendingApprove.requestedPlan} to ${pendingApprove.user?.name || pendingApprove.user?.email}?`
+                : "The customer will be notified of the decision."}
+            </p>
+            <div className="modal-actions">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setPendingApprove(null);
+                  setPendingReject(null);
+                }}
+              >
+                Cancel
+              </Button>
+              {pendingApprove ? (
+                <Button
+                  disabled={approvingId === getRequestId(pendingApprove)}
+                  onClick={() => {
+                    const reason = window.prompt("Approval reason (required):");
+                    if (reason?.trim())
+                      handleConfirmApprove({
+                        grantedPlan: pendingApprove.requestedPlan,
+                        reason: reason.trim(),
+                      });
+                  }}
+                >
+                  {approvingId ? "Approving…" : "Approve"}
+                </Button>
+              ) : (
+                <Button
+                  variant="danger"
+                  disabled={rejectingId === getRequestId(pendingReject)}
+                  onClick={() => {
+                    const reason = window.prompt(
+                      "Reason for rejection (required):",
+                    );
+                    if (reason?.trim()) handleConfirmReject(reason.trim());
+                  }}
+                >
+                  {rejectingId ? "Rejecting…" : "Reject request"}
+                </Button>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+    </Page>
+  );
 }

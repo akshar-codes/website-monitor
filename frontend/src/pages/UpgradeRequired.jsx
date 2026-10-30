@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { ROUTES } from "../constants/routes";
+import { AuthShell, Button } from "../components/ui/Primitives";
 
 export default function UpgradeRequired() {
   const navigate = useNavigate();
@@ -11,5 +12,20 @@ export default function UpgradeRequired() {
 
   const handleAction = () => navigate(ROUTES.BILLING);
 
-  return null;
+  return (
+    <AuthShell
+      title="Unlock this feature"
+      description={message}
+      footer="Choose a plan that fits your monitoring needs."
+    >
+      <div className="upgrade-art">
+        <span>PRO</span>
+        <span>12</span>
+        <span>∞</span>
+      </div>
+      <Button type="button" onClick={handleAction}>
+        View plans and billing
+      </Button>
+    </AuthShell>
+  );
 }
