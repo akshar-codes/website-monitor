@@ -1146,6 +1146,27 @@ export const getMonitorStatusList = async (user, limit = 12) => {
     },
   ]);
 
+  const uptimeByMonitor = monitors.length
+    ? await DailyStat.aggregate([
+        {
+          $match: {
+            monitor: { $in: monitors.map((monitor) => monitor._id) },
+            date: { $gte: startOfDayUTC(msBefore(WINDOW_MS["24h"])) },
+          },
+        },
+        {
+          $group: {
+            _id: "$monitor",
+            totalChecks: { $sum: "$totalChecks" },
+            successfulChecks: { $sum: "$successfulChecks" },
+          },
+        },
+      ])
+    : [];
+  const uptimeById = new Map(
+    uptimeByMonitor.map((row) => [String(row._id), row]),
+  );
+
   return monitors.map((m) => {
     let status = m.status || HEALTH_STATUS.UNKNOWN;
     if (m.checkedAt && isStale(m.checkedAt, m.interval)) {
@@ -1157,6 +1178,16 @@ export const getMonitorStatusList = async (user, limit = 12) => {
       url: m.url,
       status,
       responseTime: m.responseTime ?? null,
+      checkedAt: m.checkedAt ?? null,
+      uptimePercentage: uptimeById.get(String(m._id))?.totalChecks
+        ? Number(
+            (
+              (uptimeById.get(String(m._id)).successfulChecks /
+                uptimeById.get(String(m._id)).totalChecks) *
+              100
+            ).toFixed(2),
+          )
+        : null,
     };
   });
 };

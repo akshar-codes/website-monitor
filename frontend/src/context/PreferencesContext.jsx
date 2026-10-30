@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PreferencesContext } from "../contexts/PreferencesContext";
 import { useAuth } from "../hooks/useAuth";
 import * as preferencesApi from "../services/api/preferences";
-import { THEMES } from "../constants/preferences";
 
 /**
  * Fetched ONCE at the app root — mirrors PermissionsContext's pattern —
@@ -12,13 +11,8 @@ import { THEMES } from "../constants/preferences";
  * request. Must be nested inside <AuthProvider>, since it only fetches
  * once a user session exists.
  *
- * NOTE ON THEME: this app's design system (see src/index.css) is
- * currently dark-only — the `@theme` tokens have no light-mode
- * counterpart yet. Applying `data-theme` on <html> here is the
- * integration point a future light/system stylesheet would hook into;
- * on its own it does not yet change visual appearance. The preference is
- * still fully persisted and round-tripped so that work is a CSS-only
- * addition later, not a data-model change.
+ * SiteWatch is presented in light mode throughout the product. Older saved
+ * dark/system values are intentionally ignored so they cannot change the UI.
  */
 export function PreferencesProvider({ children }) {
   const { user } = useAuth();
@@ -26,15 +20,7 @@ export function PreferencesProvider({ children }) {
   const [loading, setLoading] = useState(!!user);
 
   const applyPreferences = useCallback((prefs) => {
-    const theme = prefs?.theme;
-    const resolved =
-      theme === THEMES.SYSTEM
-        ? window.matchMedia?.("(prefers-color-scheme: light)").matches
-          ? THEMES.LIGHT
-          : THEMES.DARK
-        : theme || THEMES.DARK;
-
-    document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.theme = "light";
     document.documentElement.dataset.timezone = prefs?.timezone || "UTC";
     document.documentElement.dataset.dateFormat =
       prefs?.dateFormat || "MMM D, YYYY";
@@ -68,14 +54,6 @@ export function PreferencesProvider({ children }) {
     const request = setTimeout(loadPreferences, 0);
     return () => clearTimeout(request);
   }, [loadPreferences]);
-
-  useEffect(() => {
-    if (preferences?.theme !== THEMES.SYSTEM || !window.matchMedia) return;
-    const media = window.matchMedia("(prefers-color-scheme: light)");
-    const updateSystemTheme = () => applyPreferences(preferences);
-    media.addEventListener?.("change", updateSystemTheme);
-    return () => media.removeEventListener?.("change", updateSystemTheme);
-  }, [preferences, applyPreferences]);
 
   /**
    * Optimistically merges a server response (or partial patch) into the
