@@ -6,6 +6,14 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "../hooks/useAuth";
 import * as accountApi from "../services/api/account";
+import {
+  Page,
+  Panel,
+  Button,
+  Input,
+  Notice,
+} from "../components/ui/Primitives";
+import { Save, Trash2, UserRound } from "lucide-react";
 
 const accountSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(120),
@@ -40,14 +48,11 @@ const accountSchema = z.object({
     .optional(),
 });
 
-const dateLabel = (value) =>
-  value ? new Date(value).toLocaleString() : "Not available";
-
 export default function AccountSettings() {
   const { refetchUser } = useAuth();
   const navigate = useNavigate();
   const [account, setAccount] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -128,5 +133,124 @@ export default function AccountSettings() {
     }
   };
 
-  return null;
+  return (
+    <Page
+      title="Account settings"
+      description="Update your account details and manage account lifecycle."
+      eyebrow="SETTINGS"
+    >
+      <div className="settings-layout">
+        <aside className="settings-intro">
+          <span className="settings-avatar">
+            <UserRound size={24} />
+          </span>
+          <b>{account?.name || "Your account"}</b>
+          <small>{account?.email}</small>
+          <p>
+            These details are used for account communication and your profile.
+          </p>
+        </aside>
+        <div>
+          <Panel
+            title="Personal information"
+            subtitle="Keep your account details current"
+          >
+            <form className="settings-form" onSubmit={handleSubmit(onSave)}>
+              <label className="sw-field">
+                Name
+                <input {...register("name")} />
+                {errors.name && (
+                  <small className="field-error">{errors.name.message}</small>
+                )}
+              </label>
+              <label className="sw-field">
+                Bio
+                <textarea rows="3" {...register("bio")} />
+                {errors.bio && (
+                  <small className="field-error">{errors.bio.message}</small>
+                )}
+              </label>
+              <label className="sw-field">
+                Location
+                <input {...register("location")} />
+                {errors.location && (
+                  <small className="field-error">
+                    {errors.location.message}
+                  </small>
+                )}
+              </label>
+              <label className="sw-field">
+                Website
+                <input
+                  type="url"
+                  placeholder="https://"
+                  {...register("website")}
+                />
+                {errors.website && (
+                  <small className="field-error">
+                    {errors.website.message}
+                  </small>
+                )}
+              </label>
+              <label className="sw-field">
+                Phone
+                <input type="tel" {...register("phone")} />
+                {errors.phone && (
+                  <small className="field-error">{errors.phone.message}</small>
+                )}
+              </label>
+              <div className="form-actions">
+                <Button disabled={saving || !isDirty}>
+                  <Save size={14} />
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+              </div>
+            </form>
+          </Panel>
+          <Panel
+            title="Danger zone"
+            subtitle="Permanently delete your account and associated data"
+          >
+            <Notice tone="warning">
+              Account deletion is permanent and cannot be undone.
+            </Notice>
+            <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+              <Trash2 size={14} /> Delete account
+            </Button>
+          </Panel>
+        </div>
+      </div>
+      {deleteOpen && (
+        <div className="modal-backdrop">
+          <section className="form-modal">
+            <h2>Delete your account?</h2>
+            <p className="muted-copy">
+              Confirm your email address to permanently delete this account.
+            </p>
+            <form className="sw-form" onSubmit={onDelete}>
+              <Input
+                label="Account email"
+                type="email"
+                value={confirmationEmail}
+                onChange={(e) => setConfirmationEmail(e.target.value)}
+                required
+              />
+              <div className="modal-actions">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => setDeleteOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button variant="danger" disabled={deleting}>
+                  {deleting ? "Deleting…" : "Delete account permanently"}
+                </Button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+    </Page>
+  );
 }

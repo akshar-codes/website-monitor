@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Laptop, Monitor, Smartphone } from "lucide-react";
 import { formatDateTime } from "../utils/format";
 import { useAuth } from "../hooks/useAuth";
 import * as authApi from "../services/api/auth";
+import { Page, Panel, Button } from "../components/ui/Primitives";
+import { Eye, EyeOff, ShieldCheck, LogOut } from "lucide-react";
 
 const passwordSchema = z
   .object({
@@ -161,5 +163,206 @@ export default function SecuritySettings() {
   const providerLabel = (provider) =>
     provider.charAt(0).toUpperCase() + provider.slice(1);
 
-  return null;
+  return (
+    <Page
+      title="Security"
+      description="Manage password strength and active sign-in sessions."
+      eyebrow="SETTINGS"
+    >
+      <div className="settings-layout">
+        <aside className="settings-intro">
+          <span className="settings-avatar">
+            <ShieldCheck size={24} />
+          </span>
+          <b>Account security</b>
+          <small>
+            {security?.twoFactorEnabled
+              ? "Two-factor authentication enabled"
+              : "Protect your account"}
+          </small>
+          <p>Change your password regularly and review devices with access.</p>
+        </aside>
+        <div>
+          <Panel
+            title="Change password"
+            subtitle="Your new password must meet all requirements"
+          >
+            <form
+              className="settings-form"
+              onSubmit={handleSubmit(onChangePassword)}
+            >
+              <label className="sw-field">
+                Current password
+                <div className="password-field">
+                  <input
+                    type={visible.current ? "text" : "password"}
+                    autoComplete="current-password"
+                    {...register("currentPassword")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVisible((v) => ({ ...v, current: !v }))}
+                  >
+                    {visible.current ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                {errors.currentPassword && (
+                  <small className="field-error">
+                    {errors.currentPassword.message}
+                  </small>
+                )}
+              </label>
+              <label className="sw-field">
+                New password
+                <div className="password-field">
+                  <input
+                    type={visible.password ? "text" : "password"}
+                    autoComplete="new-password"
+                    {...register("password")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVisible((v) => ({ ...v, password: !v }))}
+                  >
+                    {visible.password ? (
+                      <EyeOff size={15} />
+                    ) : (
+                      <Eye size={15} />
+                    )}
+                  </button>
+                </div>
+                {errors.password && (
+                  <small className="field-error">
+                    {errors.password.message}
+                  </small>
+                )}
+              </label>
+              <div className="password-requirements">
+                {requirements.map(([key, label, test]) => (
+                  <span
+                    key={key}
+                    className={test(newPassword || "") ? "met" : ""}
+                  >
+                    {test(newPassword || "") ? "✓" : "○"} {label}
+                  </span>
+                ))}
+              </div>
+              <label className="sw-field">
+                Confirm new password
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  {...register("confirmPassword")}
+                />
+                {errors.confirmPassword && (
+                  <small className="field-error">
+                    {errors.confirmPassword.message}
+                  </small>
+                )}
+              </label>
+              <Button disabled={savingPassword}>
+                {savingPassword ? "Updating…" : "Update password"}
+              </Button>
+            </form>
+          </Panel>
+          <Panel
+            title="Signed-in devices"
+            subtitle="Revoke sessions you no longer recognize"
+            actions={
+              <Button
+                variant="secondary"
+                onClick={() => setLogoutAllOpen(true)}
+              >
+                <LogOut size={14} /> Sign out everywhere
+              </Button>
+            }
+          >
+            {loading || sessionsLoading ? (
+              <div className="sw-loading">Loading sessions…</div>
+            ) : (
+              <div className="session-list">
+                {displayedSessions.map((session) => {
+                  const device = deviceLabel(session.userAgent);
+                  const DeviceIcon = device.icon;
+                  return (
+                    <article className="session-row" key={session.id}>
+                      <span className="session-device">
+                        <DeviceIcon size={17} />
+                      </span>
+                      <div>
+                        <b>
+                          {device.label}{" "}
+                          {session.current && (
+                            <span className="current-tag">Current</span>
+                          )}
+                        </b>
+                        <p>
+                          {session.ipAddress || session.ip || "IP unavailable"}{" "}
+                          · {providerLabel(session.provider || "password")}
+                        </p>
+                        <small>
+                          Last active{" "}
+                          {formatDateTime(
+                            session.lastActiveAt || session.createdAt,
+                          )}
+                        </small>
+                      </div>
+                      {!session.current && (
+                        <Button
+                          variant="secondary"
+                          disabled={revoking}
+                          onClick={() => setSelectedSession(session)}
+                        >
+                          Revoke
+                        </Button>
+                      )}
+                    </article>
+                  );
+                })}
+                {!sessions.length && (
+                  <div className="sw-empty">
+                    <b>No session details available</b>
+                  </div>
+                )}
+              </div>
+            )}
+          </Panel>
+        </div>
+      </div>
+      {(selectedSession || logoutAllOpen) && (
+        <div className="modal-backdrop">
+          <section className="form-modal">
+            <h2>
+              {selectedSession
+                ? "Revoke this session?"
+                : "Sign out of all devices?"}
+            </h2>
+            <p className="muted-copy">
+              {selectedSession
+                ? "This device will need to sign in again."
+                : "You will need to sign in again on every device."}
+            </p>
+            <div className="modal-actions">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSelectedSession(null);
+                  setLogoutAllOpen(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={revoking || loggingOutAll}
+                onClick={selectedSession ? revokeSelectedSession : logoutAll}
+              >
+                {selectedSession ? "Revoke session" : "Sign out everywhere"}
+              </Button>
+            </div>
+          </section>
+        </div>
+      )}
+    </Page>
+  );
 }
