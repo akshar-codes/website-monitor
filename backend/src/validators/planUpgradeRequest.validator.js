@@ -30,6 +30,10 @@ export const approvePlanUpgradeRequestSchema = z
         invalid_type_error: `Granted plan must be one of: ${PLAN_VALUES.join(", ")}`,
       })
       .optional(),
+    paymentRequired: z.boolean().optional().default(false),
+    period: z.enum(["monthly", "yearly"]).optional().default("monthly"),
+    discountPercent: z.coerce.number().min(0).max(100).optional().default(0),
+    planExpiresAt: z.string().datetime({ offset: true }).optional(),
     reason: z.string().trim().min(3).max(500),
     expiresAt: z.string().datetime({ offset: true }).optional(),
   })
@@ -39,6 +43,12 @@ export const approvePlanUpgradeRequestSchema = z
         code: "custom",
         path: ["expiresAt"],
         message: "Expiry must be in the future",
+      });
+    if (value.planExpiresAt && new Date(value.planExpiresAt) <= new Date())
+      ctx.addIssue({
+        code: "custom",
+        path: ["planExpiresAt"],
+        message: "Plan expiry must be in the future",
       });
   });
 

@@ -12,31 +12,108 @@ import { getChangeType } from "../utils/planUtils.js";
 const razorpayRequest = async (path, { method = "GET", body } = {}) => {
   const response = await fetch(`https://api.razorpay.com/v1${path}`, {
     method,
-    headers: { Authorization: `Basic ${Buffer.from(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`).toString("base64")}`, ...(body ? { "Content-Type": "application/json" } : {}) },
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`).toString("base64")}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw ApiError.badRequest(data?.error?.description || "Razorpay could not process the payment request.", "RAZORPAY_REQUEST_FAILED");
+  if (!response.ok)
+    throw ApiError.badRequest(
+      data?.error?.description ||
+        "Razorpay could not process the payment request.",
+      "RAZORPAY_REQUEST_FAILED",
+    );
   return data;
 };
 
-export const createPlanOrder = async (user, { plan, period = "monthly" }) => {
+export const createPlanOrder = async (
+  user,
+  { plan, period = "monthly", requestId },
+) => {
   const settings = await getBillingSettings();
-  if (settings.mode !== "payment") throw ApiError.badRequest("Direct payments are currently disabled.");
-  if (!settings.paymentReady) throw ApiError.badRequest("Razorpay is not configured on the server.");
-  if (settings.currency !== "INR") throw ApiError.badRequest("Razorpay checkout requires INR pricing.");
+  if (settings.mode !== "payment" && !requestId)
+    throw ApiError.badRequest("Direct payments are currently disabled.");
+  if (!settings.paymentReady)
+    throw ApiError.badRequest("Razorpay is not configured on the server.");
+  if (settings.currency !== "INR")
+    throw ApiError.badRequest("Razorpay checkout requires INR pricing.");
   const definition = getPlanDefinition(plan);
-  if (!definition || plan === "free") throw ApiError.badRequest("Choose a paid plan.");
-  if (getChangeType(user.plan, plan) !== "upgrade") throw ApiError.badRequest("Checkout is available for plan upgrades only.");
-  const amount = settings.prices?.[plan]?.[period];
-  if (!Number.isFinite(amount) || amount <= 0) throw ApiError.badRequest("This plan does not have a valid price for the selected period.");
+  if (!definition || plan === "free")
+    throw ApiError.badRequest("Choose a paid plan.");
+  if (getChangeType(user.plan, plan) !== "upgrade")
+    throw ApiError.badRequest("Checkout is available for plan upgrades only.");
+  let discountPercent = 0;
+  let expiresAt = null;
+  let offerRequest = null;
+  if (requestId) {
+    offerRequest = await PlanUpgradeRequest.findOne({
+      _id: requestId,
+      user: user.id || user._id,
+      status: "payment_pending",
+    });
+    if (
+      !offerRequest ||
+      offerRequest.paymentOffer?.plan !== plan ||
+      offerRequest.paymentOffer?.period !== period
+    )
+      throw ApiError.badRequest("This payment offer is no longer available.");
+    discountPercent = offerRequest.paymentOffer.discountPercent || 0;
+    expiresAt = offerRequest.paymentOffer.expiresAt || null;
+    if (expiresAt && expiresAt <= new Date())
+      throw ApiError.badRequest(
+        "The plan expiry date in this offer has passed. Contact support for a new offer.",
+      );
+  }
+  const listPrice = settings.prices?.[plan]?.[period];
+  if (!Number.isFinite(listPrice) || listPrice <= 0)
+    throw ApiError.badRequest(
+      "This plan does not have a valid price for the selected period.",
+    );
+  const amount = listPrice * (1 - discountPercent / 100);
+  if (amount <= 0)
+    throw ApiError.badRequest(
+      "The offer discount must leave a positive payment amount.",
+    );
   const amountSubunits = Math.round(amount * 100);
-  const order = await razorpayRequest("/orders", { method: "POST", body: {
-    amount: amountSubunits, currency: "INR", receipt: `plan_${Date.now()}_${crypto.randomBytes(5).toString("hex")}`,
-    notes: { userId: String(user.id || user._id), plan, period },
-  } });
-  await PlanPayment.create({ user: user.id || user._id, plan, period, amount: amountSubunits, currency: "INR", orderId: order.id });
-  return { keyId: settings.publicKeyId, orderId: order.id, amount: amountSubunits, currency: "INR", plan: definition.name, period, customer: { name: user.name, email: user.email } };
+  const order = await razorpayRequest("/orders", {
+    method: "POST",
+    body: {
+      amount: amountSubunits,
+      currency: "INR",
+      receipt: `plan_${Date.now()}_${crypto.randomBytes(5).toString("hex")}`,
+      notes: {
+        userId: String(user.id || user._id),
+        plan,
+        period,
+        ...(requestId
+          ? { requestId, discountPercent: String(discountPercent) }
+          : {}),
+      },
+    },
+  });
+  await PlanPayment.create({
+    user: user.id || user._id,
+    upgradeRequest: offerRequest?._id || null,
+    plan,
+    period,
+    amount: amountSubunits,
+    discountPercent,
+    expiresAt,
+    currency: "INR",
+    orderId: order.id,
+  });
+  return {
+    keyId: settings.publicKeyId,
+    orderId: order.id,
+    amount: amountSubunits,
+    currency: "INR",
+    plan: definition.name,
+    period,
+    discountPercent,
+    customer: { name: user.name, email: user.email },
+  };
 };
 
 const signatureMatches = (expected, provided) => {
@@ -50,39 +127,95 @@ const addPeriod = (from, period) => {
   const day = date.getDate();
   date.setDate(1);
   date.setMonth(date.getMonth() + (period === "yearly" ? 12 : 1));
-  date.setDate(Math.min(day, new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()));
+  date.setDate(
+    Math.min(
+      day,
+      new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate(),
+    ),
+  );
   return date;
 };
 
-export const verifyPlanPayment = async (user, { orderId, paymentId, signature }) => {
+export const verifyPlanPayment = async (
+  user,
+  { orderId, paymentId, signature },
+) => {
   const userId = user.id || user._id;
   const record = await PlanPayment.findOne({ orderId, user: userId });
   if (!record) throw ApiError.notFound("Payment order not found.");
   if (record.status === "paid") return { paid: true, plan: record.plan };
-  const expected = crypto.createHmac("sha256", env.RAZORPAY_KEY_SECRET).update(`${orderId}|${paymentId}`).digest("hex");
-  if (!signatureMatches(expected, signature)) throw ApiError.forbidden("Payment signature could not be verified.");
-  const providerPayment = await razorpayRequest(`/payments/${encodeURIComponent(paymentId)}`);
-  if (providerPayment.order_id !== orderId || providerPayment.amount !== record.amount || providerPayment.currency !== record.currency || providerPayment.status !== "captured") throw ApiError.badRequest("Razorpay has not confirmed a captured payment for this order.");
-  const lock = await PlanPayment.findOneAndUpdate({ _id: record._id, status: "created" }, { $set: { status: "processing", paymentId } }, { new: true });
+  const expected = crypto
+    .createHmac("sha256", env.RAZORPAY_KEY_SECRET)
+    .update(`${orderId}|${paymentId}`)
+    .digest("hex");
+  if (!signatureMatches(expected, signature))
+    throw ApiError.forbidden("Payment signature could not be verified.");
+  const providerPayment = await razorpayRequest(
+    `/payments/${encodeURIComponent(paymentId)}`,
+  );
+  if (
+    providerPayment.order_id !== orderId ||
+    providerPayment.amount !== record.amount ||
+    providerPayment.currency !== record.currency ||
+    providerPayment.status !== "captured"
+  )
+    throw ApiError.badRequest(
+      "Razorpay has not confirmed a captured payment for this order.",
+    );
+  const lock = await PlanPayment.findOneAndUpdate(
+    { _id: record._id, status: "created" },
+    { $set: { status: "processing", paymentId } },
+    { new: true },
+  );
   if (!lock) {
     const latest = await PlanPayment.findById(record._id).lean();
     if (latest?.status === "paid") return { paid: true, plan: latest.plan };
     throw ApiError.conflict("This payment is already being processed.");
   }
   const target = getPlanDefinition(record.plan);
-  const expiresAt = addPeriod(new Date(), record.period);
+  const expiresAt = record.expiresAt || addPeriod(new Date(), record.period);
   try {
-    await changeUserPlan(userId, record.plan, user, { reason: `Razorpay payment ${paymentId} (${record.period})`, expiresAt, paidVerified: true });
-    await PlanPayment.updateOne({ _id: record._id, status: "processing" }, { $set: { status: "paid", paidAt: new Date(), paymentId } });
-    await PlanUpgradeRequest.updateMany({ user: userId, status: "pending" }, { $set: { status: "rejected", rejectionReason: "A direct plan payment was completed.", reviewedAt: new Date() } }).catch(() => {});
+    await changeUserPlan(userId, record.plan, user, {
+      reason: `Razorpay payment ${paymentId} (${record.period})`,
+      expiresAt,
+      paidVerified: true,
+    });
+    await PlanPayment.updateOne(
+      { _id: record._id, status: "processing" },
+      { $set: { status: "paid", paidAt: new Date(), paymentId } },
+    );
+    if (record.upgradeRequest)
+      await PlanUpgradeRequest.updateOne(
+        { _id: record.upgradeRequest, user: userId, status: "payment_pending" },
+        { $set: { status: "approved", reviewedAt: new Date() } },
+      );
+    await PlanUpgradeRequest.updateMany(
+      { user: userId, status: "pending" },
+      {
+        $set: {
+          status: "rejected",
+          rejectionReason: "A direct plan payment was completed.",
+          reviewedAt: new Date(),
+        },
+      },
+    ).catch(() => {});
     return { paid: true, plan: record.plan, planName: target.name, expiresAt };
   } catch (error) {
-    const current = await User.findById(userId).select("plan").lean().catch(() => null);
+    const current = await User.findById(userId)
+      .select("plan")
+      .lean()
+      .catch(() => null);
     if (current?.plan === record.plan) {
-      await PlanPayment.updateOne({ _id: record._id, status: "processing" }, { $set: { status: "paid", paidAt: new Date(), paymentId } });
+      await PlanPayment.updateOne(
+        { _id: record._id, status: "processing" },
+        { $set: { status: "paid", paidAt: new Date(), paymentId } },
+      );
       return { paid: true, plan: record.plan, planName: target.name };
     }
-    await PlanPayment.updateOne({ _id: record._id, status: "processing" }, { $set: { status: "created" }, $unset: { paymentId: 1 } });
+    await PlanPayment.updateOne(
+      { _id: record._id, status: "processing" },
+      { $set: { status: "created" }, $unset: { paymentId: 1 } },
+    );
     throw error;
   }
 };

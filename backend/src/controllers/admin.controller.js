@@ -4,7 +4,10 @@ import * as adminOperationsService from "../services/adminOperations.service.js"
 import * as adminService from "../services/admin.service.js";
 import * as planUpgradeRequestService from "../services/planUpgradeRequest.service.js";
 import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
-import { getBillingSettings, saveBillingSettings } from "../services/billingSettings.service.js";
+import {
+  getBillingSettings,
+  saveBillingSettings,
+} from "../services/billingSettings.service.js";
 
 // ── Controllers: users ───────────────────────────────────────────────────────
 
@@ -153,11 +156,15 @@ export const getPlanOverview = asyncHandler(async (_req, res) =>
   sendSuccess(res, { data: await adminService.getPlanOverview() }),
 );
 
-export const getAdminBillingSettings = asyncHandler(async (_req, res) => sendSuccess(res, { data: await getBillingSettings() }));
-export const updateAdminBillingSettings = asyncHandler(async (req, res) => sendSuccess(res, {
-  message: "Billing settings saved.",
-  data: await saveBillingSettings(req.body, req.user),
-}));
+export const getAdminBillingSettings = asyncHandler(async (_req, res) =>
+  sendSuccess(res, { data: await getBillingSettings() }),
+);
+export const updateAdminBillingSettings = asyncHandler(async (req, res) =>
+  sendSuccess(res, {
+    message: "Billing settings saved.",
+    data: await saveBillingSettings(req.body, req.user),
+  }),
+);
 
 export const getPlanHistory = asyncHandler(async (_req, res) =>
   sendSuccess(res, { data: await adminService.getPlanHistory() }),
@@ -262,11 +269,20 @@ export const approvePlanUpgradeRequest = asyncHandler(async (req, res) => {
       grantedPlan: req.body.grantedPlan,
       reason: req.body.reason,
       expiresAt: req.body.expiresAt ? new Date(req.body.expiresAt) : null,
+      paymentRequired: req.body.paymentRequired,
+      period: req.body.period,
+      discountPercent: req.body.discountPercent,
+      planExpiresAt: req.body.planExpiresAt
+        ? new Date(req.body.planExpiresAt)
+        : null,
     },
   );
 
   sendSuccess(res, {
-    message: "Upgrade request approved and the user's plan has been updated",
+    message:
+      request.status === "payment_pending"
+        ? "Payment offer sent to the user"
+        : "Upgrade request approved and the user's plan has been updated",
     data: request,
   });
 });

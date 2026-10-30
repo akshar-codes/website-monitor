@@ -54,6 +54,13 @@ const planUpgradeRequestSchema = new mongoose.Schema(
       default: null,
     },
 
+    paymentOffer: {
+      plan: { type: String, enum: PLAN_VALUES, default: null },
+      period: { type: String, enum: ["monthly", "yearly"], default: null },
+      discountPercent: { type: Number, min: 0, max: 100, default: 0 },
+      expiresAt: { type: Date, default: null },
+    },
+
     status: {
       type: String,
       required: [true, "Status is required"],
@@ -127,7 +134,12 @@ planUpgradeRequestSchema.index({ status: 1, createdAt: 1 });
 planUpgradeRequestSchema.statics.findActivePendingForUser = function (userId) {
   return this.findOne({
     user: userId,
-    status: PLAN_UPGRADE_REQUEST_STATUS.PENDING,
+    status: {
+      $in: [
+        PLAN_UPGRADE_REQUEST_STATUS.PENDING,
+        PLAN_UPGRADE_REQUEST_STATUS.PAYMENT_PENDING,
+      ],
+    },
   });
 };
 

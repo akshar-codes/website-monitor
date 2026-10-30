@@ -106,6 +106,7 @@ export const PLAN_STATUS_VALUES = Object.freeze(Object.values(PLAN_STATUS));
 
 export const PLAN_UPGRADE_REQUEST_STATUS = Object.freeze({
   PENDING: "pending",
+  PAYMENT_PENDING: "payment_pending",
   APPROVED: "approved",
   REJECTED: "rejected",
 });

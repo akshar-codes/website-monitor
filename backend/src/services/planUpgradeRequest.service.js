@@ -45,7 +45,10 @@ const resolveUserId = (user) => user.id || user._id.toString();
  */
 export const createUpgradeRequest = async (user, requestedPlan) => {
   const billingSettings = await getBillingSettings();
-  if (billingSettings.mode === "payment") throw ApiError.badRequest("Plan upgrades use direct checkout. Choose a paid plan from Plans & billing.");
+  if (billingSettings.mode === "payment")
+    throw ApiError.badRequest(
+      "Plan upgrades use direct checkout. Choose a paid plan from Plans & billing.",
+    );
   const definition = getPlanDefinition(requestedPlan);
   if (!definition) {
     throw ApiError.badRequest(`Unknown plan: ${requestedPlan}`);
@@ -228,10 +231,21 @@ export const getRequestForAdmin = async (requestId) => {
 export const approveRequest = async (
   requestId,
   adminUser,
-  { grantedPlan, reason, expiresAt } = {},
+  {
+    grantedPlan,
+    reason,
+    expiresAt,
+    paymentRequired = false,
+    period = "monthly",
+    discountPercent = 0,
+    planExpiresAt = null,
+  } = {},
 ) => {
   const billingSettings = await getBillingSettings();
-  if (billingSettings.mode === "payment") throw ApiError.badRequest("Direct payment mode is active. Switch to request review mode before approving a manual upgrade.");
+  if (billingSettings.mode === "payment" && !paymentRequired)
+    throw ApiError.badRequest(
+      "Direct payment mode is active. Choose a payment offer for this request.",
+    );
   const request = await PlanUpgradeRequest.findById(requestId);
   if (!request) {
     throw ApiError.notFound(
@@ -260,6 +274,58 @@ export const approveRequest = async (
     throw ApiError.badRequest(
       "An upgrade request can only grant a higher plan than the user's current plan.",
     );
+  }
+
+  if (paymentRequired) {
+    if (!billingSettings.paymentReady || billingSettings.currency !== "INR") {
+      throw ApiError.badRequest(
+        "Payment offers require configured Razorpay checkout with INR pricing.",
+      );
+    }
+    const amount = billingSettings.prices?.[actualPlan]?.[period];
+    if (!Number.isFinite(amount) || amount <= 0)
+      throw ApiError.badRequest(
+        "The selected plan has no valid price for this billing period.",
+      );
+    request.status = PLAN_UPGRADE_REQUEST_STATUS.PAYMENT_PENDING;
+    request.grantedPlan = actualPlan;
+    request.reviewedBy = adminId;
+    request.reviewedAt = new Date();
+    request.paymentOffer = {
+      plan: actualPlan,
+      period,
+      discountPercent,
+      expiresAt: planExpiresAt,
+    };
+    await request.save();
+    await createNotification({
+      ownerId: request.user,
+      type: NOTIFICATION_TYPES.PLAN_UPGRADE_REQUEST_APPROVED,
+      title: "A discounted plan offer is ready",
+      message: `Your request was approved. Complete payment for the ${actualPlan} plan${discountPercent ? ` with a ${discountPercent}% discount` : ""} from Plans & billing.`,
+      priority: NOTIFICATION_PRIORITIES.HIGH,
+      link: "/billing",
+      relatedResource: {
+        resourceType: "PlanUpgradeRequest",
+        resourceId: request._id,
+      },
+    });
+    await logActivity({
+      userId: adminId,
+      category: ACTIVITY_CATEGORIES.ADMIN,
+      action: ACTIVITY_ACTIONS.ADMIN_PLAN_UPGRADE_REQUEST_APPROVED,
+      description: `Sent ${actualPlan} payment offer to ${currentUser.email}${discountPercent ? ` with ${discountPercent}% discount` : ""}`,
+      entityType: "PlanUpgradeRequest",
+      entityId: request._id,
+      metadata: {
+        targetEmail: currentUser.email,
+        to: actualPlan,
+        period,
+        discountPercent,
+        planExpiresAt,
+      },
+    });
+    return { request, user: currentUser };
   }
 
   const { user: updatedUser } = await changeUserPlan(
