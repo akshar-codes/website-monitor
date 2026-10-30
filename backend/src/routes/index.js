@@ -10,6 +10,7 @@ import profileRoutes from "./profile.routes.js";
 import accountRoutes from "./account.routes.js";
 import preferenceRoutes from "./preference.routes.js";
 import planRoutes from "./plan.routes.js";
+import paymentRoutes from "./payment.routes.js";
 import planUpgradeRequestRoutes from "./planUpgradeRequest.routes.js";
 import usageRoutes from "./usage.routes.js";
 import monitorRoutes from "./monitor.routes.js";
@@ -40,6 +41,7 @@ router.use("/auth", authRoutes);
 router.use("/profile", profileRoutes);
 router.use("/account", accountRoutes);
 router.use("/plans", planRoutes);
+router.use("/payments", paymentRoutes);
 
 // API key access is isolated to read-only v1 endpoints and rate-limited per key.
 router.use("/v1", requireApiKey, apiKeyLimiter, recordApiKeyUsage, apiV1Routes);

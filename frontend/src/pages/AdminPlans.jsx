@@ -17,6 +17,7 @@ import {
 import { CreditCard, RefreshCw, Users } from "lucide-react";
 import { formatPlanPrice } from "../utils/formatPlanPrice";
 import { formatPlanLimit } from "../utils/formatPlanLimit";
+import AdminBillingSettings from "../components/admin/AdminBillingSettings";
 
 export default function AdminPlans() {
   const [page, _setPage] = useState(1);
@@ -93,6 +94,7 @@ export default function AdminPlans() {
           note="Customer accounts"
         />
       </div>
+      <AdminBillingSettings onSaved={refetchPlans} />
       {plansError && <Notice tone="error">Could not load plan catalog.</Notice>}
       <div className="plan-grid">
         {(plans || []).map((plan) => (

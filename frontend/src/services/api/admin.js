@@ -66,6 +66,15 @@ export async function getAdminPlanOverview() {
   return data?.data || [];
 }
 
+export async function getAdminBillingSettings() {
+  const { data } = await apiClient.get("/admin/billing-settings");
+  return data?.data;
+}
+export async function updateAdminBillingSettings(payload) {
+  const { data } = await apiClient.patch("/admin/billing-settings", payload);
+  return data?.data;
+}
+
 export async function getAdminPlanHistory() {
   const { data } = await apiClient.get("/admin/plans/history");
   return data?.data || [];

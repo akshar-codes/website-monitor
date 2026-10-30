@@ -9,6 +9,7 @@
 import { Router } from "express";
 import {
   getPlans,
+  getBillingMode,
   getCurrentPlan,
   changePlan,
 } from "../controllers/plan.controller.js";
@@ -20,6 +21,7 @@ import { changePlanSchema } from "../validators/plan.validator.js";
 const router = Router();
 
 router.get("/", getPlans);
+router.get("/billing-mode", getBillingMode);
 router.get(
   "/current",
   isAuthenticated,

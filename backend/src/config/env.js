@@ -19,6 +19,10 @@ const envSchema = z
       .default("development"),
     PORT: z.coerce.number().int().positive().default(5000),
 
+    RAZORPAY_KEY_ID: z.string().optional(),
+    RAZORPAY_KEY_SECRET: z.string().optional(),
+    RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+
     // ── MongoDB ──
     MONGO_URI: z
       .string({ required_error: "MONGO_URI is required" })

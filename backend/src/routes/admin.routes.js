@@ -30,6 +30,8 @@ import {
   getUsers,
   getUserDetails,
   getPlanOverview,
+  getAdminBillingSettings,
+  updateAdminBillingSettings,
   getPlanHistory,
   getUserPlanDetails,
   updateUserRole,
@@ -43,6 +45,7 @@ import {
   rejectPlanUpgradeRequest,
 } from "../controllers/admin.controller.js";
 import { adminDashboardQuerySchema } from "../validators/adminDashboard.validator.js";
+import { updateBillingSettingsSchema } from "../validators/billingSettings.validator.js";
 import {
   adminMonitorListSchema,
   adminIncidentListSchema,
@@ -114,6 +117,8 @@ router.post(
 
 router.get("/users", validate(listUsersSchema, "query"), getUsers);
 router.get("/plans/overview", getPlanOverview);
+router.get("/billing-settings", getAdminBillingSettings);
+router.patch("/billing-settings", validate(updateBillingSettingsSchema, "body"), updateAdminBillingSettings);
 router.get("/plans/history", getPlanHistory);
 router.get("/users/:id/plan", validateObjectId("id"), getUserPlanDetails);
 router.get("/users/:id", validateObjectId("id"), getUserDetails);

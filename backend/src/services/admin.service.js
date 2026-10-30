@@ -11,7 +11,8 @@ import { escapeRegExp } from "../utils/regex.js";
 import { ROLES } from "../config/constants.js";
 import { changeUserPlan as changePlanForUser } from "./plan.service.js";
 import { getUsageForUser } from "./usage.service.js";
-import { getPlanDefinition, getPublicPlanCatalog } from "../config/plans.js";
+import { getPlanDefinition } from "../config/plans.js";
+import { getPricedPlanCatalog } from "./billingSettings.service.js";
 import { destroyAllUserSessions } from "./session.service.js";
 import { logActivity } from "../utils/activityLogger.js";
 import {
@@ -320,7 +321,8 @@ export const getPlanOverview = async () => {
       { users: item.users, activeUsers: item.activeUsers },
     ]),
   );
-  return getPublicPlanCatalog().map((definition) => ({
+  const catalog = await getPricedPlanCatalog();
+  return catalog.map((definition) => ({
     ...definition,
     ...(counts[definition.id] || { users: 0, activeUsers: 0 }),
   }));

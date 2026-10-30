@@ -49,7 +49,12 @@ app.use(
 );
 
 // ── Body parsing ──
-app.use(express.json({ limit: env.MAX_BODY_SIZE }));
+app.use(express.json({
+  limit: env.MAX_BODY_SIZE,
+  verify(req, _res, buffer) {
+    if (req.originalUrl.startsWith("/api/payments/webhook")) req.rawBody = Buffer.from(buffer);
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: env.MAX_BODY_SIZE }));
 
 // ── Cookies ──

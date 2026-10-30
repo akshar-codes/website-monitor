@@ -1,6 +1,7 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import * as planService from "../services/plan.service.js";
 import { sendSuccess } from "../utils/apiResponse.js";
+import { getBillingSettings } from "../services/billingSettings.service.js";
 
 // ── Controllers ──────────────────────────────────────────────────────────────
 
@@ -9,9 +10,14 @@ import { sendSuccess } from "../utils/apiResponse.js";
  * Public plan catalog — pricing, limits, and feature copy for every tier.
  */
 export const getPlans = asyncHandler(async (_req, res) => {
-  const data = planService.getPlanCatalog();
+  const data = await planService.getPlanCatalog();
 
   sendSuccess(res, { data });
+});
+
+export const getBillingMode = asyncHandler(async (_req, res) => {
+  const { mode, currency, paymentReady, publicKeyId } = await getBillingSettings();
+  sendSuccess(res, { data: { mode, currency, paymentReady, publicKeyId } });
 });
 
 /**

@@ -4,6 +4,7 @@ import * as adminOperationsService from "../services/adminOperations.service.js"
 import * as adminService from "../services/admin.service.js";
 import * as planUpgradeRequestService from "../services/planUpgradeRequest.service.js";
 import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
+import { getBillingSettings, saveBillingSettings } from "../services/billingSettings.service.js";
 
 // ── Controllers: users ───────────────────────────────────────────────────────
 
@@ -151,6 +152,12 @@ export const updateUserPlan = asyncHandler(async (req, res) => {
 export const getPlanOverview = asyncHandler(async (_req, res) =>
   sendSuccess(res, { data: await adminService.getPlanOverview() }),
 );
+
+export const getAdminBillingSettings = asyncHandler(async (_req, res) => sendSuccess(res, { data: await getBillingSettings() }));
+export const updateAdminBillingSettings = asyncHandler(async (req, res) => sendSuccess(res, {
+  message: "Billing settings saved.",
+  data: await saveBillingSettings(req.body, req.user),
+}));
 
 export const getPlanHistory = asyncHandler(async (_req, res) =>
   sendSuccess(res, { data: await adminService.getPlanHistory() }),

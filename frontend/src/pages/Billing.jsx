@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   useCurrentPlan,
   usePlanCatalog,
@@ -14,10 +14,32 @@ import { getPlanChangeType } from "../utils/planCompare";
 import { formatPlanPrice } from "../utils/formatPlanPrice";
 import { formatPlanName } from "../utils/formatPlanName";
 import { formatPlanLimit } from "../utils/formatPlanLimit";
+import {
+  getBillingMode,
+  createPlanOrder,
+  verifyPlanPayment,
+} from "../services/api/plans";
 import { Page, Panel, Button, Notice } from "../components/ui/Primitives";
 import { Check, CreditCard, RefreshCw, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 
 const EMPTY_PLANS = Object.freeze([]);
+let checkoutScriptPromise;
+function loadRazorpayCheckout() {
+  if (window.Razorpay) return Promise.resolve(true);
+  if (!checkoutScriptPromise)
+    checkoutScriptPromise = new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => {
+        checkoutScriptPromise = null;
+        resolve(false);
+      };
+      document.body.appendChild(script);
+    });
+  return checkoutScriptPromise;
+}
 
 /**
  * There is no payment gateway wired up yet, so plan changes split into two
@@ -34,6 +56,21 @@ export default function Billing() {
   const [actionPlanId, setActionPlanId] = useState(null);
   const [pendingDowngrade, setPendingDowngrade] = useState(null);
   const [pendingUpgrade, setPendingUpgrade] = useState(null);
+  const [billingMode, setBillingMode] = useState(null);
+  const [billingPeriod, setBillingPeriod] = useState("monthly");
+
+  useEffect(() => {
+    let active = true;
+    getBillingMode()
+      .then((response) => active && setBillingMode(response?.data || null))
+      .catch(
+        () =>
+          active && setBillingMode({ mode: "request", paymentReady: false }),
+      );
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const {
     data: currentPlanData,
@@ -72,6 +109,73 @@ export default function Billing() {
   const { changePlan } = usePlanChange(handleDowngradeSuccess);
   const { requestUpgrade } = useRequestPlanUpgrade(handleUpgradeRequestSuccess);
 
+  const startDirectPayment = useCallback(
+    async (planId) => {
+      setActionPlanId(planId);
+      try {
+        if (!(await loadRazorpayCheckout()))
+          throw new Error(
+            "Razorpay checkout could not be loaded. Check your connection and try again.",
+          );
+        const response = await createPlanOrder(planId, billingPeriod);
+        const order = response?.data;
+        if (!order) throw new Error("Could not create a payment order.");
+        const checkout = new window.Razorpay({
+          key: order.keyId,
+          amount: order.amount,
+          currency: order.currency,
+          name: "SiteWatch",
+          description: `${order.plan} plan · ${order.period}`,
+          order_id: order.orderId,
+          prefill: order.customer,
+          theme: { color: "#079b74" },
+          handler: async (result) => {
+            try {
+              const verified = await verifyPlanPayment({
+                orderId: result.razorpay_order_id || order.orderId,
+                paymentId: result.razorpay_payment_id,
+                signature: result.razorpay_signature,
+              });
+              toast.success(
+                verified?.message ||
+                  "Payment verified and your plan is active.",
+              );
+              await Promise.all([
+                refetchCurrentPlan(),
+                refetchUser(),
+                refetchUsage(),
+                refetchUpgradeRequest(),
+              ]);
+            } catch {
+              /* API interceptor displays verification errors. */
+            } finally {
+              setActionPlanId(null);
+            }
+          },
+          modal: { ondismiss: () => setActionPlanId(null) },
+        });
+        checkout.on("payment.failed", (event) => {
+          toast.error(
+            event?.error?.description || "Payment could not be completed.",
+          );
+          setActionPlanId(null);
+        });
+        checkout.open();
+      } catch (error) {
+        setActionPlanId(null);
+        if (!error?.response)
+          toast.error(error.message || "Could not start checkout.");
+      }
+    },
+    [
+      billingPeriod,
+      refetchCurrentPlan,
+      refetchUser,
+      refetchUsage,
+      refetchUpgradeRequest,
+    ],
+  );
+
   const handleSelectPlan = useCallback(
     async (planId) => {
       const targetPlan = plans.find((p) => p.id === planId);
@@ -87,6 +191,10 @@ export default function Billing() {
       }
 
       if (changeType === "upgrade") {
+        if (billingMode?.mode === "payment") {
+          await startDirectPayment(planId);
+          return;
+        }
         setPendingUpgrade(planId);
         return;
       }
@@ -102,7 +210,14 @@ export default function Billing() {
         setActionPlanId(null);
       }
     },
-    [plans, currentPlan, requestUpgrade, changePlan],
+    [
+      plans,
+      currentPlan,
+      requestUpgrade,
+      changePlan,
+      billingMode,
+      startDirectPayment,
+    ],
   );
 
   const handleConfirmUpgrade = async () => {
@@ -145,7 +260,13 @@ export default function Billing() {
         </Button>
       }
     >
-      {pendingRequest && (
+      {billingMode?.mode === "payment" && !billingMode.paymentReady && (
+        <Notice tone="warning">
+          Direct checkout is selected, but payments are not configured. Please
+          contact support.
+        </Notice>
+      )}
+      {billingMode?.mode !== "payment" && pendingRequest && (
         <Notice tone="warning">
           Your request to move to {pendingPlanName} is waiting for administrator
           review.
@@ -193,6 +314,31 @@ export default function Billing() {
           <small>{requestHistory.length} prior requests</small>
         </div>
       </div>
+      {billingMode?.mode === "payment" && (
+        <div className="billing-period-choice">
+          <div
+            className="billing-period-toggle"
+            role="group"
+            aria-label="Billing period"
+          >
+            <button
+              className={billingPeriod === "monthly" ? "active" : ""}
+              onClick={() => setBillingPeriod("monthly")}
+            >
+              Monthly
+            </button>
+            <button
+              className={billingPeriod === "yearly" ? "active" : ""}
+              onClick={() => setBillingPeriod("yearly")}
+            >
+              Yearly
+            </button>
+          </div>
+          <small>
+            Paid once for the selected period. Plans do not renew automatically.
+          </small>
+        </div>
+      )}
       <div className="plan-grid">
         {catalogLoading || currentPlanLoading ? (
           <div className="sw-loading">Loading plans…</div>
@@ -216,9 +362,9 @@ export default function Billing() {
                     "Flexible website monitoring for your team."}
                 </p>
                 <div className="plan-price">
-                  {formatPlanPrice(plan.price)}
+                  {formatPlanPrice(plan.price, billingPeriod)}
                   <small>
-                    {plan.billingPeriod ? `/${plan.billingPeriod}` : "/ month"}
+                    {`/ ${billingPeriod === "yearly" ? "year" : "month"}`}
                   </small>
                 </div>
                 <ul>
@@ -236,66 +382,79 @@ export default function Billing() {
                 </ul>
                 <Button
                   variant={current ? "secondary" : "primary"}
-                  disabled={current || !!pendingRequest || actionPlanId === id}
+                  disabled={
+                    current ||
+                    (billingMode?.mode !== "payment" && !!pendingRequest) ||
+                    (billingMode?.mode === "payment" &&
+                      !billingMode.paymentReady) ||
+                    !billingMode ||
+                    actionPlanId === id
+                  }
                   onClick={() => handleSelectPlan(id)}
                 >
                   {current
                     ? "Current plan"
-                    : pending
+                    : pending && billingMode?.mode !== "payment"
                       ? "Request pending"
                       : actionPlanId === id
-                        ? "Updating…"
-                        : "Choose plan"}
+                        ? billingMode?.mode === "payment"
+                          ? "Opening checkout…"
+                          : "Updating…"
+                        : billingMode?.mode === "payment"
+                          ? "Upgrade & pay"
+                          : "Choose plan"}
                 </Button>
               </article>
             );
           })
         )}
       </div>
-      <Panel
-        title="Plan request history"
-        subtitle="Upgrade requests and review outcomes"
-      >
-        <div className="sw-table-wrap">
-          <table className="sw-table">
-            <thead>
-              <tr>
-                <th>Requested plan</th>
-                <th>Submitted</th>
-                <th>Status</th>
-                <th>Reviewed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {requestHistory.map((r, i) => (
-                <tr key={r.id || r._id || i}>
-                  <td>
-                    {plans.find((p) => p.id === r.requestedPlan)?.name ||
-                      r.requestedPlan}
-                  </td>
-                  <td>
-                    {r.createdAt
-                      ? new Date(r.createdAt).toLocaleDateString()
-                      : "—"}
-                  </td>
-                  <td>{r.status}</td>
-                  <td>
-                    {r.reviewedAt
-                      ? new Date(r.reviewedAt).toLocaleDateString()
-                      : "—"}
-                  </td>
+      {billingMode?.mode !== "payment" && (
+        <Panel
+          title="Plan request history"
+          subtitle="Upgrade requests and review outcomes"
+        >
+          <div className="sw-table-wrap">
+            <table className="sw-table">
+              <thead>
+                <tr>
+                  <th>Requested plan</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                  <th>Reviewed</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {!requestHistory.length && (
-          <div className="sw-empty">
-            <b>No plan requests yet</b>
-            <p>Upgrade requests and decisions will appear here.</p>
+              </thead>
+              <tbody>
+                {requestHistory.map((r, i) => (
+                  <tr key={r.id || r._id || i}>
+                    <td>
+                      {plans.find((p) => p.id === r.requestedPlan)?.name ||
+                        r.requestedPlan}
+                    </td>
+                    <td>
+                      {r.createdAt
+                        ? new Date(r.createdAt).toLocaleDateString()
+                        : "—"}
+                    </td>
+                    <td>{r.status}</td>
+                    <td>
+                      {r.reviewedAt
+                        ? new Date(r.reviewedAt).toLocaleDateString()
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </Panel>
+          {!requestHistory.length && (
+            <div className="sw-empty">
+              <b>No plan requests yet</b>
+              <p>Upgrade requests and decisions will appear here.</p>
+            </div>
+          )}
+        </Panel>
+      )}
       {(pendingUpgrade || pendingDowngrade) && (
         <div className="modal-backdrop">
           <section className="form-modal">

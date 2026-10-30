@@ -1,11 +1,18 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   usePlanUpgradeRequestList,
   useApprovePlanUpgradeRequest,
   useRejectPlanUpgradeRequest,
 } from "../hooks/useAdmin";
-import { Page, Panel, Button, Status } from "../components/ui/Primitives";
+import {
+  Page,
+  Panel,
+  Button,
+  Status,
+  Notice,
+} from "../components/ui/Primitives";
 import { Check, X, RefreshCw } from "lucide-react";
+import { getBillingMode } from "../services/api/plans";
 
 const STATUS_FILTERS = [
   { label: "Pending", value: "pending" },
@@ -28,6 +35,19 @@ const getRequestId = (request) => request?.id || request?._id;
 export default function AdminPlanRequests() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("pending");
+  const [paymentMode, setPaymentMode] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getBillingMode()
+      .then(
+        (response) =>
+          active && setPaymentMode(response?.data?.mode === "payment"),
+      )
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Both "pending" actions route through a confirmation step before the
   // mutation fires, mirroring the pattern used throughout AdminUsers.jsx.
@@ -84,6 +104,13 @@ export default function AdminPlanRequests() {
         </Button>
       }
     >
+      {paymentMode && (
+        <Notice tone="info">
+          Direct checkout mode is active. New upgrades are paid through customer
+          checkout; manual approvals are paused until request review mode is
+          restored.
+        </Notice>
+      )}
       <Panel
         title="Plan upgrade queue"
         subtitle={`${requests.length} requests on this page`}
@@ -153,6 +180,7 @@ export default function AdminPlanRequests() {
                           <div className="row-actions">
                             <button
                               title="Approve"
+                              disabled={paymentMode}
                               onClick={() => setPendingApprove(request)}
                             >
                               <Check size={14} />

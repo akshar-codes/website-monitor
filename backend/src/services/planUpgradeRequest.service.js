@@ -6,6 +6,7 @@ import { PLAN_UPGRADE_REQUEST_STATUS, ROLES } from "../config/constants.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { isUpgrade } from "../utils/planUtils.js";
 import { changeUserPlan } from "./plan.service.js";
+import { getBillingSettings } from "./billingSettings.service.js";
 import {
   createNotification,
   createNotificationForUsers,
@@ -43,6 +44,8 @@ const resolveUserId = (user) => user.id || user._id.toString();
  * requests.
  */
 export const createUpgradeRequest = async (user, requestedPlan) => {
+  const billingSettings = await getBillingSettings();
+  if (billingSettings.mode === "payment") throw ApiError.badRequest("Plan upgrades use direct checkout. Choose a paid plan from Plans & billing.");
   const definition = getPlanDefinition(requestedPlan);
   if (!definition) {
     throw ApiError.badRequest(`Unknown plan: ${requestedPlan}`);
@@ -227,6 +230,8 @@ export const approveRequest = async (
   adminUser,
   { grantedPlan, reason, expiresAt } = {},
 ) => {
+  const billingSettings = await getBillingSettings();
+  if (billingSettings.mode === "payment") throw ApiError.badRequest("Direct payment mode is active. Switch to request review mode before approving a manual upgrade.");
   const request = await PlanUpgradeRequest.findById(requestId);
   if (!request) {
     throw ApiError.notFound(

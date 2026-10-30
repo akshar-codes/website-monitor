@@ -1,7 +1,8 @@
 import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
-import { getPlanDefinition, getPublicPlanCatalog } from "../config/plans.js";
+import { getPlanDefinition } from "../config/plans.js";
+import { getPricedPlanCatalog } from "./billingSettings.service.js";
 import { getChangeType } from "../utils/planUtils.js";
 import { logActivity } from "../utils/activityLogger.js";
 import {
@@ -12,7 +13,7 @@ import {
 // ── Catalog ──────────────────────────────────────────────────────────────────
 
 /** Full public plan catalog (pricing, limits, feature copy), ranked. */
-export const getPlanCatalog = () => getPublicPlanCatalog();
+export const getPlanCatalog = () => getPricedPlanCatalog();
 
 // ── Current plan ─────────────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ export const changeUserPlan = async (
   userId,
   targetPlan,
   actingUser = null,
-  { reason = null, expiresAt = null } = {},
+  { reason = null, expiresAt = null, paidVerified = false } = {},
 ) => {
   const definition = getPlanDefinition(targetPlan);
   if (!definition) {
@@ -81,9 +82,9 @@ export const changeUserPlan = async (
     : null;
   const isSelfService = !actingUserId || actingUserId === userId.toString();
 
-  if (isSelfService && changeType === "upgrade") {
+  if (isSelfService && changeType === "upgrade" && !paidVerified) {
     throw ApiError.forbidden(
-      "Paid plan upgrades require an approved upgrade request.",
+      "Paid plan upgrades require a confirmed payment.",
       "PLAN_UPGRADE_APPROVAL_REQUIRED",
     );
   }
