@@ -224,12 +224,31 @@ export function useApprovePlanUpgradeRequest(onSuccess) {
   const [submittingId, setSubmittingId] = useState(null);
 
   const approve = useCallback(
-    async (requestId, { grantedPlan, reason, expiresAt }) => {
+    async (
+      requestId,
+      {
+        grantedPlan,
+        reason,
+        expiresAt,
+        paymentRequired,
+        period,
+        discountPercent,
+        planExpiresAt,
+      },
+    ) => {
       setSubmittingId(requestId);
       try {
         const { message } = await adminApi.approvePlanUpgradeRequest(
           requestId,
-          { grantedPlan, reason, expiresAt },
+          {
+            grantedPlan,
+            reason,
+            expiresAt,
+            paymentRequired,
+            period,
+            discountPercent,
+            planExpiresAt,
+          },
         );
         window.dispatchEvent(new Event("admin:plan-requests-changed"));
         toast.success(message || "Upgrade request approved");

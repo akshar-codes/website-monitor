@@ -12,10 +12,11 @@ export async function getBillingMode() {
   const { data } = await apiClient.get("/plans/billing-mode");
   return data;
 }
-export async function createPlanOrder(plan, period) {
+export async function createPlanOrder(plan, period, requestId) {
   const { data } = await apiClient.post("/payments/plan-orders", {
     plan,
     period,
+    ...(requestId ? { requestId } : {}),
   });
   return data;
 }

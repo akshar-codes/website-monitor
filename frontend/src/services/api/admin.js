@@ -148,14 +148,26 @@ export async function getPlanUpgradeRequests(params = {}) {
  */
 export async function approvePlanUpgradeRequest(
   requestId,
-  { grantedPlan, reason, expiresAt } = {},
+  {
+    grantedPlan,
+    reason,
+    expiresAt,
+    paymentRequired,
+    period,
+    discountPercent,
+    planExpiresAt,
+  } = {},
 ) {
   const { data } = await apiClient.patch(
     `/admin/plan-upgrade-requests/${requestId}/approve`,
     {
       ...(grantedPlan ? { grantedPlan } : {}),
       reason,
+      ...(paymentRequired !== undefined ? { paymentRequired } : {}),
+      ...(period ? { period } : {}),
+      ...(discountPercent !== undefined ? { discountPercent } : {}),
       ...(expiresAt ? { expiresAt } : {}),
+      ...(planExpiresAt ? { planExpiresAt } : {}),
     },
   );
   return data;

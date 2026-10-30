@@ -110,14 +110,19 @@ export default function Billing() {
   const { requestUpgrade } = useRequestPlanUpgrade(handleUpgradeRequestSuccess);
 
   const startDirectPayment = useCallback(
-    async (planId) => {
+    async (planId, requestId, periodOverride) => {
       setActionPlanId(planId);
       try {
         if (!(await loadRazorpayCheckout()))
           throw new Error(
             "Razorpay checkout could not be loaded. Check your connection and try again.",
           );
-        const response = await createPlanOrder(planId, billingPeriod);
+        const checkoutPeriod = periodOverride || billingPeriod;
+        const response = await createPlanOrder(
+          planId,
+          checkoutPeriod,
+          requestId,
+        );
         const order = response?.data;
         if (!order) throw new Error("Could not create a payment order.");
         const checkout = new window.Razorpay({
@@ -125,7 +130,7 @@ export default function Billing() {
           amount: order.amount,
           currency: order.currency,
           name: "SiteWatch",
-          description: `${order.plan} plan · ${order.period}`,
+          description: `${order.plan} plan · ${order.period}${order.discountPercent ? ` · ${order.discountPercent}% discount` : ""}`,
           order_id: order.orderId,
           prefill: order.customer,
           theme: { color: "#079b74" },
@@ -266,10 +271,35 @@ export default function Billing() {
           contact support.
         </Notice>
       )}
-      {billingMode?.mode !== "payment" && pendingRequest && (
-        <Notice tone="warning">
-          Your request to move to {pendingPlanName} is waiting for administrator
-          review.
+      {billingMode?.mode !== "payment" &&
+        pendingRequest?.status === "pending" && (
+          <Notice tone="warning">
+            Your request to move to {pendingPlanName} is waiting for
+            administrator review.
+          </Notice>
+        )}
+      {pendingRequest?.status === "payment_pending" && (
+        <Notice tone="info">
+          Your{" "}
+          {plans.find((p) => p.id === pendingRequest.paymentOffer?.plan)
+            ?.name || pendingRequest.paymentOffer?.plan}{" "}
+          offer is ready
+          {pendingRequest.paymentOffer?.discountPercent
+            ? ` with ${pendingRequest.paymentOffer.discountPercent}% off`
+            : ""}
+          . Complete checkout to activate it.
+          <Button
+            disabled={!billingMode?.paymentReady || !!actionPlanId}
+            onClick={() =>
+              startDirectPayment(
+                pendingRequest.paymentOffer.plan,
+                pendingRequest.id || pendingRequest._id,
+                pendingRequest.paymentOffer.period,
+              )
+            }
+          >
+            {actionPlanId ? "Opening checkout…" : "Pay for plan"}
+          </Button>
         </Notice>
       )}
       <div className="sw-metric-grid">
@@ -309,7 +339,11 @@ export default function Billing() {
           </span>
           <span className="sw-metric-label">Upgrade status</span>
           <strong className="plan-metric">
-            {pendingRequest ? "In review" : "No pending request"}
+            {pendingRequest?.status === "payment_pending"
+              ? "Payment required"
+              : pendingRequest
+                ? "In review"
+                : "No pending request"}
           </strong>
           <small>{requestHistory.length} prior requests</small>
         </div>
@@ -384,7 +418,7 @@ export default function Billing() {
                   variant={current ? "secondary" : "primary"}
                   disabled={
                     current ||
-                    (billingMode?.mode !== "payment" && !!pendingRequest) ||
+                    !!pendingRequest ||
                     (billingMode?.mode === "payment" &&
                       !billingMode.paymentReady) ||
                     !billingMode ||
