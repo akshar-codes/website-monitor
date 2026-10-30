@@ -46,23 +46,7 @@ const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const OAuthCallback = lazy(() => import("./components/auth/OAuthCallback"));
-import { Skeleton } from "./components/ui/Skeleton";
 import { ROLES } from "./constants/roles";
-
-function PageFallback() {
-  return (
-    <div className="flex flex-1 flex-col gap-4 p-8">
-      <Skeleton className="h-8 w-48" />
-      <Skeleton className="h-4 w-64" />
-      <div className="mt-4 grid grid-cols-4 gap-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 rounded-xl" />
-        ))}
-      </div>
-      <Skeleton className="mt-4 h-72 rounded-xl" />
-    </div>
-  );
-}
 
 export default function App() {
   return (
@@ -71,31 +55,14 @@ export default function App() {
         <PermissionsProvider>
           <PreferencesProvider>
             <NotificationsProvider>
-              <Toaster
-                position="bottom-right"
-                toastOptions={{
-                  style: {
-                    background: "#18181b",
-                    border: "1px solid #27272a",
-                    color: "#fafafa",
-                    fontSize: "13px",
-                    borderRadius: "12px",
-                  },
-                  classNames: {
-                    success: "!text-emerald-400",
-                    error: "!text-red-400",
-                    warning: "!text-amber-400",
-                  },
-                }}
-                richColors
-              />
+              <Toaster position="bottom-right" />
               {/* Listens for the `access:denied` event dispatched by
                 services/api/client.js and presents every role/permission/
                 plan authorization failure with a single, consistent toast
                 (with an upgrade CTA where relevant). Needs to live inside
                 <BrowserRouter> for useNavigate. */}
               <AccessErrorListener />
-              <Suspense fallback={<PageFallback />}>
+              <Suspense fallback={null}>
                 <Routes>
                   {/* Public — redirects to the dashboard if already logged in */}
                   <Route element={<GuestRoute />}>
@@ -133,7 +100,7 @@ export default function App() {
                         <Route
                           path="/"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <Dashboard />
                             </Suspense>
                           }
@@ -142,7 +109,7 @@ export default function App() {
                         <Route
                           path="/monitors"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <Monitors />
                             </Suspense>
                           }
@@ -150,7 +117,7 @@ export default function App() {
                         <Route
                           path="/monitors/:id"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <MonitorDetails />
                             </Suspense>
                           }
@@ -158,7 +125,7 @@ export default function App() {
                         <Route
                           path="/ssl"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <SslMonitoring />
                             </Suspense>
                           }
@@ -167,7 +134,7 @@ export default function App() {
                         <Route
                           path="/insights"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <Insights />
                             </Suspense>
                           }
@@ -175,7 +142,7 @@ export default function App() {
                         <Route
                           path="/incidents"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <IncidentHistory />
                             </Suspense>
                           }
@@ -183,7 +150,7 @@ export default function App() {
                         <Route
                           path="/billing"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <Billing />
                             </Suspense>
                           }
@@ -193,7 +160,7 @@ export default function App() {
                       <Route
                         path="/activity"
                         element={
-                          <Suspense fallback={<PageFallback />}>
+                          <Suspense fallback={null}>
                             <Activity />
                           </Suspense>
                         }
@@ -201,7 +168,7 @@ export default function App() {
                       <Route
                         path="/notifications"
                         element={
-                          <Suspense fallback={<PageFallback />}>
+                          <Suspense fallback={null}>
                             <Notifications />
                           </Suspense>
                         }
@@ -209,7 +176,7 @@ export default function App() {
                       <Route
                         path="/profile"
                         element={
-                          <Suspense fallback={<PageFallback />}>
+                          <Suspense fallback={null}>
                             <Profile />
                           </Suspense>
                         }
@@ -217,7 +184,7 @@ export default function App() {
                       <Route
                         path="/preferences"
                         element={
-                          <Suspense fallback={<PageFallback />}>
+                          <Suspense fallback={null}>
                             <Preferences />
                           </Suspense>
                         }
@@ -256,7 +223,7 @@ export default function App() {
                         <Route
                           path="/admin"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminDashboard />
                             </Suspense>
                           }
@@ -264,7 +231,7 @@ export default function App() {
                         <Route
                           path="/admin/plans"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminPlans />
                             </Suspense>
                           }
@@ -272,7 +239,7 @@ export default function App() {
                         <Route
                           path="/admin/plan-history"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminPlanHistory />
                             </Suspense>
                           }
@@ -280,7 +247,7 @@ export default function App() {
                         <Route
                           path="/admin/monitors"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminMonitors />
                             </Suspense>
                           }
@@ -288,7 +255,7 @@ export default function App() {
                         <Route
                           path="/admin/monitors/:id"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminMonitorDetails />
                             </Suspense>
                           }
@@ -296,7 +263,7 @@ export default function App() {
                         <Route
                           path="/admin/incidents"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminIncidents />
                             </Suspense>
                           }
@@ -304,7 +271,7 @@ export default function App() {
                         <Route
                           path="/admin/audit-logs"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminAuditLogs />
                             </Suspense>
                           }
@@ -312,7 +279,7 @@ export default function App() {
                         <Route
                           path="/admin/incidents/:id"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminIncidentDetails />
                             </Suspense>
                           }
@@ -320,7 +287,7 @@ export default function App() {
                         <Route
                           path="/admin/users/:id"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminUserDetails />
                             </Suspense>
                           }
@@ -328,7 +295,7 @@ export default function App() {
                         <Route
                           path="/admin/users"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminUsers />
                             </Suspense>
                           }
@@ -336,7 +303,7 @@ export default function App() {
                         <Route
                           path="/admin/plan-requests"
                           element={
-                            <Suspense fallback={<PageFallback />}>
+                            <Suspense fallback={null}>
                               <AdminPlanRequests />
                             </Suspense>
                           }

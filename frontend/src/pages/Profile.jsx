@@ -1,13 +1,14 @@
 import { useCallback } from "react";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import { Card } from "../components/ui/Card";
-import AvatarUpload from "../components/profile/AvatarUpload";
-import ProfileCompletionIndicator from "../components/profile/ProfileCompletionIndicator";
-import ProfileForm from "../features/profile/ProfileForm";
-import AccountInfoCard from "../features/profile/AccountInfoCard";
 import { useProfile, useProfileMutations } from "../hooks/useProfile";
 import { useAuth } from "../hooks/useAuth";
+import {
+  Page,
+  Panel,
+  Button,
+  Input,
+  Notice,
+} from "../components/ui/Primitives";
+import { Camera, Trash2, UserRound, Save } from "lucide-react";
 
 export default function Profile() {
   const { data: profileData, loading, refetch } = useProfile();
@@ -31,50 +32,103 @@ export default function Profile() {
     avatarSubmitting,
   } = useProfileMutations(handleMutationSuccess);
 
+  const submit = async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await updateProfile({
+      name: form.get("name"),
+      bio: form.get("bio"),
+      location: form.get("location"),
+      website: form.get("website"),
+    });
+  };
+  const avatarChange = (event) => {
+    const file = event.target.files?.[0];
+    if (file) uploadAvatar(file);
+  };
   return (
-    <PageContainer>
-      <PageHeader
-        title="Profile"
-        subtitle="Manage your personal information and how others see you"
-        className="mb-6"
-      />
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <Card>
-            <AvatarUpload
-              avatarUrl={profile?.avatarUrl}
-              name={profile?.name}
-              onUpload={uploadAvatar}
-              onDelete={deleteAvatar}
-              uploading={avatarSubmitting}
-            />
-          </Card>
-
-          <Card>
-            {loading && !profile ? (
-              <div className="space-y-4">
-                <div className="h-4 w-32 animate-pulse rounded bg-bg-overlay" />
-                <div className="h-24 w-full animate-pulse rounded bg-bg-overlay" />
-              </div>
-            ) : (
-              <ProfileForm
-                profile={profile}
-                onSubmit={updateProfile}
-                submitting={submitting}
+    <Page
+      title="Profile"
+      description="Manage the name, photo, and details shown on your account."
+      eyebrow="SETTINGS"
+    >
+      {loading ? (
+        <div className="sw-loading">Loading profile…</div>
+      ) : (
+        <div className="settings-layout">
+          <aside className="settings-intro">
+            <span className="settings-avatar">
+              {profile?.avatarUrl ? (
+                <img src={profile.avatarUrl} alt="Profile" />
+              ) : (
+                <UserRound size={24} />
+              )}
+            </span>
+            <b>{profile?.name || "Your profile"}</b>
+            <small>{profile?.email}</small>
+            <label className="sw-button secondary avatar-upload">
+              <Camera size={14} />
+              {avatarSubmitting ? "Uploading…" : "Change photo"}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={avatarChange}
+                disabled={avatarSubmitting}
               />
+            </label>
+            {profile?.avatarUrl && (
+              <Button
+                variant="ghost"
+                onClick={deleteAvatar}
+                disabled={avatarSubmitting}
+              >
+                <Trash2 size={13} /> Remove photo
+              </Button>
             )}
-          </Card>
+          </aside>
+          <Panel
+            title="Public profile"
+            subtitle="This information helps identify your account"
+          >
+            <form className="settings-form" onSubmit={submit}>
+              <Input
+                label="Display name"
+                name="name"
+                defaultValue={profile?.name}
+                required
+              />
+              <label className="sw-field">
+                About you
+                <textarea
+                  rows="4"
+                  name="bio"
+                  defaultValue={profile?.bio || ""}
+                  maxLength={500}
+                />
+              </label>
+              <Input
+                label="Location"
+                name="location"
+                defaultValue={profile?.location || ""}
+              />
+              <Input
+                label="Website"
+                name="website"
+                type="url"
+                placeholder="https://"
+                defaultValue={profile?.website || ""}
+              />
+              <Notice tone="info">
+                Your email address is managed in account settings.
+              </Notice>
+              <Button disabled={submitting}>
+                <Save size={14} />
+                {submitting ? "Saving…" : "Save profile"}
+              </Button>
+            </form>
+          </Panel>
         </div>
-
-        <div className="space-y-4">
-          <ProfileCompletionIndicator
-            completion={profile?.profileCompletion}
-            loading={loading && !profile}
-          />
-          <AccountInfoCard profile={profile} loading={loading && !profile} />
-        </div>
-      </div>
-    </PageContainer>
+      )}
+    </Page>
   );
 }

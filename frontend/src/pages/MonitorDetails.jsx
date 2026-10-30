@@ -1,32 +1,44 @@
 import { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import PageContainer from "../components/layout/PageContainer";
-import Button from "../components/ui/Button";
-import ErrorState from "../components/ui/ErrorState";
-import ConfirmDialog from "../components/ui/ConfirmDialog";
-import SectionLabel from "../components/ui/SectionLabel";
-import ChartCard from "../components/cards/ChartCard";
-import ResponseTimeChart from "../components/charts/ResponseTimeChart";
-import UptimeChart from "../components/charts/UptimeChart";
-import {
-  SeverityBadge,
-  IncidentStatusBadge,
-} from "../components/ui/SeverityBadge";
-import MonitorFormModal from "../features/monitors/MonitorFormModal";
-import MonitorDetailHeader from "../features/monitorDetails/MonitorDetailHeader";
-import MonitorStatusOverview from "../features/monitorDetails/MonitorStatusOverview";
-import MonitorInfoCard from "../features/monitorDetails/MonitorInfoCard";
-import MonitorRecentChecks from "../features/monitorDetails/MonitorRecentChecks";
-import MonitorSslPanel from "../features/monitorDetails/MonitorSslPanel";
-import MonitorAnalytics from "../features/monitorDetails/MonitorAnalytics";
-import MonitorDiagnostics from "../features/monitorDetails/MonitorDiagnostics";
-import ExpectedResponseHistory from "../features/monitorDetails/ExpectedResponseHistory";
-import RestrictedFeature from "../components/access/RestrictedFeature";
 import { useMonitorDetails, useMonitorMutations } from "../hooks/useMonitors";
 import { useUsage } from "../hooks/useUsage";
 import { ROUTES } from "../constants/routes";
-import { FEATURES } from "../constants/features";
-import { formatRelative } from "../utils/format";
+import { formatRelative, formatUptime } from "../utils/format";
+import {
+  Page,
+  Panel,
+  Button,
+  Input,
+  Select,
+  Metric,
+  Status,
+  Table,
+  Notice,
+} from "../components/ui/Primitives";
+import {
+  ArrowLeft,
+  ExternalLink,
+  Pencil,
+  Play,
+  Pause,
+  Trash2,
+  RefreshCw,
+  Globe2,
+  Clock3,
+  TriangleAlert,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  LineChart,
+  Line,
+} from "recharts";
 
 const WINDOWS = [
   { label: "24h", value: "24h" },
@@ -46,7 +58,7 @@ export default function MonitorDetails() {
   const details = data?.data;
 
   const { data: usageData } = useUsage();
-  const usage = usageData?.data;
+  const _usage = usageData?.data;
 
   const handleMutationSuccess = useCallback(
     (action) => {
@@ -75,183 +87,280 @@ export default function MonitorDetails() {
 
   // Full-page error — the monitor doesn't exist, isn't owned by the
   // caller, or the request failed outright with no cached data to show.
-  if (error && !data) {
+  if (loading && !data)
     return (
-      <PageContainer>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(ROUTES.MONITORS)}
-          className="mb-4"
-        >
-          ← Back to Monitors
-        </Button>
-        <ErrorState
-          title="Couldn't load this monitor"
-          description="It may have been deleted, or something went wrong while fetching its details."
-          onRetry={refetch}
-        />
-      </PageContainer>
-    );
-  }
-
-  const isInitialLoad = loading && !data;
-
-  return (
-    <PageContainer>
-      <MonitorDetailHeader
-        monitor={details?.monitor}
-        loading={isInitialLoad}
-        onBack={() => navigate(ROUTES.MONITORS)}
-        onRefresh={refetch}
-        onEdit={() => setEditOpen(true)}
-        onToggle={() =>
-          toggleMonitor(id, !details?.monitor?.active, details?.monitor?.name)
-        }
-        onDelete={() => setDeleteOpen(true)}
-        onManualCheck={() => runMonitorCheck(id)}
-        checking={submitting}
+      <Page
+        title="Loading monitor…"
+        description="Fetching its latest health data."
       />
-
-      {/* Active incident banner */}
-      {details?.activeIncident && (
-        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 sm:flex-row sm:items-center">
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-red-300">
-                Active incident
-              </p>
-              <SeverityBadge severity={details.activeIncident.severity} />
-              <IncidentStatusBadge status={details.activeIncident.status} />
-            </div>
-            <p className="mt-1 text-xs text-red-200/80">
-              Started {formatRelative(details.activeIncident.startedAt)}
-              {details.activeIncident.rootCause
-                ? ` · ${details.activeIncident.rootCause}`
-                : ""}
+    );
+  if (error || !details)
+    return (
+      <Page
+        title="Monitor unavailable"
+        description="This monitor could not be found or its details could not be loaded."
+        actions={
+          <Button variant="secondary" onClick={() => navigate(ROUTES.MONITORS)}>
+            <ArrowLeft size={14} /> Back to monitors
+          </Button>
+        }
+      >
+        <Notice tone="error">
+          Please check your connection or return to the monitor list.
+        </Notice>
+      </Page>
+    );
+  const monitor = details.monitor || {};
+  const checks = details.recentChecks || [];
+  const chartPoints = details.chart?.dataPoints || [];
+  const chart = chartPoints.map((point) => ({
+    day: new Date(point.timestamp).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: window === "24h" ? "numeric" : undefined,
+    }),
+    uptime: point.uptimePercentage,
+    response: point.avgResponseTime,
+  }));
+  return (
+    <Page
+      eyebrow="MONITOR DETAIL"
+      title={monitor.name || "Monitor"}
+      description={monitor.url}
+      actions={
+        <>
+          <a
+            className="sw-button secondary"
+            href={monitor.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLink size={14} /> Open website
+          </a>
+          <Button
+            variant="secondary"
+            onClick={() => toggleMonitor(id, !monitor.active, monitor.name)}
+            disabled={submitting}
+          >
+            {monitor.active ? <Pause size={14} /> : <Play size={14} />}{" "}
+            {monitor.active ? "Pause" : "Resume"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => runMonitorCheck(id)}
+            disabled={submitting}
+          >
+            <RefreshCw size={14} /> Check now
+          </Button>
+          <Button variant="secondary" onClick={() => setEditOpen(true)}>
+            <Pencil size={14} /> Edit
+          </Button>
+          <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+            <Trash2 size={14} /> Delete
+          </Button>
+        </>
+      }
+    >
+      <div className="monitor-detail-status">
+        <Status value={details.currentStatus} />
+        <span>Last checked {formatRelative(details.lastCheckedAt)}</span>
+        <span>Every {monitor.interval || "—"} seconds</span>
+        {details.activeIncident && (
+          <Link to="/incidents">
+            View active incident <ArrowLeft size={13} />
+          </Link>
+        )}
+      </div>
+      <div className="sw-metric-grid">
+        <Metric
+          label="Uptime"
+          value={
+            details.uptime?.percentage == null
+              ? "—"
+              : formatUptime(details.uptime.percentage)
+          }
+          icon={Globe2}
+          note={`${details.uptime?.totalChecks || 0} checks observed`}
+        />
+        <Metric
+          label="Average response"
+          value={`${Math.round(details.responseTime?.average || 0)} ms`}
+          icon={Clock3}
+          note={`Min ${details.responseTime?.min || 0} ms · Max ${details.responseTime?.max || 0} ms`}
+          tone="blue"
+        />
+        <Metric
+          label="Estimated downtime"
+          value={`${Math.round((details.uptime?.estimatedDowntimeSeconds || 0) / 60)} min`}
+          icon={TriangleAlert}
+          tone="amber"
+          note={`Coverage ${details.uptime?.coveragePercentage ?? 0}%`}
+        />
+        <Metric
+          label="Failed checks"
+          value={details.uptime?.failedChecks ?? 0}
+          icon={TriangleAlert}
+          tone={details.uptime?.failedChecks ? "red" : "green"}
+          note={`Window ${window}`}
+        />
+      </div>
+      <Panel
+        title="Performance history"
+        subtitle="Uptime and response trends"
+        actions={
+          <div className="segmented-control">
+            {WINDOWS.map((w) => (
+              <button
+                className={window === w.value ? "active" : ""}
+                key={w.value}
+                onClick={() => setWindow(w.value)}
+              >
+                {w.label}
+              </button>
+            ))}
+          </div>
+        }
+      >
+        <div className="detail-chart-grid">
+          <div>
+            <h3>Uptime</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={chart}>
+                <CartesianGrid stroke="#edf2f6" />
+                <XAxis dataKey="day" tick={{ fontSize: 9 }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 9 }} />
+                <Tooltip />
+                <Area
+                  dataKey="uptime"
+                  stroke="#08a879"
+                  fill="#08a87920"
+                  connectNulls={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div>
+            <h3>Response time</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={chart}>
+                <CartesianGrid stroke="#edf2f6" />
+                <XAxis dataKey="day" tick={{ fontSize: 9 }} />
+                <YAxis tick={{ fontSize: 9 }} />
+                <Tooltip />
+                <Line dataKey="response" stroke="#3a8ddd" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        {!chart.length && (
+          <div className="sw-empty">
+            <b>No chart history for this period</b>
+            <p>
+              Check retention limits for your plan and come back after more
+              checks.
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="shrink-0 text-red-300 hover:bg-red-500/10 hover:text-red-200"
-            onClick={() => navigate(ROUTES.INSIGHTS)}
-          >
-            View insights →
-          </Button>
+        )}
+      </Panel>
+      <Panel title="Recent checks" subtitle="Latest health check results">
+        <Table
+          columns={[
+            {
+              key: "checkedAt",
+              label: "Checked",
+              render: (v) => (v ? new Date(v).toLocaleString() : "—"),
+            },
+            {
+              key: "status",
+              label: "Status",
+              render: (v) => <Status value={v} />,
+            },
+            {
+              key: "responseTime",
+              label: "Response",
+              render: (v) => (v == null ? "—" : `${v} ms`),
+            },
+            { key: "statusCode", label: "HTTP code" },
+            { key: "errorMessage", label: "Details" },
+          ]}
+          rows={checks}
+        />
+      </Panel>
+      {(editOpen || deleteOpen) && (
+        <div className="modal-backdrop">
+          <section className="form-modal">
+            <h2>{editOpen ? "Edit monitor" : "Delete monitor?"}</h2>
+            {editOpen ? (
+              <form
+                className="sw-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  handleFormSubmit({
+                    name: f.get("name"),
+                    url: f.get("url"),
+                    interval: Number(f.get("interval")),
+                  });
+                }}
+              >
+                <Input
+                  label="Monitor name"
+                  name="name"
+                  defaultValue={monitor.name}
+                  required
+                />
+                <Input
+                  label="URL"
+                  name="url"
+                  type="url"
+                  defaultValue={monitor.url}
+                  required
+                />
+                <Select
+                  label="Interval"
+                  name="interval"
+                  defaultValue={monitor.interval}
+                >
+                  <option value="60">60 seconds</option>
+                  <option value="300">300 seconds</option>
+                  <option value="600">600 seconds</option>
+                </Select>
+                <div className="modal-actions">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setEditOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button disabled={submitting}>Save changes</Button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <p className="muted-copy">
+                  This will remove the monitor and its history.
+                </p>
+                <div className="modal-actions">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setDeleteOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="danger"
+                    disabled={submitting}
+                    onClick={() => deleteMonitor(id, monitor.name)}
+                  >
+                    Delete monitor
+                  </Button>
+                </div>
+              </>
+            )}
+          </section>
         </div>
       )}
-
-      {/* Overview / current status */}
-      <div className="mb-6">
-        <MonitorStatusOverview details={details} loading={isInitialLoad} />
-      </div>
-
-      {/* Charts + monitor info */}
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <ChartCard
-            title="Response Time"
-            subtitle="Average response time over the selected window"
-            loading={isInitialLoad}
-            height={240}
-            windows={WINDOWS}
-            window={window}
-            onWindowChange={setWindow}
-          >
-            <ResponseTimeChart
-              data={details?.chart?.dataPoints || []}
-              window={window}
-            />
-          </ChartCard>
-
-          <ChartCard
-            title="Uptime"
-            subtitle="Uptime percentage over the selected window"
-            loading={isInitialLoad}
-            height={220}
-          >
-            <UptimeChart
-              data={details?.chart?.dataPoints || []}
-              window={window}
-            />
-          </ChartCard>
-        </div>
-
-        <div>
-          <MonitorInfoCard monitor={details?.monitor} loading={isInitialLoad} />
-        </div>
-      </div>
-
-      {/* Recent checks */}
-      <div className="mb-6">
-        <MonitorRecentChecks
-          checks={details?.recentChecks || []}
-          loading={isInitialLoad}
-        />
-      </div>
-
-      {/* SSL & domain monitoring — certificate validity, expiry countdown,
-          and domain registration status for this endpoint (see
-          features/monitorDetails/MonitorSslPanel.jsx). Independent of the
-          live-status view above; renders its own loading/eligibility
-          states, so it's safe to mount before the rest of the page has
-          finished its initial load. */}
-      <div className="mb-6">
-        <SectionLabel className="mb-3">SSL &amp; Domain</SectionLabel>
-        <MonitorSslPanel monitorId={id} />
-      </div>
-
-      <div className="mb-6">
-        <SectionLabel className="mb-3">Diagnostics</SectionLabel>
-        <MonitorDiagnostics monitorId={id} />
-      </div>
-
-      <div className="mb-6">
-        <SectionLabel className="mb-3">Response history</SectionLabel>
-        <RestrictedFeature
-          feature={FEATURES.RESPONSE_INSPECTION}
-          title="Response history is available on Pro"
-          description="Compare the expected health response with recent endpoint responses from your last 10 checks."
-          onUpgradeClick={() => navigate(ROUTES.BILLING)}
-        >
-          <ExpectedResponseHistory checks={details?.recentChecks || []} />
-        </RestrictedFeature>
-      </div>
-
-      {/* Analytics & performance insights — custom date-range reporting,
-          independent of the live-status view above (see
-          features/monitorDetails/MonitorAnalytics.jsx). */}
-      <div>
-        <SectionLabel className="mb-3">
-          Analytics &amp; Performance Insights
-        </SectionLabel>
-        <MonitorAnalytics
-          monitorId={id}
-          retentionDays={usage?.retention?.days}
-        />
-      </div>
-
-      {/* Edit modal */}
-      <MonitorFormModal
-        open={editOpen}
-        onClose={() => setEditOpen(false)}
-        onSubmit={handleFormSubmit}
-        monitor={details?.monitor}
-        loading={submitting}
-        minIntervalSeconds={usage?.interval?.minSeconds ?? 30}
-      />
-
-      {/* Delete confirmation */}
-      <ConfirmDialog
-        open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={() => deleteMonitor(id, details?.monitor?.name)}
-        title="Delete Monitor"
-        description={`"${details?.monitor?.name}" and all its history will be permanently deleted. This cannot be undone.`}
-        confirmLabel="Delete Monitor"
-        loading={submitting}
-      />
-    </PageContainer>
+    </Page>
   );
 }

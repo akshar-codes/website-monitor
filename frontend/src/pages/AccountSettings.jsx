@@ -3,19 +3,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Save, RotateCcw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { Card } from "../components/ui/Card";
-import Button from "../components/ui/Button";
-import { FormField, Input, Textarea } from "../components/ui/Input";
-import {
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-} from "../components/ui/Modal";
 import { useAuth } from "../hooks/useAuth";
 import * as accountApi from "../services/api/account";
+import {
+  Page,
+  Panel,
+  Button,
+  Input,
+  Notice,
+} from "../components/ui/Primitives";
+import { Save, Trash2, UserRound } from "lucide-react";
 
 const accountSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(120),
@@ -50,14 +48,11 @@ const accountSchema = z.object({
     .optional(),
 });
 
-const dateLabel = (value) =>
-  value ? new Date(value).toLocaleString() : "Not available";
-
 export default function AccountSettings() {
   const { refetchUser } = useAuth();
   const navigate = useNavigate();
   const [account, setAccount] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -138,215 +133,124 @@ export default function AccountSettings() {
     }
   };
 
-  if (loading)
-    return (
-      <div className="space-y-4">
-        <div className="h-64 animate-pulse rounded-xl bg-bg-overlay" />
-        <div className="h-40 animate-pulse rounded-xl bg-bg-overlay" />
-      </div>
-    );
-
   return (
-    <div className="space-y-5">
-      <Card>
-        <div className="mb-5">
-          <h2 className="text-base font-semibold text-white">
-            Account information
-          </h2>
-          <p className="mt-1 text-xs text-text-muted">
-            Update the information associated with your account.
+    <Page
+      title="Account settings"
+      description="Update your account details and manage account lifecycle."
+      eyebrow="SETTINGS"
+    >
+      <div className="settings-layout">
+        <aside className="settings-intro">
+          <span className="settings-avatar">
+            <UserRound size={24} />
+          </span>
+          <b>{account?.name || "Your account"}</b>
+          <small>{account?.email}</small>
+          <p>
+            These details are used for account communication and your profile.
           </p>
-        </div>
-        <form onSubmit={handleSubmit(onSave)} className="space-y-4" noValidate>
-          <FormField label="Full name" required error={errors.name?.message}>
-            <Input
-              {...register("name")}
-              error={!!errors.name}
-              autoComplete="name"
-            />
-          </FormField>
-          <FormField
-            label="Email address"
-            hint="Email changes require a separate verification workflow."
+        </aside>
+        <div>
+          <Panel
+            title="Personal information"
+            subtitle="Keep your account details current"
           >
-            <Input value={account?.email || ""} disabled aria-readonly="true" />
-          </FormField>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="Phone" error={errors.phone?.message}>
-              <Input
-                {...register("phone")}
-                error={!!errors.phone}
-                autoComplete="tel"
-              />
-            </FormField>
-            <FormField label="Location" error={errors.location?.message}>
-              <Input
-                {...register("location")}
-                error={!!errors.location}
-                autoComplete="address-level2"
-              />
-            </FormField>
-          </div>
-          <FormField label="Website" error={errors.website?.message}>
-            <Input
-              {...register("website")}
-              error={!!errors.website}
-              placeholder="https://example.com"
-            />
-          </FormField>
-          <FormField label="Bio" error={errors.bio?.message}>
-            <Textarea
-              {...register("bio")}
-              error={!!errors.bio}
-              rows={3}
-              maxLength={500}
-            />
-          </FormField>
-          <div className="flex flex-wrap justify-end gap-2 border-t border-border-subtle pt-4">
-            <Button
-              type="button"
-              icon={RotateCcw}
-              disabled={!isDirty || saving}
-              onClick={() => reset()}
-            >
-              Reset
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              icon={Save}
-              loading={saving}
-              disabled={!isDirty || saving}
-            >
-              Save changes
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      <Card>
-        <div className="mb-4 flex items-center gap-2">
-          <ShieldCheck size={17} className="text-emerald-400" />
-          <h2 className="text-base font-semibold text-white">
-            Account status &amp; metadata
-          </h2>
-        </div>
-        <dl className="grid gap-x-6 sm:grid-cols-2">
-          <div className="border-b border-border-subtle py-3">
-            <dt className="text-xs text-text-muted">Status</dt>
-            <dd className="mt-1 text-sm text-white">
-              {account?.active ? "Active" : "Suspended"}
-            </dd>
-          </div>
-          <div className="border-b border-border-subtle py-3">
-            <dt className="text-xs text-text-muted">Email verification</dt>
-            <dd className="mt-1 text-sm text-white">
-              {account?.emailVerified ? "Verified" : "Not verified"}
-            </dd>
-          </div>
-          <div className="border-b border-border-subtle py-3">
-            <dt className="text-xs text-text-muted">Account type</dt>
-            <dd className="mt-1 text-sm capitalize text-white">
-              {account?.role || "User"}
-            </dd>
-          </div>
-          <div className="border-b border-border-subtle py-3">
-            <dt className="text-xs text-text-muted">Plan</dt>
-            <dd className="mt-1 text-sm capitalize text-white">
-              {account?.planStatus === "active"
-                ? account?.plan
-                : `${account?.plan} · ${account?.planStatus}`}
-            </dd>
-          </div>
-          <div className="py-3">
-            <dt className="text-xs text-text-muted">Member since</dt>
-            <dd className="mt-1 text-sm text-white">
-              {dateLabel(account?.createdAt)}
-            </dd>
-          </div>
-          <div className="py-3">
-            <dt className="text-xs text-text-muted">Last sign in</dt>
-            <dd className="mt-1 text-sm text-white">
-              {dateLabel(account?.lastLoginAt)}
-            </dd>
-          </div>
-        </dl>
-      </Card>
-
-      <Card className="border-red-500/20">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-red-300">
-              Delete account
-            </h2>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-text-muted">
-              Permanently delete your account and associated monitor data,
-              history, preferences, and sessions.
-            </p>
-          </div>
-          <Button
-            variant="danger"
-            icon={AlertTriangle}
-            onClick={() => setDeleteOpen(true)}
+            <form className="settings-form" onSubmit={handleSubmit(onSave)}>
+              <label className="sw-field">
+                Name
+                <input {...register("name")} />
+                {errors.name && (
+                  <small className="field-error">{errors.name.message}</small>
+                )}
+              </label>
+              <label className="sw-field">
+                Bio
+                <textarea rows="3" {...register("bio")} />
+                {errors.bio && (
+                  <small className="field-error">{errors.bio.message}</small>
+                )}
+              </label>
+              <label className="sw-field">
+                Location
+                <input {...register("location")} />
+                {errors.location && (
+                  <small className="field-error">
+                    {errors.location.message}
+                  </small>
+                )}
+              </label>
+              <label className="sw-field">
+                Website
+                <input
+                  type="url"
+                  placeholder="https://"
+                  {...register("website")}
+                />
+                {errors.website && (
+                  <small className="field-error">
+                    {errors.website.message}
+                  </small>
+                )}
+              </label>
+              <label className="sw-field">
+                Phone
+                <input type="tel" {...register("phone")} />
+                {errors.phone && (
+                  <small className="field-error">{errors.phone.message}</small>
+                )}
+              </label>
+              <div className="form-actions">
+                <Button disabled={saving || !isDirty}>
+                  <Save size={14} />
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+              </div>
+            </form>
+          </Panel>
+          <Panel
+            title="Danger zone"
+            subtitle="Permanently delete your account and associated data"
           >
-            Delete account
-          </Button>
+            <Notice tone="warning">
+              Account deletion is permanent and cannot be undone.
+            </Notice>
+            <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+              <Trash2 size={14} /> Delete account
+            </Button>
+          </Panel>
         </div>
-      </Card>
-
-      <Modal
-        open={deleteOpen}
-        onClose={() => {
-          if (!deleting) {
-            setDeleteOpen(false);
-            setConfirmationEmail("");
-          }
-        }}
-        maxWidthClassName="max-w-md"
-      >
-        <ModalHeader
-          title="Permanently delete your account?"
-          description="This action cannot be undone."
-          onClose={() => setDeleteOpen(false)}
-        />
-        <form onSubmit={onDelete}>
-          <ModalBody className="space-y-4">
-            <p className="text-sm leading-relaxed text-text-muted">
-              All monitors, monitoring history, incidents, preferences, and
-              active sessions associated with this account will be deleted.
+      </div>
+      {deleteOpen && (
+        <div className="modal-backdrop">
+          <section className="form-modal">
+            <h2>Delete your account?</h2>
+            <p className="muted-copy">
+              Confirm your email address to permanently delete this account.
             </p>
-            <FormField label="Type your account email to confirm" required>
+            <form className="sw-form" onSubmit={onDelete}>
               <Input
+                label="Account email"
                 type="email"
                 value={confirmationEmail}
-                onChange={(event) => setConfirmationEmail(event.target.value)}
-                autoComplete="email"
+                onChange={(e) => setConfirmationEmail(e.target.value)}
+                required
               />
-            </FormField>
-          </ModalBody>
-          <ModalFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={deleting}
-              onClick={() => setDeleteOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="danger"
-              loading={deleting}
-              disabled={
-                confirmationEmail.toLowerCase() !==
-                account?.email?.toLowerCase()
-              }
-            >
-              Delete permanently
-            </Button>
-          </ModalFooter>
-        </form>
-      </Modal>
-    </div>
+              <div className="modal-actions">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => setDeleteOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button variant="danger" disabled={deleting}>
+                  {deleting ? "Deleting…" : "Delete account permanently"}
+                </Button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+    </Page>
   );
 }

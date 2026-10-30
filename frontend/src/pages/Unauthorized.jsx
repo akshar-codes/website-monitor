@@ -1,21 +1,25 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import AccessDenied from "../components/access/AccessDenied";
 import { ROUTES } from "../constants/routes";
+import { AuthShell, Button } from "../components/ui/Primitives";
 
-/**
- * Landed on when a <RoleProtectedRoute> blocks access because the
- * current user's role isn't allowed. `location.state.message` (optional)
- * lets the redirecting route customize the copy — mirrors
- * pages/UpgradeRequired.jsx's identical pattern for plan-based denials.
- */
 export default function Unauthorized() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const handleAction = () => navigate(ROUTES.DASHBOARD);
+
   return (
-    <AccessDenied
-      message={location.state?.message}
-      onAction={() => navigate(ROUTES.DASHBOARD)}
-    />
+    <AuthShell
+      title="Access restricted"
+      description={
+        location.state?.message ||
+        "Your account doesn’t have permission to view this page."
+      }
+      footer="If you think this is a mistake, contact your workspace administrator."
+    >
+      <Button type="button" onClick={handleAction}>
+        Return to dashboard
+      </Button>
+    </AuthShell>
   );
 }

@@ -1,43 +1,32 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import {
-  RefreshCw,
-  Users,
-  Monitor,
-  AlertTriangle,
-  Activity,
-} from "lucide-react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import Button from "../components/ui/Button";
-import EmptyState from "../components/ui/EmptyState";
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 import { useAdminDashboard } from "../hooks/useAdmin";
+import {
+  Page,
+  Panel,
+  Button,
+  Metric,
+  Status,
+  Table,
+  Select,
+  Notice,
+} from "../components/ui/Primitives";
+import {
+  Users,
+  Activity,
+  TriangleAlert,
+  Globe2,
+  RefreshCw,
+} from "lucide-react";
 
-const colors = ["#34d399", "#10b981", "#059669", "#52525b"];
-const card = "rounded-xl border border-[#27272a] bg-bg-surface p-5";
-const title = "text-xs font-medium uppercase tracking-wider text-zinc-500";
-const dateInput =
-  "rounded-lg border border-[#303034] bg-bg-surface px-3 py-2 text-sm text-zinc-200 outline-none focus:border-emerald-500";
-
-function StatCard({ label, value, icon: Icon, detail }) {
-  return (
-    <div className={card}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className={title}>{label}</p>
-          <p className="mt-3 text-3xl font-semibold text-white">
-            {value ?? "—"}
-          </p>
-          {detail && <p className="mt-1 text-xs text-zinc-500">{detail}</p>}
-        </div>
-        <span className="rounded-lg bg-emerald-500/10 p-2.5 text-emerald-400">
-          <Icon size={18} />
-        </span>
-      </div>
-    </div>
-  );
-}
+("rounded-lg border border-[#303034] bg-bg-surface px-3 py-2 text-sm text-zinc-200 outline-none focus:border-emerald-500");
 
 export default function AdminDashboard() {
   const [days, setDays] = useState(30);
@@ -67,251 +56,201 @@ export default function AdminDashboard() {
     data?.recentAdminActivity?.length;
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Admin Overview"
-        subtitle="Platform health, usage, and recent administrative activity."
-      />
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <label htmlFor="admin-range" className="text-sm text-zinc-400">
-            Activity range
-          </label>
-          <select
-            id="admin-range"
-            className={dateInput}
+    <Page
+      title="Administration"
+      description="A live overview of users, monitors, incidents, and platform activity."
+      eyebrow="SITEWATCH CONTROL ROOM"
+      actions={
+        <>
+          <Select
+            aria-label="Date range"
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
           >
-            <option value={7}>Last 7 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option>
-          </select>
-        </div>
-        <Button variant="secondary" onClick={refetch} disabled={loading}>
-          <RefreshCw size={15} className={loading ? "animate-spin" : ""} />{" "}
-          Refresh
-        </Button>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </Select>
+          <Button variant="secondary" onClick={refetch}>
+            <RefreshCw size={14} /> Refresh
+          </Button>
+        </>
+      }
+    >
+      <div className="sw-metric-grid">
+        <Metric
+          label="Registered users"
+          value={data?.users?.total ?? "—"}
+          icon={Users}
+          note="All accounts"
+        />
+        <Metric
+          label="Active monitors"
+          value={data?.monitors?.active ?? "—"}
+          icon={Activity}
+          tone="blue"
+          note="Across all users"
+        />
+        <Metric
+          label="Active incidents"
+          value={data?.incidents?.activeCount ?? "—"}
+          icon={TriangleAlert}
+          tone="red"
+          note="Need review"
+        />
+        <Metric
+          label="New registrations"
+          value={
+            data?.users?.registeredInRange ??
+            data?.recentRegistrations?.length ??
+            "—"
+          }
+          icon={Globe2}
+          tone="amber"
+          note={`Last ${days} days`}
+        />
       </div>
       {error && (
-        <div
-          role="alert"
-          className="mb-5 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300"
-        >
-          Dashboard data could not be loaded.{" "}
-          <button onClick={refetch} className="ml-2 underline">
-            Try again
-          </button>
-        </div>
+        <Notice tone="error">
+          Could not load the admin overview.{" "}
+          <button onClick={refetch}>Try again</button>
+        </Notice>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {loading && !data ? (
-          Array.from({ length: 4 }, (_, i) => (
-            <div
-              key={i}
-              className={`${card} h-28 animate-pulse bg-zinc-900/70`}
-            />
-          ))
-        ) : (
-          <>
-            <StatCard
-              label="Total users"
-              value={data?.users?.total}
-              detail={`${data?.users?.active || 0} active`}
-              icon={Users}
-            />
-            <StatCard
-              label="Total monitors"
-              value={data?.monitors?.total}
-              detail={`${data?.monitors?.active || 0} enabled`}
-              icon={Monitor}
-            />
-            <StatCard
-              label="Active incidents"
-              value={data?.incidents?.activeCount}
-              icon={AlertTriangle}
-            />
-            <StatCard
-              label="Checks in range"
-              value={data?.system?.checksInRange}
-              detail={`${data?.system?.failureRate || 0}% failed · ${data?.system?.averageResponseTime || 0} ms avg`}
-              icon={Activity}
-            />
-          </>
-        )}
-      </div>
-      {data && (
-        <div className="mt-4 grid gap-4 xl:grid-cols-2">
-          <section className={card}>
-            <h2 className="text-sm font-semibold text-white">Users by plan</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="h-48">
-                {usersByPlan.some((x) => x.users) ? (
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie
-                        data={usersByPlan}
-                        dataKey="users"
-                        nameKey="name"
-                        innerRadius={48}
-                        outerRadius={76}
-                        paddingAngle={3}
-                      >
-                        {usersByPlan.map((item, i) => (
-                          <Cell
-                            key={item.name}
-                            fill={colors[i % colors.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          background: "#18181b",
-                          border: "1px solid #3f3f46",
-                          borderRadius: 8,
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="grid h-full place-items-center text-sm text-zinc-500">
-                    No users yet
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col justify-center gap-3">
-                {usersByPlan.map((p, i) => (
-                  <Link
-                    key={p.name}
-                    to={`/admin/users?plan=${p.name.toLowerCase()}`}
-                    className="flex items-center justify-between text-sm rounded-lg px-2 py-1.5 transition-colors hover:bg-zinc-800/60"
-                  >
-                    <span className="flex items-center gap-2 capitalize text-zinc-400">
-                      <i
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ background: colors[i % colors.length] }}
-                      />
-                      {p.name}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="text-right">
-                        <b className="text-white">{p.users}</b>
-                        <small className="ml-2 text-zinc-500">
-                          users · {p.monitors} monitors
-                        </small>
-                      </span>
-                      <span className="text-xs text-zinc-500 hover:text-emerald-400">
-                        view &rarr;
-                      </span>
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </section>
-          <section className={card}>
-            <h2 className="text-sm font-semibold text-white">
-              Monitor status breakdown
-            </h2>
-            <div className="mt-5 space-y-4">
-              {statuses.map(([status, count]) => (
-                <div key={status}>
-                  <div className="mb-1.5 flex justify-between text-sm">
-                    <span className="capitalize text-zinc-400">{status}</span>
-                    <span className="text-zinc-200">{count}</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-                    <div
-                      className="h-full rounded-full bg-emerald-500"
-                      style={{
-                        width: `${data.monitors.total ? (count / data.monitors.total) * 100 : 0}%`,
-                      }}
+      <div className="two-panel-grid">
+        <Panel title="Users by plan" subtitle="Account distribution">
+          {loading && !data ? (
+            <div className="sw-loading">Loading analytics…</div>
+          ) : usersByPlan.length ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie
+                  data={usersByPlan}
+                  dataKey="users"
+                  nameKey="name"
+                  innerRadius={58}
+                  outerRadius={85}
+                  paddingAngle={3}
+                >
+                  {usersByPlan.map((entry, index) => (
+                    <Cell
+                      key={entry.name}
+                      fill={
+                        ["#08a879", "#3b8edb", "#e6a83e", "#8c6bd1"][index % 4]
+                      }
                     />
-                  </div>
-                </div>
-              ))}
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="sw-empty">
+              <b>No account data</b>
             </div>
-          </section>
-          {[
-            [
-              "Recent registrations",
-              data.recentRegistrations,
-              (u) => (
-                <div
-                  key={u.id}
-                  className="flex items-center justify-between border-t border-zinc-800 py-3"
-                >
-                  <div>
-                    <p className="text-sm text-zinc-200">{u.name}</p>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      {u.role === "admin"
-                        ? "Admin access"
-                        : `${u.role} · ${u.plan}`}
-                    </p>
-                  </div>
-                  <time className="text-xs text-zinc-500">
-                    {new Date(u.createdAt).toLocaleDateString()}
-                  </time>
-                </div>
-              ),
-            ],
-            [
-              "Active incidents",
-              data.incidents.active,
-              (i) => (
-                <div
-                  key={i.id}
-                  className="flex items-center justify-between border-t border-zinc-800 py-3"
-                >
-                  <div>
-                    <p className="text-sm text-zinc-200">
-                      {i.monitor?.name || "Monitor unavailable"}
-                    </p>
-                    <p className="mt-0.5 text-xs capitalize text-zinc-500">
-                      {i.severity} · {i.status}
-                    </p>
-                  </div>
-                  <time className="text-xs text-zinc-500">
-                    {new Date(i.startedAt).toLocaleString()}
-                  </time>
-                </div>
-              ),
-            ],
-            [
-              "Recent admin activity",
-              data.recentAdminActivity,
-              (a) => (
-                <div key={a.id} className="border-t border-zinc-800 py-3">
-                  <p className="text-sm text-zinc-200">{a.description}</p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    {a.actor} · {new Date(a.createdAt).toLocaleString()}
-                  </p>
-                </div>
-              ),
-            ],
-          ].map(([heading, rows, render]) => (
-            <section key={heading} className={card}>
-              <h2 className="mb-3 text-sm font-semibold text-white">
-                {heading}
-              </h2>
-              {rows.length ? (
-                rows.map(render)
-              ) : (
-                <EmptyState
-                  title="Nothing to show"
-                  description="There are no records for this section yet."
-                />
-              )}
-            </section>
-          ))}
-        </div>
+          )}
+        </Panel>
+        <Panel title="Monitor status" subtitle="Current fleet health">
+          <div className="status-distribution">
+            {statuses.map(([name, count]) => (
+              <div key={name}>
+                <Status value={name} />
+                <b>{count}</b>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </div>
+      <div className="two-panel-grid">
+        <Panel title="Recent registrations" subtitle="Latest accounts">
+          <Table
+            columns={[
+              {
+                key: "name",
+                label: "User",
+                render: (v, row) => (
+                  <>
+                    <b>{v || row.email}</b>
+                    <small className="table-secondary">{row.email}</small>
+                  </>
+                ),
+              },
+              { key: "plan", label: "Plan" },
+              {
+                key: "createdAt",
+                label: "Joined",
+                render: (v) => (v ? new Date(v).toLocaleDateString() : "—"),
+              },
+            ]}
+            rows={data?.recentRegistrations || []}
+          />
+        </Panel>
+        <Panel
+          title="Active incidents"
+          subtitle="Latest unresolved platform events"
+        >
+          <Table
+            columns={[
+              {
+                key: "monitor",
+                label: "Monitor",
+                render: (v, row) => v?.name || row.monitorName || "—",
+              },
+              {
+                key: "title",
+                label: "Incident",
+                render: (v, row) => v || row.message || "Service interruption",
+              },
+              {
+                key: "severity",
+                label: "Severity",
+                render: (v) => <Status value={v} />,
+              },
+              {
+                key: "createdAt",
+                label: "Started",
+                render: (v) => (v ? new Date(v).toLocaleString() : "—"),
+              },
+            ]}
+            rows={data?.incidents?.active || []}
+          />
+        </Panel>
+      </div>
+      <Panel
+        title="Recent administrator activity"
+        subtitle="Audit trail of privileged actions"
+      >
+        <Table
+          columns={[
+            {
+              key: "actor",
+              label: "Admin",
+              render: (v, row) => v?.name || row.actorName || "Administrator",
+            },
+            {
+              key: "eventType",
+              label: "Action",
+              render: (v) => String(v || "Update").replaceAll("_", " "),
+            },
+            {
+              key: "target",
+              label: "Target",
+              render: (v, row) => v?.name || row.targetName || "—",
+            },
+            {
+              key: "createdAt",
+              label: "When",
+              render: (v) => (v ? new Date(v).toLocaleString() : "—"),
+            },
+          ]}
+          rows={data?.recentAdminActivity || []}
+        />
+      </Panel>
+      {!hasRows && (
+        <Notice tone="info">
+          The admin overview will fill in as the platform receives activity.
+        </Notice>
       )}
-      {!loading && !error && data && !hasRows && (
-        <p className="mt-4 text-xs text-zinc-600">
-          No recent registrations, incidents, or administrative activity for
-          this date range.
-        </p>
-      )}
-    </PageContainer>
+    </Page>
   );
 }

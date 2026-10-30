@@ -1,18 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Monitor, RefreshCw } from "lucide-react";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import Button from "../components/ui/Button";
-import { Input } from "../components/ui/Input";
-import MonitorRow from "../features/monitors/MonitorRow";
-import MonitorFormModal from "../features/monitors/MonitorFormModal";
-import ConfirmDialog from "../components/ui/ConfirmDialog";
-import Pagination from "../components/ui/Pagination";
-import EmptyState from "../components/ui/EmptyState";
-import { SkeletonRow } from "../components/ui/Skeleton";
-import UsageIndicator from "../components/usage/UsageIndicator";
-import LimitExceededBanner from "../components/usage/LimitExceededBanner";
 import { useMonitorList, useMonitorMutations } from "../hooks/useMonitors";
 import { useUsage } from "../hooks/useUsage";
 import { useQuery } from "../hooks/useQuery";
@@ -21,8 +8,29 @@ import {
   isUpgradeRequiredError,
   getAccessErrorMessage,
 } from "../utils/accessErrors";
-import { ROUTES } from "../constants/routes";
-import { cn } from "../utils/cn";
+import {
+  Page,
+  Panel,
+  Button,
+  Input,
+  Select,
+  Status,
+  Notice,
+} from "../components/ui/Primitives";
+import {
+  Globe2,
+  Gauge,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  Pause,
+  Play,
+  Copy,
+  Pencil,
+  ExternalLink,
+} from "lucide-react";
+import { formatUptime } from "../utils/format";
 
 const STATUS_FILTERS = [
   { label: "All", value: "all" },
@@ -163,193 +171,341 @@ export default function Monitors() {
     setFormOpen(true);
   };
 
+  const remaining = usage?.monitors?.remaining;
   return (
-    <PageContainer>
-      <PageHeader
-        title="Monitors"
-        subtitle="Manage and track all your monitored endpoints"
-        actions={
-          <div className="flex items-center gap-3">
-            <UsageIndicator usage={usage} loading={usageLoading} />
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={RefreshCw}
-              onClick={() => {
-                refetch();
-                refetchUsage();
-              }}
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onClick={openCreate}
-            >
-              Add Monitor
-            </Button>
-          </div>
-        }
-        className="mb-6"
-      />
-
-      {limitMessage && (
-        <LimitExceededBanner
-          message={limitMessage}
-          onUpgradeClick={() => navigate(ROUTES.BILLING)}
-          className="mb-5"
-        />
-      )}
-
-      {/* Filters bar */}
-      <div className="mb-5 flex items-center gap-3 flex-wrap">
-        {/* Search */}
-        <div className="relative flex-1 min-w-60 max-w-sm">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
-          />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search monitors…"
-            className="pl-9"
-          />
+    <Page
+      title="Monitors"
+      description="Manage checks for the websites and services you rely on."
+      actions={
+        <>
+          <Button variant="secondary" onClick={refetch}>
+            <RefreshCw size={14} /> Refresh
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus size={15} /> Add monitor
+          </Button>
+        </>
+      }
+    >
+      <div className="sw-metric-grid">
+        <div className="sw-metric">
+          <span className="sw-metric-icon">
+            <Globe2 size={17} />
+          </span>
+          <span className="sw-metric-label">Monitors</span>
+          <strong>
+            {usageLoading
+              ? "—"
+              : (usage?.monitors?.used ??
+                monitorsData?.pagination?.total ??
+                monitors.length)}
+          </strong>
+          <small>
+            {remaining == null
+              ? "Current plan usage"
+              : `${remaining} slots remaining`}
+          </small>
         </div>
-
-        {/* Status filter pills */}
-        <div className="flex items-center gap-1 rounded-lg border border-border-default bg-bg-elevated p-1">
-          {STATUS_FILTERS.map((f) => (
+        <div className="sw-metric">
+          <span className="sw-metric-icon">●</span>
+          <span className="sw-metric-label">Active checks</span>
+          <strong>{monitors.filter((m) => m.active).length}</strong>
+          <small>Checking on schedule</small>
+        </div>
+        <div className="sw-metric">
+          <span className="sw-metric-icon red">!</span>
+          <span className="sw-metric-label">Paused</span>
+          <strong>{monitors.filter((m) => !m.active).length}</strong>
+          <small>Can be resumed any time</small>
+        </div>
+        <div className="sw-metric">
+          <span className="sw-metric-icon blue">
+            <Gauge size={17} />
+          </span>
+          <span className="sw-metric-label">Plan</span>
+          <strong className="plan-metric">{usage?.planName || "Active"}</strong>
+          <small>Monitor capacity</small>
+        </div>
+      </div>
+      {limitMessage && (
+        <Notice tone="warning">
+          {limitMessage} <a href="/billing">View plans</a>
+        </Notice>
+      )}
+      <Panel
+        title="All monitors"
+        subtitle="Search, filter, and manage your health checks"
+        actions={
+          <label className="inline-search">
+            <Search size={14} />
+            <input
+              placeholder="Search monitors"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+        }
+      >
+        <div className="filter-pills">
+          {STATUS_FILTERS.map((filter) => (
             <button
-              key={f.value}
+              key={filter.value}
+              className={statusFilter === filter.value ? "active" : ""}
               onClick={() => {
-                setStatusFilter(f.value);
+                setStatusFilter(filter.value);
                 setPage(1);
               }}
-              className={cn(
-                "rounded-md px-3 py-1 text-xs font-medium transition-all",
-                statusFilter === f.value
-                  ? "bg-bg-subtle text-white"
-                  : "text-text-muted hover:text-text-secondary",
-              )}
             >
-              {f.label}
+              {filter.label}
             </button>
           ))}
         </div>
-
-        {pagination && (
-          <p className="ml-auto text-xs text-text-muted">
-            {pagination.total} monitor{pagination.total !== 1 ? "s" : ""}
-          </p>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="rounded-xl border border-border-subtle bg-bg-surface">
-        {/* Column headers */}
-        <div className="grid grid-cols-[1fr_100px_100px_90px_90px_100px_40px] items-center gap-3 border-b border-border-subtle px-5 py-3">
-          {COLUMN_HEADERS.map((col, i) => (
-            <p
-              key={i}
-              className="text-[11px] font-semibold uppercase tracking-wider text-text-disabled"
-            >
-              {col.label}
-            </p>
-          ))}
-        </div>
-
-        {/* Rows */}
         {loading ? (
-          Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
-        ) : !filteredMonitors.length ? (
-          <EmptyState
-            icon={Monitor}
-            title={search ? "No monitors match your search" : "No monitors yet"}
-            description={
-              search
-                ? "Try a different search term."
-                : "Add your first monitor to start tracking uptime."
-            }
-            action={
-              !search && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={Plus}
-                  onClick={openCreate}
-                >
-                  Add Monitor
-                </Button>
-              )
-            }
-            className="py-16"
-          />
+          <div className="sw-loading">Loading monitors…</div>
         ) : (
-          filteredMonitors.map((monitor) => (
-            <MonitorRow
-              key={monitor.id || monitor._id}
-              monitor={monitor}
-              stats={statsMap[monitor.id || monitor._id]}
-              onEdit={() => openEdit(monitor)}
-              onDelete={() => setDeleteTarget(monitor)}
-              onDuplicate={() => {
-                setDuplicateSource(monitor);
-                setFormOpen(true);
-              }}
-              onToggle={() =>
-                toggleMonitor(
-                  monitor.id || monitor._id,
-                  !monitor.active,
-                  monitor.name,
-                )
-              }
-            />
-          ))
+          <div className="sw-table-wrap">
+            <table className="sw-table">
+              <thead>
+                <tr>
+                  {COLUMN_HEADERS.map((col, i) => (
+                    <th key={i}>{col.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMonitors.map((m) => {
+                  const id = m.id || m._id;
+                  const stats = statsMap[id];
+                  return (
+                    <tr key={id}>
+                      <td>
+                        <b className="table-primary">{m.name}</b>
+                        <small className="table-secondary">{m.url}</small>
+                      </td>
+                      <td>
+                        <Status
+                          value={m.status || (m.active ? "unknown" : "paused")}
+                        />
+                      </td>
+                      <td>
+                        {stats?.uptimePercentage != null
+                          ? formatUptime(stats.uptimePercentage)
+                          : "—"}
+                      </td>
+                      <td>
+                        {stats?.avgResponseTime != null
+                          ? `${Math.round(stats.avgResponseTime)} ms`
+                          : "—"}
+                      </td>
+                      <td>{m.interval ? `${m.interval}s` : "—"}</td>
+                      <td>
+                        {m.lastCheckedAt
+                          ? new Date(m.lastCheckedAt).toLocaleString()
+                          : "—"}
+                      </td>
+                      <td>
+                        <div className="row-actions">
+                          <button
+                            title="Open"
+                            onClick={() => navigate(`/monitors/${id}`)}
+                          >
+                            <ExternalLink size={14} />
+                          </button>
+                          <button title="Edit" onClick={() => openEdit(m)}>
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            title={m.active ? "Pause" : "Resume"}
+                            onClick={() => toggleMonitor(id, !m.active, m.name)}
+                          >
+                            <>
+                              {m.active ? (
+                                <Pause size={14} />
+                              ) : (
+                                <Play size={14} />
+                              )}
+                            </>
+                          </button>
+                          <button
+                            title="Duplicate"
+                            onClick={() => {
+                              setDuplicateSource(m);
+                              setEditMonitor(null);
+                              setFormOpen(true);
+                            }}
+                          >
+                            <Copy size={14} />
+                          </button>
+                          <button
+                            title="Delete"
+                            onClick={() => setDeleteTarget(m)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!filteredMonitors.length && (
+                  <tr>
+                    <td colSpan="7" className="table-empty">
+                      {search
+                        ? "No monitors match your search."
+                        : "No monitors yet. Add your first one to start checking availability."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
-
-      {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <Pagination
-          page={pagination.page}
-          totalPages={pagination.totalPages}
-          onPageChange={setPage}
-          className="mt-4"
-        />
+        {pagination && pagination.pages > 1 && (
+          <div className="pagination-bar">
+            <span>
+              Page {pagination.page} of {pagination.pages} · {pagination.total}{" "}
+              monitors
+            </span>
+            <div>
+              <Button
+                variant="secondary"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={page >= pagination.pages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </Panel>
+      {formOpen && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => setFormOpen(false)}
+        >
+          <section
+            className="form-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="monitor-form-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sw-panel-heading">
+              <div>
+                <h2 id="monitor-form-title">
+                  {duplicateSource
+                    ? "Duplicate monitor"
+                    : editMonitor
+                      ? "Edit monitor"
+                      : "Add a monitor"}
+                </h2>
+                <p>Configure the endpoint you want to keep an eye on.</p>
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => setFormOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <form
+              className="sw-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const form = new FormData(e.currentTarget);
+                handleFormSubmit({
+                  name: form.get("name"),
+                  url: form.get("url"),
+                  interval: Number(form.get("interval")),
+                  method: form.get("method") || "GET",
+                  active: true,
+                });
+              }}
+            >
+              <Input
+                label="Monitor name"
+                name="name"
+                defaultValue={duplicateSource?.name || editMonitor?.name}
+                required
+              />
+              <Input
+                label="Website URL"
+                name="url"
+                type="url"
+                placeholder="https://example.com"
+                defaultValue={duplicateSource?.url || editMonitor?.url}
+                required
+              />
+              <Select
+                label="Check interval"
+                name="interval"
+                defaultValue={editMonitor?.interval || 300}
+              >
+                <option value="60">Every minute</option>
+                <option value="300">Every 5 minutes</option>
+                <option value="600">Every 10 minutes</option>
+                <option value="1800">Every 30 minutes</option>
+              </Select>
+              <Select
+                label="HTTP method"
+                name="method"
+                defaultValue={editMonitor?.method || "GET"}
+              >
+                <option>GET</option>
+                <option>HEAD</option>
+                <option>POST</option>
+              </Select>
+              <div className="modal-actions">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => setFormOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button disabled={submitting}>
+                  {submitting ? "Saving…" : "Save monitor"}
+                </Button>
+              </div>
+            </form>
+          </section>
+        </div>
       )}
-
-      {/* Modals */}
-      <MonitorFormModal
-        open={formOpen}
-        onClose={() => {
-          setFormOpen(false);
-          setEditMonitor(null);
-          setDuplicateSource(null);
-        }}
-        onSubmit={handleFormSubmit}
-        monitor={editMonitor}
-        duplicateSource={duplicateSource}
-        loading={submitting}
-        minIntervalSeconds={usage?.interval?.minSeconds ?? 30}
-      />
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() =>
-          deleteMonitor(
-            deleteTarget?.id || deleteTarget?._id,
-            deleteTarget?.name,
-          )
-        }
-        title="Delete Monitor"
-        description={`"${deleteTarget?.name}" and all its history will be permanently deleted.`}
-        confirmLabel="Delete Monitor"
-        loading={submitting}
-      />
-    </PageContainer>
+      {deleteTarget && (
+        <div className="modal-backdrop">
+          <section className="form-modal">
+            <h2>Delete {deleteTarget.name}?</h2>
+            <p className="muted-copy">
+              This removes its monitoring history and configuration.
+            </p>
+            <div className="modal-actions">
+              <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={submitting}
+                onClick={() =>
+                  deleteMonitor(
+                    deleteTarget.id || deleteTarget._id,
+                    deleteTarget.name,
+                  )
+                }
+              >
+                Delete monitor
+              </Button>
+            </div>
+          </section>
+        </div>
+      )}
+    </Page>
   );
 }

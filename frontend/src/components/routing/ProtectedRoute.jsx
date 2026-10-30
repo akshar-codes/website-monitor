@@ -1,7 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { ROUTES } from "../../constants/routes";
-import FullScreenLoader from "../ui/FullScreenLoader";
 
 /**
  * Blocks access to nested routes until a session has been confirmed.
@@ -12,7 +11,7 @@ export default function ProtectedRoute() {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) return <FullScreenLoader />;
+  if (loading) return null;
 
   if (!user) {
     return <Navigate to={ROUTES.LOGIN} replace state={{ from: location }} />;

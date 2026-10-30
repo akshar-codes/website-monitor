@@ -1,254 +1,653 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Monitor,
-  CheckCircle,
-  XCircle,
-  Clock,
-  RefreshCw,
-  AlertTriangle,
+  Activity,
+  ArrowRight,
+  Bell,
+  ChevronDown,
+  ChevronRight,
+  CircleAlert,
+  Clock3,
+  FileText,
+  Globe2,
+  Menu,
+  Plus,
+  Search,
+  ShieldCheck,
+  Sparkles,
   TrendingUp,
+  TriangleAlert,
+  X,
 } from "lucide-react";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import StatCard from "../components/cards/StatCard";
-import SectionLabel from "../components/ui/SectionLabel";
-import Button from "../components/ui/Button";
-import ErrorState from "../components/ui/ErrorState";
-import QuickActions from "../features/dashboard/QuickActions";
-import RecentActivity from "../features/dashboard/RecentActivity";
-import ActiveIncidents from "../features/dashboard/ActiveIncidents";
-import OverviewChart from "../features/dashboard/OverviewChart";
-import MonitorStatusGrid from "../features/dashboard/MonitorStatusGrid";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useDashboardSummary } from "../hooks/useMonitors";
-import { formatResponseTime, formatUptime } from "../utils/format";
 import { usePreferences } from "../hooks/usePreferences";
+import { useAuth } from "../hooks/useAuth";
+import { useNotificationsCenter } from "../hooks/useNotifications";
+import {
+  formatResponseTime,
+  formatUptime,
+  formatRelative,
+} from "../utils/format";
+import { useQuery } from "../hooks/useQuery";
+import * as healthApi from "../services/api/health";
+import Sparkline from "../components/charts/Sparkline";
+import SegmentedControl from "../components/ui/SegmentedControl";
+import { useSidebarLayout } from "../hooks/useSidebarLayout";
+import WorkspaceSidebar from "../components/layout/WorkspaceSidebar";
 
-/**
- * The dashboard page is powered by a single aggregated request
- * (GET /api/dashboard/summary — see backend/src/services/dashboard.service.js
- * #getDashboardSummary) rather than assembling itself from several
- * independent, overlapping queries. This keeps the page's data flow to one
- * request/poll cycle and avoids the N+1 per-monitor fan-out the previous
- * implementation used for the status grid and the multi-window chart.
- */
+const statusLabel = (status) =>
+  status === "up"
+    ? "Up"
+    : status === "down"
+      ? "Down"
+      : status === "degraded"
+        ? "Degraded"
+        : status === "paused" || status === "inactive"
+          ? "Paused"
+          : "Unknown";
+const shortUrl = (url = "") =>
+  url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+
+function MiniTrend({ color = "#08a879", values }) {
+  if (!values?.length) return null;
+  return (
+    <div className="mini-trend">
+      <Sparkline values={values} color={color} label="Recent trend" />
+    </div>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, color = "green", spark }) {
+  return (
+    <article className="metric-card">
+      <div className={`metric-icon ${color}`}>
+        <Icon size={18} />
+      </div>
+      <div className="metric-main">
+        <span className="eyebrow">{label}</span>
+        <strong>{value}</strong>
+        <div className="metric-foot">
+          <span>
+            {spark?.length ? "Trend · last 7 days" : "Current snapshot"}
+          </span>
+        </div>
+      </div>
+      <MiniTrend
+        values={spark}
+        color={color === "red" ? "#f05c62" : "#08a879"}
+      />
+    </article>
+  );
+}
+
+function ChartTooltip({ active, payload, label, suffix = "" }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="chart-tooltip">
+      <b>{label}</b>
+      <span>
+        {payload[0].value}
+        {suffix}
+      </span>
+    </div>
+  );
+}
+
 export default function Dashboard() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { preferences } = usePreferences();
+  const { user, logout } = useAuth();
+  const { unreadTotal } = useNotificationsCenter();
+  const { collapsed, mobileOpen, toggle, closeMobile } = useSidebarLayout();
+  const { data: systemHealth } = useQuery(() => healthApi.getHealth(), []);
   const dashboardPrefs = preferences?.dashboard;
   const { data, loading, error, refetch } = useDashboardSummary(
     (dashboardPrefs?.autoRefreshInterval || 30) * 1000,
   );
-
-  const overview = data?.data?.overview;
-  const monitorStatuses = data?.data?.monitorStatusList || [];
-  const chartData = data?.data?.chartData || {};
-
-  const checks = overview?.recentChecks || [];
-  const incidentsList = overview?.activeIncidents?.latest || [];
-  const incidentCount = overview?.activeIncidents?.count || 0;
-
-  // Only true on the very first load — subsequent polling refreshes never
-  // flash skeletons over data the user is already looking at.
-  const isInitialLoad = loading && !data;
-  const defaultWidgetOrder = [
-    "quickActions",
-    "overviewChart",
-    "recentActivity",
-    "activeIncidents",
-    "monitorStatusGrid",
-  ];
-  const widgetOrder = dashboardPrefs?.widgetOrder || defaultWidgetOrder;
-  const visibleWidgets = widgetOrder.filter(
-    (key) =>
-      dashboardPrefs?.widgets?.[
-        `show${key[0].toUpperCase()}${key.slice(1)}`
-      ] !== false,
+  const [windowKey, setWindowKey] = useState("7d");
+  const [filter, setFilter] = useState("All");
+  const [query, setQuery] = useState("");
+  const summary = data?.data || data || {};
+  const overview = summary.overview || {};
+  const monitors = useMemo(
+    () => summary.monitorStatusList || [],
+    [summary.monitorStatusList],
   );
-  const widgetContent = {
-    quickActions: <QuickActions />,
-    overviewChart: (
-      <OverviewChart
-        data={chartData}
-        loading={isInitialLoad}
-        defaultWindow={dashboardPrefs?.defaultWindow || "24h"}
-      />
-    ),
-    recentActivity: <RecentActivity checks={checks} loading={isInitialLoad} />,
-    activeIncidents: (
-      <ActiveIncidents
-        incidents={incidentsList}
-        count={incidentCount}
-        loading={isInitialLoad}
-      />
-    ),
-    monitorStatusGrid: (
-      <MonitorStatusGrid monitors={monitorStatuses} loading={isInitialLoad} />
-    ),
-  };
-
-  const kpiCards = useMemo(
-    () => [
-      {
-        label: "Total Monitors",
-        value: overview?.monitors?.total ?? "—",
-        description: `${overview?.monitors?.active ?? 0} active`,
-        icon: Monitor,
-        iconColor: "text-text-secondary",
-        iconBg: "bg-bg-overlay",
-      },
-      {
-        label: "Online",
-        value: overview?.currentStatus?.up ?? "—",
-        description: "Currently healthy",
-        icon: CheckCircle,
-        iconColor: "text-emerald-400",
-        iconBg: "bg-emerald-500/10",
-        accent: "text-emerald-400",
-      },
-      {
-        label: "Offline",
-        value:
-          (overview?.currentStatus?.down ?? 0) +
-          (overview?.currentStatus?.degraded ?? 0),
-        description: `${overview?.currentStatus?.down ?? 0} down · ${overview?.currentStatus?.degraded ?? 0} degraded`,
-        icon: XCircle,
-        iconColor: "text-red-400",
-        iconBg: "bg-red-500/10",
-        accent:
-          (overview?.currentStatus?.down ?? 0) > 0
-            ? "text-red-400"
-            : "text-white",
-      },
-      {
-        label: "Avg Response",
-        value: formatResponseTime(overview?.responseTime?.average),
-        description: "Last 24 hours",
-        icon: Clock,
-        iconColor: "text-amber-400",
-        iconBg: "bg-amber-500/10",
-      },
-    ],
-    [overview],
+  const chartData = summary.chartData || {};
+  const incidents = overview.activeIncidents?.latest || [];
+  const incidentCount = overview.activeIncidents?.count || 0;
+  const currentStatus = overview.currentStatus || {};
+  const chartRows = chartData[windowKey] || [];
+  const uptimeData = chartRows
+    .map((point) => ({
+      day: new Date(point.timestamp).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      }),
+      value: point.uptimePercentage,
+    }))
+    .filter((point) => point.value != null);
+  const responseData = chartRows
+    .filter((point) => point.avgResponseTime != null)
+    .map((point) => ({
+      day: new Date(point.timestamp).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      }),
+      value: point.avgResponseTime,
+    }));
+  const uptime = overview.uptime?.percentage;
+  const response = overview.responseTime?.average;
+  const filteredMonitors = useMemo(
+    () =>
+      monitors.filter((monitor) => {
+        const status = statusLabel(monitor.status).toLowerCase();
+        const matchFilter = filter === "All" || status === filter.toLowerCase();
+        return (
+          matchFilter &&
+          `${monitor.name} ${monitor.url}`
+            .toLowerCase()
+            .includes(query.toLowerCase())
+        );
+      }),
+    [monitors, filter, query],
   );
-
-  // Full-page error state — only when the initial load fails outright and
-  // there's no cached data to fall back to.
-  if (error && !data) {
-    return (
-      <PageContainer>
-        <PageHeader
-          title="Dashboard"
-          subtitle="Real-time overview of all your monitored services"
-          className="mb-6"
-        />
-        <ErrorState
-          title="Couldn't load your dashboard"
-          description="Something went wrong while fetching your dashboard data. Check your connection and try again."
-          onRetry={refetch}
-        />
-      </PageContainer>
-    );
-  }
+  const displayName = user?.name?.split(" ")[0] || "there";
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Dashboard"
-        subtitle="Real-time overview of all your monitored services"
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={RefreshCw}
-            onClick={refetch}
-          >
-            Refresh
-          </Button>
-        }
-        className="mb-6"
+    <div
+      className={`site-shell${collapsed ? " sidebar-collapsed" : ""}${mobileOpen ? " mobile-sidebar-open" : ""}`}
+    >
+      {mobileOpen && (
+        <button
+          className="sidebar-backdrop"
+          aria-label="Close navigation menu"
+          onClick={closeMobile}
+        />
+      )}
+      <WorkspaceSidebar
+        collapsed={collapsed}
+        onToggle={toggle}
+        onNavigate={closeMobile}
+        user={user}
+        incidentCount={incidentCount}
+        onSignOut={async () => {
+          await logout();
+          navigate("/login", { replace: true });
+        }}
       />
 
-      {/* Stale-data banner — a background refresh failed but cached data
-          from a previous successful load is still being shown. */}
-      {error && data && (
-        <div className="mb-6 flex flex-col gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
-          <div className="flex items-center gap-2.5">
-            <AlertTriangle size={16} className="shrink-0 text-amber-400" />
-            <p className="text-xs text-amber-200">
-              We couldn&apos;t refresh your dashboard just now — showing the
-              last known data.
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="xs"
-            className="shrink-0 sm:ml-auto"
-            onClick={refetch}
+      <div className="site-workspace">
+        <header className="site-topbar">
+          <button
+            className="mobile-menu-toggle"
+            onClick={toggle}
+            aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
           >
-            Retry
-          </Button>
-        </div>
-      )}
-
-      {/* KPI Cards */}
-      <div className="mb-6">
-        <SectionLabel className="mb-3">Overview — System Status</SectionLabel>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {kpiCards.map((card) => (
-            <StatCard key={card.label} {...card} loading={isInitialLoad} />
-          ))}
-        </div>
-      </div>
-
-      {/* Uptime summary banner */}
-      {!isInitialLoad && overview && (
-        <div className="mb-6 flex flex-col gap-4 rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-5 py-4 sm:flex-row sm:items-center sm:gap-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
-              <TrendingUp size={18} className="text-emerald-400" />
-            </div>
+            {mobileOpen ? <X size={19} /> : <Menu size={19} />}
+          </button>
+          <label className="global-search">
+            <Search size={16} />
+            <input
+              placeholder="Search monitors, domains..."
+              aria-label="Search monitors and domains"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <kbd>⌘ K</kbd>
+          </label>
+          <div className="topbar-actions">
+            <Link
+              className={`notification-button${location.pathname === "/notifications" ? " selected" : ""}`}
+              to="/notifications"
+              aria-label={`${unreadTotal} unread notifications`}
+              aria-current={
+                location.pathname === "/notifications" ? "page" : undefined
+              }
+            >
+              <Bell size={18} />
+              {unreadTotal > 0 && <i />}
+            </Link>
+          </div>
+        </header>
+        <main className="dashboard-page">
+          <div className="welcome-row">
             <div>
-              <p className="text-sm font-semibold text-white">
-                {formatUptime(overview.uptime?.percentage)} uptime
-              </p>
-              <p className="text-xs text-text-muted">
-                {overview.uptime?.totalChecks?.toLocaleString()} checks in the
-                last 24 hours ·{" "}
-                {incidentCount > 0
-                  ? `${incidentCount} active incident${incidentCount !== 1 ? "s" : ""}`
-                  : "No active incidents"}
-              </p>
+              <h1>
+                Good morning, {displayName} <span aria-hidden="true">☀️</span>
+              </h1>
+              <p>Here’s what’s happening with your websites today.</p>
+            </div>
+            <div className="date-stamp">
+              {new Date().toLocaleDateString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+              <small>
+                {new Date().toLocaleTimeString(undefined, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </small>
             </div>
           </div>
-          {incidentCount > 0 && (
-            <div className="flex items-center gap-2 sm:ml-auto">
-              <AlertTriangle size={14} className="text-amber-400" />
-              <span className="text-xs font-medium text-amber-400">
-                {incidentCount} incident{incidentCount !== 1 ? "s" : ""} need
-                attention
-              </span>
+          {error && (
+            <div className="dashboard-error">
+              <CircleAlert size={16} /> Couldn’t refresh dashboard data.{" "}
+              <button onClick={refetch}>Try again</button>
             </div>
           )}
-        </div>
-      )}
+          <div className="dashboard-layout">
+            <section className="dashboard-main-column">
+              <div className="metric-grid">
+                <MetricCard
+                  icon={TrendingUp}
+                  label="Overall Uptime"
+                  value={uptime == null ? "—" : formatUptime(uptime)}
+                  spark={uptimeData.map((point) => point.value)}
+                />
+                <MetricCard
+                  icon={Globe2}
+                  label="Total Monitors"
+                  value={overview.monitors?.total ?? "—"}
+                  color="aqua"
+                />
+                <MetricCard
+                  icon={TriangleAlert}
+                  label="Active Incidents"
+                  value={incidentCount}
+                  color={incidentCount ? "red" : "green"}
+                />
+                <MetricCard
+                  icon={Clock3}
+                  label="Avg. Response Time"
+                  value={response == null ? "—" : formatResponseTime(response)}
+                  spark={responseData.map((point) => point.value)}
+                />
+              </div>
 
-      <div className={dashboardPrefs?.compactMode ? "space-y-4" : "space-y-6"}>
-        {visibleWidgets.map((key) => (
-          <section
-            key={key}
-            className={
-              dashboardPrefs?.compactMode ? "dashboard-compact-section" : ""
-            }
-          >
-            {key === "overviewChart" && (
-              <SectionLabel className="mb-3">Analytics</SectionLabel>
-            )}
-            {key === "monitorStatusGrid" && (
-              <SectionLabel className="mb-3">Monitor Status</SectionLabel>
-            )}
-            {widgetContent[key]}
-          </section>
-        ))}
+              <div className="chart-grid">
+                <article className="panel chart-panel uptime-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <h2>Uptime Overview</h2>
+                      <p>Uptime across your monitors</p>
+                    </div>
+                    <SegmentedControl
+                      label="Chart time range"
+                      value={windowKey}
+                      onChange={setWindowKey}
+                      options={[
+                        { value: "24h", label: "24H" },
+                        { value: "7d", label: "7D" },
+                        { value: "30d", label: "30D" },
+                      ]}
+                    />
+                  </div>
+                  <div className="chart-area">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart
+                        data={uptimeData}
+                        margin={{ top: 12, right: 6, left: -18, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient
+                            id="uptimeFill"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="#10b981"
+                              stopOpacity={0.18}
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="#10b981"
+                              stopOpacity={0.015}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid vertical stroke="#edf2f6" />
+                        <XAxis
+                          dataKey="day"
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: "#687d95", fontSize: 11 }}
+                        />
+                        <YAxis
+                          domain={[98, 100]}
+                          ticks={[98, 98.5, 99, 99.5, 100]}
+                          tickFormatter={(v) => `${v}%`}
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: "#687d95", fontSize: 11 }}
+                        />
+                        <Tooltip content={<ChartTooltip suffix="%" />} />
+                        <Area
+                          dataKey="value"
+                          type="monotone"
+                          stroke="#08ad7c"
+                          strokeWidth={2.2}
+                          fill="url(#uptimeFill)"
+                          dot={{ r: 2, fill: "#08ad7c", strokeWidth: 0 }}
+                          activeDot={{ r: 4 }}
+                          isAnimationActive={false}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </article>
+                <article className="panel chart-panel response-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <h2>Response Time</h2>
+                      <p>Average response time (ms)</p>
+                    </div>
+                    <div className="chart-current">
+                      <b>
+                        {response == null ? "—" : formatResponseTime(response)}
+                      </b>
+                      <span>{windowKey.toUpperCase()} window</span>
+                    </div>
+                  </div>
+                  <div className="chart-area">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={responseData}
+                        margin={{ top: 12, right: 8, left: -16, bottom: 0 }}
+                      >
+                        <CartesianGrid stroke="#edf2f6" />
+                        <XAxis
+                          dataKey="day"
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: "#687d95", fontSize: 11 }}
+                        />
+                        <YAxis
+                          domain={[0, "auto"]}
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: "#687d95", fontSize: 11 }}
+                        />
+                        <Tooltip content={<ChartTooltip suffix=" ms" />} />
+                        <Line
+                          dataKey="value"
+                          type="monotone"
+                          stroke="#08ad7c"
+                          strokeWidth={2.2}
+                          dot={{ r: 2, fill: "#08ad7c", strokeWidth: 0 }}
+                          activeDot={{ r: 4 }}
+                          isAnimationActive={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </article>
+              </div>
+
+              <article className="panel monitors-panel">
+                <div className="panel-heading monitors-heading">
+                  <div>
+                    <h2>Monitors</h2>
+                    <p>Your website monitors at a glance</p>
+                  </div>
+                  <Link className="view-all" to="/monitors">
+                    View all <ArrowRight size={14} />
+                  </Link>
+                </div>
+                <label className="monitor-search">
+                  <Search size={15} />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search monitors..."
+                  />
+                </label>
+                <div className="filter-pills">
+                  {[
+                    ["All", monitors.length],
+                    ["Up", currentStatus.up ?? 0],
+                    [
+                      "Down",
+                      (currentStatus.down ?? 0) + (currentStatus.degraded ?? 0),
+                    ],
+                    ["Paused", overview.monitors?.inactive ?? 0],
+                  ].map(([label, count]) => (
+                    <button
+                      key={label}
+                      onClick={() => setFilter(label)}
+                      className={filter === label ? "active" : ""}
+                    >
+                      {label} ({count})
+                    </button>
+                  ))}
+                </div>
+                <div className="table-scroll">
+                  <table className="monitor-table">
+                    <thead>
+                      <tr>
+                        <th>
+                          Name <ChevronDown size={11} />
+                        </th>
+                        <th>Status</th>
+                        <th>Uptime (24h)</th>
+                        <th>Response Time</th>
+                        <th>Last Check</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loading && !data ? (
+                        <tr>
+                          <td colSpan="6" className="table-message">
+                            Loading monitors…
+                          </td>
+                        </tr>
+                      ) : filteredMonitors.length ? (
+                        filteredMonitors.slice(0, 8).map((monitor) => (
+                          <tr key={monitor.id}>
+                            <td>
+                              <div className="monitor-name">
+                                <span className="monitor-symbol">
+                                  <Globe2 size={15} />
+                                </span>
+                                <span>
+                                  <b>{monitor.name}</b>
+                                  <small>{shortUrl(monitor.url)}</small>
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              <span
+                                className={`status-text ${statusLabel(monitor.status).toLowerCase()}`}
+                              >
+                                <i />
+                                {statusLabel(monitor.status)}
+                              </span>
+                            </td>
+                            <td>
+                              {monitor.uptimePercentage == null
+                                ? "—"
+                                : formatUptime(monitor.uptimePercentage)}
+                            </td>
+                            <td>
+                              {monitor.responseTime == null
+                                ? "—"
+                                : formatResponseTime(monitor.responseTime)}
+                            </td>
+                            <td>
+                              {monitor.checkedAt
+                                ? formatRelative(monitor.checkedAt)
+                                : "—"}
+                            </td>
+                            <td>
+                              <Link
+                                className="row-more"
+                                to={`/monitors/${monitor.id}`}
+                                aria-label={`Open ${monitor.name}`}
+                              >
+                                <ChevronRight size={15} />
+                              </Link>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="table-message">
+                            {monitors.length
+                              ? "No monitors match this filter."
+                              : "No monitors yet. Add your first monitor to start tracking uptime."}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </section>
+
+            <aside className="dashboard-rail">
+              <article className="panel incident-panel">
+                <div className="rail-title">
+                  <span
+                    className={incidentCount ? "incident-dot" : "healthy-dot"}
+                  />{" "}
+                  <b>
+                    {incidentCount} Active{" "}
+                    {incidentCount === 1 ? "Incident" : "Incidents"}
+                  </b>
+                  <Link to="/incidents" aria-label="View incidents">
+                    <ChevronRight size={16} />
+                  </Link>
+                </div>
+                {incidents.length ? (
+                  incidents.slice(0, 1).map((incident) => (
+                    <Link
+                      className="incident-callout"
+                      key={incident.id || incident._id}
+                      to={`/incidents`}
+                    >
+                      <b>
+                        {incident.monitorName ||
+                          incident.monitor?.name ||
+                          "Monitor issue"}
+                      </b>
+                      <span>
+                        {incident.title ||
+                          incident.message ||
+                          "Website is not responding"}
+                      </span>
+                      <small>
+                        {incident.startedAt
+                          ? formatRelative(incident.startedAt)
+                          : "Active now"}
+                      </small>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="all-clear">
+                    <ShieldCheck size={17} /> No active incidents
+                  </div>
+                )}
+              </article>
+              <article className="panel quick-panel">
+                <h2>Quick Actions</h2>
+                <Link to="/monitors" className="quick-action">
+                  <span>
+                    <Plus size={20} />
+                  </span>
+                  <b>Add Monitor</b>
+                  <ChevronRight size={15} />
+                </Link>
+                <Link to="/insights" className="quick-action">
+                  <span>
+                    <FileText size={18} />
+                  </span>
+                  <b>View Reports</b>
+                  <ChevronRight size={15} />
+                </Link>
+                <Link to="/incidents" className="quick-action">
+                  <span>
+                    <TriangleAlert size={18} />
+                  </span>
+                  <b>Check Incidents</b>
+                  <ChevronRight size={15} />
+                </Link>
+              </article>
+              <article className="panel health-panel">
+                <h2>System Health</h2>
+                {[
+                  [
+                    "API Server",
+                    systemHealth?.status === "ok"
+                      ? "Healthy"
+                      : systemHealth
+                        ? "Issues"
+                        : "Checking",
+                    systemHealth?.status === "ok",
+                  ],
+                  [
+                    "Database",
+                    systemHealth?.mongo === "connected"
+                      ? "Healthy"
+                      : systemHealth?.mongo || "Checking",
+                    systemHealth?.mongo === "connected",
+                  ],
+                  ["Worker", "Not reported", null],
+                ].map(([label, state, healthy]) => (
+                  <div className="health-row" key={label}>
+                    <span
+                      className={
+                        healthy === null
+                          ? "unknown-dot"
+                          : healthy
+                            ? "healthy-dot"
+                            : "incident-dot"
+                      }
+                    />
+                    <b>{label}</b>
+                    <strong
+                      className={healthy === null ? "unknown-health" : ""}
+                    >
+                      {state}
+                    </strong>
+                  </div>
+                ))}
+              </article>
+              <article className="insight-promo">
+                <span className="promo-icon">
+                  <Activity size={19} />
+                </span>
+                <Sparkles className="promo-sparkle" size={17} />
+                <h2>Stay ahead of downtime</h2>
+                <p>
+                  Get instant alerts and keep your websites running smoothly,
+                  always.
+                </p>
+                <Link to="/insights">
+                  View Insights <ArrowRight size={14} />
+                </Link>
+              </article>
+            </aside>
+          </div>
+        </main>
       </div>
-    </PageContainer>
+    </div>
   );
 }

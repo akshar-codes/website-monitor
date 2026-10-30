@@ -11,11 +11,7 @@ export const THEMES = Object.freeze({
   SYSTEM: "system",
 });
 
-export const THEME_OPTIONS = [
-  { value: THEMES.DARK, label: "Dark" },
-  { value: THEMES.LIGHT, label: "Light" },
-  { value: THEMES.SYSTEM, label: "System" },
-];
+export const THEME_OPTIONS = [{ value: THEMES.LIGHT, label: "Light" }];
 
 export const LANGUAGES = Object.freeze({
   EN: "en",

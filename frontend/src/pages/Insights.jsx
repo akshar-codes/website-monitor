@@ -1,23 +1,39 @@
 import { useState } from "react";
-import { RefreshCw } from "lucide-react";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import Button from "../components/ui/Button";
-import SectionLabel from "../components/ui/SectionLabel";
-import ChartCard from "../components/cards/ChartCard";
-import StatusPieChart from "../components/charts/StatusPieChart";
-import DowntimeStatsCards from "../features/insights/DowntimeStatsCards";
-import IncidentsTable from "../features/insights/IncidentsTable";
-import UptimeTrendChart from "../features/insights/UptimeTrendChart";
-import ResponseTimeTrendChart from "../features/insights/ResponseTimeTrendChart";
 import { useDowntimeStats, useIncidentList } from "../hooks/useInsights";
 import { useQuery } from "../hooks/useQuery";
 import { useAuth } from "../hooks/useAuth";
 import { PLANS } from "../constants/plans";
 import * as monitorsApi from "../services/api/monitors";
 import * as dashboardApi from "../services/api/dashboard";
-import { formatUptime } from "../utils/format";
-import { cn } from "../utils/cn";
+import {
+  Page,
+  Panel,
+  Button,
+  Metric,
+  Table,
+  Status,
+  Select,
+} from "../components/ui/Primitives";
+import {
+  RefreshCw,
+  Clock3,
+  TriangleAlert,
+  TrendingUp,
+  ShieldCheck,
+} from "lucide-react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 
 const WINDOWS = [
   { label: "24h", value: "24h" },
@@ -25,31 +41,6 @@ const WINDOWS = [
   { label: "30d", value: "30d" },
 ];
 
-function WindowSelector({ value, onChange }) {
-  return (
-    <div className="flex items-center gap-0.5 rounded-lg border border-border-default bg-bg-elevated p-0.5">
-      {WINDOWS.map((w) => (
-        <button
-          key={w.value}
-          onClick={() => onChange(w.value)}
-          className={cn(
-            "rounded-md px-3 py-1 text-[11px] font-medium transition-all",
-            value === w.value
-              ? "bg-bg-subtle text-white"
-              : "text-text-muted hover:text-text-secondary",
-          )}
-        >
-          {w.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Fetches all monitors then their chart data for the window,
- * merges into multi-monitor time-series datasets.
- */
 function useInsightChartData(window) {
   return useQuery(async () => {
     const monitorsRes = await monitorsApi.getMonitors({
@@ -146,12 +137,12 @@ export default function Insights() {
 
   const {
     data: statsData,
-    loading: statsLoading,
+    loading: _statsLoading,
     refetch: refetchStats,
   } = useDowntimeStats({ window: statsWindow });
   const stats = statsData?.data;
 
-  const { data: allIncidentsData, loading: allIncidentsLoading } =
+  const { data: allIncidentsData, loading: _allIncidentsLoading } =
     useIncidentList({
       page: 1,
       limit: 50,
@@ -168,225 +159,208 @@ export default function Insights() {
     refetchStats();
   };
 
+  const monitorLines = chartData?.monitors || [];
+  const points = chartData?.uptimeData || [];
+  const latestStatus = statusDist || [];
+  const colors = {
+    up: "#08a879",
+    down: "#ed5d62",
+    degraded: "#e6a83e",
+    unknown: "#8a9bb0",
+  };
   return (
-    <PageContainer>
-      <PageHeader
-        title="Insights"
-        subtitle="Deeper trends across uptime, response time, and incident patterns"
-        actions={
-          <div className="flex items-center gap-2">
-            <WindowSelector
-              value={statsWindow}
-              onChange={(v) => {
-                setStatsWindow(v);
-              }}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={RefreshCw}
-              onClick={handleRefresh}
-            >
-              Refresh
-            </Button>
-          </div>
-        }
-        className="mb-6"
-      />
-
-      {/* Downtime KPI stats */}
-      <div className="mb-6">
-        <SectionLabel className="mb-3">
-          Downtime Overview — {statsWindow}
-        </SectionLabel>
-        <DowntimeStatsCards stats={stats} loading={statsLoading} />
-      </div>
-
-      {/* Trend charts */}
-      <div className="mb-6">
-        <div className="mb-3 flex items-center justify-between">
-          <SectionLabel>Trends</SectionLabel>
-          <WindowSelector value={chartWindow} onChange={setChartWindow} />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <ChartCard
-            title="Uptime Trend"
-            subtitle="Per-monitor uptime over time"
-            loading={chartLoading}
-            height={260}
+    <Page
+      title="Insights"
+      description="Explore reliability, outages, and response trends across your monitors."
+      eyebrow="ANALYTICS"
+      actions={
+        <>
+          <Select
+            aria-label="Analytics period"
+            value={statsWindow}
+            onChange={(e) => setStatsWindow(e.target.value)}
           >
-            <UptimeTrendChart
-              data={chartData?.uptimeData || []}
-              monitors={chartData?.monitors || []}
-              window={chartWindow}
-            />
-          </ChartCard>
-
-          <ChartCard
-            title="Response Time Trend"
-            subtitle="Average response time per monitor"
-            loading={chartLoading}
-            height={260}
-          >
-            <ResponseTimeTrendChart
-              data={chartData?.rtData || []}
-              monitors={chartData?.monitors || []}
-              window={chartWindow}
-            />
-          </ChartCard>
-        </div>
-      </div>
-
-      {/* Status distribution + incident frequency */}
-      <div className="mb-6">
-        <SectionLabel className="mb-3">Distribution</SectionLabel>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {/* Status pie */}
-          <ChartCard
-            title="Status Distribution"
-            subtitle="Current monitor health breakdown"
-            loading={statusDistLoading}
-            height={240}
-          >
-            <StatusPieChart data={statusDist || []} />
-          </ChartCard>
-
-          {/* Severity breakdown */}
-          <div className="rounded-xl border border-border-subtle bg-bg-surface p-6">
-            <p className="mb-1 text-sm font-semibold text-white">
-              Incident Severity
-            </p>
-            <p className="mb-5 text-xs text-text-muted">
-              Breakdown by severity in window
-            </p>
-            {statsLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="space-y-1.5">
-                    <div className="flex justify-between">
-                      <div className="h-2.5 w-16 animate-pulse rounded bg-bg-overlay" />
-                      <div className="h-2.5 w-8 animate-pulse rounded bg-bg-overlay" />
-                    </div>
-                    <div className="h-2 w-full animate-pulse rounded-full bg-bg-overlay" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {[
-                  {
-                    label: "Critical",
-                    value: stats?.bySeverity?.critical || 0,
-                    color: "bg-red-500",
-                  },
-                  {
-                    label: "Major",
-                    value: stats?.bySeverity?.major || 0,
-                    color: "bg-orange-500",
-                  },
-                  {
-                    label: "Minor",
-                    value: stats?.bySeverity?.minor || 0,
-                    color: "bg-amber-500",
-                  },
-                ].map(({ label, value, color }) => {
-                  const total = stats?.totalIncidents || 1;
-                  const pct = Math.round((value / total) * 100);
-                  return (
-                    <div key={label}>
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <span className="text-xs text-text-secondary">
-                          {label}
-                        </span>
-                        <span className="text-xs font-semibold text-white">
-                          {value}
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle">
-                        <div
-                          className={`h-full rounded-full ${color} transition-all duration-500`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Availability summary */}
-          <div className="rounded-xl border border-border-subtle bg-bg-surface p-6">
-            <p className="mb-1 text-sm font-semibold text-white">
-              Availability
-            </p>
-            <p className="mb-5 text-xs text-text-muted">
-              Service health by monitor
-            </p>
-            {chartLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <div className="h-2.5 w-28 animate-pulse rounded bg-bg-overlay" />
-                    <div className="h-2.5 w-12 animate-pulse rounded bg-bg-overlay" />
-                  </div>
-                ))}
-              </div>
-            ) : !chartData?.monitors?.length ? (
-              <p className="text-sm text-text-muted">No monitors available</p>
-            ) : (
-              <div className="space-y-3">
-                {chartData.monitors.map((m) => {
-                  // Calculate average uptime from the uptime data
-                  const vals = (chartData.uptimeData || [])
-                    .map((row) => row[m.id])
-                    .filter((v) => v != null);
-                  const avg =
-                    vals.length > 0
-                      ? vals.reduce((a, b) => a + b, 0) / vals.length
-                      : null;
-                  return (
-                    <div
-                      key={m.id}
-                      className="flex items-center justify-between gap-3"
-                    >
-                      <p className="truncate text-xs text-text-secondary">
-                        {m.name}
-                      </p>
-                      <p
-                        className={`shrink-0 text-xs font-semibold ${
-                          avg == null
-                            ? "text-text-muted"
-                            : avg >= 99
-                              ? "text-emerald-400"
-                              : avg >= 95
-                                ? "text-amber-400"
-                                : "text-red-400"
-                        }`}
-                      >
-                        {avg != null ? formatUptime(avg) : "—"}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Incidents table */}
-      <div>
-        <SectionLabel className="mb-3">Incident History</SectionLabel>
-        <IncidentsTable
-          incidents={allIncidents}
-          loading={allIncidentsLoading}
+            {WINDOWS.map((w) => (
+              <option value={w.value} key={w.value}>
+                {w.label}
+              </option>
+            ))}
+          </Select>
+          <Button variant="secondary" onClick={handleRefresh}>
+            <RefreshCw size={14} /> Refresh
+          </Button>
+        </>
+      }
+    >
+      <div className="sw-metric-grid">
+        <Metric
+          label="Total downtime"
+          value={
+            stats?.totalDowntimeSeconds == null
+              ? "—"
+              : `${Math.floor(stats.totalDowntimeSeconds / 3600)}h ${Math.floor((stats.totalDowntimeSeconds % 3600) / 60)}m`
+          }
+          icon={Clock3}
+          note={`During ${statsWindow}`}
+          tone="amber"
+        />
+        <Metric
+          label="Mean time to recovery"
+          value={
+            stats?.mttr == null ? "—" : `${Math.round(stats.mttr / 60)} min`
+          }
+          icon={TrendingUp}
+          note="Resolved incidents"
+          tone="blue"
+        />
+        <Metric
+          label="Incidents"
+          value={stats?.totalIncidents ?? allIncidents.length}
+          icon={TriangleAlert}
+          note="In selected period"
+          tone="red"
+        />
+        <Metric
+          label="Active monitors"
+          value={latestStatus
+            .filter((x) => x.name === "up")
+            .reduce((sum, x) => sum + x.value, 0)}
+          icon={ShieldCheck}
+          note="Currently up"
         />
       </div>
-    </PageContainer>
+      <div className="two-panel-grid">
+        <Panel
+          title="Uptime by monitor"
+          subtitle="Compare reliability over time"
+          actions={
+            <div className="segmented-control">
+              {WINDOWS.map((w) => (
+                <button
+                  key={w.value}
+                  className={chartWindow === w.value ? "active" : ""}
+                  onClick={() => setChartWindow(w.value)}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          }
+        >
+          {chartLoading ? (
+            <div className="sw-loading">Building comparison…</div>
+          ) : monitorLines.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={points}>
+                <CartesianGrid stroke="#edf2f6" />
+                <XAxis
+                  dataKey="timestamp"
+                  tickFormatter={(v) =>
+                    new Date(v).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })
+                  }
+                  tick={{ fontSize: 9 }}
+                />
+                <YAxis domain={[95, 100]} unit="%" tick={{ fontSize: 9 }} />
+                <Tooltip />
+                <Legend />
+                {monitorLines.map((m, i) => (
+                  <Line
+                    key={m.id}
+                    type="monotone"
+                    dataKey={m.id}
+                    name={m.name}
+                    stroke={
+                      ["#08a879", "#368ce0", "#df8f39", "#9a6bd6", "#e15e71"][
+                        i % 5
+                      ]
+                    }
+                    dot={false}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="sw-empty">
+              <b>No monitor history to compare</b>
+              <p>Start monitoring sites to build reliability trends.</p>
+            </div>
+          )}
+        </Panel>
+        <Panel
+          title="Current status"
+          subtitle="Availability across active monitors"
+        >
+          {statusDistLoading ? (
+            <div className="sw-loading">Loading status…</div>
+          ) : latestStatus.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={latestStatus}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={60}
+                  outerRadius={88}
+                  paddingAngle={3}
+                >
+                  {latestStatus.map((item) => (
+                    <Cell
+                      key={item.name}
+                      fill={colors[item.name] || "#8a9bb0"}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="sw-empty">
+              <b>No status data yet</b>
+            </div>
+          )}
+        </Panel>
+      </div>
+      <Panel
+        title="Recent incidents"
+        subtitle="Events contributing to your reliability metrics"
+      >
+        <Table
+          columns={[
+            {
+              key: "monitor",
+              label: "Monitor",
+              render: (v, row) => v?.name || row.monitorName || "Monitor",
+            },
+            {
+              key: "title",
+              label: "Incident",
+              render: (v, row) =>
+                v || row.message || row.description || "Service interruption",
+            },
+            {
+              key: "severity",
+              label: "Severity",
+              render: (v) => <Status value={v || "unknown"} />,
+            },
+            {
+              key: "status",
+              label: "Status",
+              render: (v) => <Status value={v} />,
+            },
+            {
+              key: "createdAt",
+              label: "Started",
+              render: (v) => (v ? new Date(v).toLocaleString() : "—"),
+            },
+          ]}
+          rows={allIncidents.slice(0, 10)}
+        />
+      </Panel>
+    </Page>
   );
 }

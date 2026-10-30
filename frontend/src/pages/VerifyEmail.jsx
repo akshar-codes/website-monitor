@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
-import AuthLayout from "../components/auth/AuthLayout";
-import LoginMarketingPanel from "../components/auth/LoginMarketingPanel";
-import VerificationStatusCard from "../components/auth/VerificationStatusCard";
-import ResendVerificationForm from "../components/auth/ResendVerificationForm";
-import Button from "../components/ui/Button";
 import { ROUTES } from "../constants/routes";
 import { mapAuthError } from "../utils/AuthErrors";
 import * as authApi from "../services/api/auth";
+import { AuthShell, Button, Notice } from "../components/ui/Primitives";
+import { Link } from "react-router-dom";
 
 /**
  * Lands here from the link in the verification email:
@@ -50,43 +46,42 @@ export default function VerifyEmail() {
   }, [token]);
 
   return (
-    <AuthLayout animKey="verify-email" marketingPanel={<LoginMarketingPanel />}>
-      {status === "missing" && (
-        <VerificationStatusCard
-          status="failed"
-          title="Verification link incomplete"
-          message="No verification token was found in this link. Enter your email below to request a new one."
-        >
-          <ResendVerificationForm />
-        </VerificationStatusCard>
-      )}
-
-      {status === "pending" && (
-        <VerificationStatusCard
-          status="pending"
-          message="Hang tight while we confirm your email address."
-        />
-      )}
-
+    <AuthShell
+      title={
+        status === "success"
+          ? "Email verified"
+          : status === "pending"
+            ? "Verifying your email"
+            : "Email verification"
+      }
+      description={
+        message ||
+        (status === "pending"
+          ? "Confirming your email address…"
+          : "Use the link in your verification email to activate your account.")
+      }
+      footer={
+        status === "success" ? (
+          <Link to={ROUTES.LOGIN}>Continue to sign in</Link>
+        ) : (
+          <Link to={ROUTES.REGISTER}>Create an account</Link>
+        )
+      }
+    >
+      <Notice
+        tone={
+          status === "failed" || status === "missing" ? "warning" : "success"
+        }
+      >
+        {status === "pending"
+          ? "Please wait while we confirm your address."
+          : message || "The verification link is missing or invalid."}
+      </Notice>
       {status === "success" && (
-        <VerificationStatusCard status="success" message={message}>
-          <Button
-            variant="primary"
-            size="lg"
-            className="w-full"
-            iconRight={ArrowRight}
-            onClick={() => navigate(ROUTES.LOGIN, { replace: true })}
-          >
-            Continue to sign in
-          </Button>
-        </VerificationStatusCard>
+        <Button type="button" onClick={() => navigate(ROUTES.LOGIN)}>
+          Sign in
+        </Button>
       )}
-
-      {status === "failed" && (
-        <VerificationStatusCard status="failed" message={message}>
-          <ResendVerificationForm />
-        </VerificationStatusCard>
-      )}
-    </AuthLayout>
+    </AuthShell>
   );
 }

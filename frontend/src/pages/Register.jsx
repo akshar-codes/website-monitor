@@ -1,26 +1,12 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowRight, Check } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import useAuthForm from "../hooks/useAuthForm";
-import { ROUTES } from "../constants/routes";
 import { mapAuthError } from "../utils/AuthErrors";
-import AuthLayout from "../components/auth/AuthLayout";
-import RegisterMarketingPanel from "../components/auth/RegisterMarketingPanel";
-import PasswordField from "../components/auth/PasswordField";
-import PasswordStrengthMeter from "../components/auth/PasswordStrengthMeter";
-import VerificationStatusCard from "../components/auth/VerificationStatusCard";
-import ResendVerificationForm from "../components/auth/ResendVerificationForm";
-import AuthErrorBanner from "../components/auth/AuthErrorBanner";
-import AuthDivider from "../components/auth/AuthDivider";
-import OAuthButtons from "../components/auth/OAuthButtons";
-import { Card } from "../components/ui/Card";
-import { FormField, Input } from "../components/ui/Input";
-import Button from "../components/ui/Button";
+import { AuthShell, Button, Input, Notice } from "../components/ui/Primitives";
+import { Link } from "react-router-dom";
 
 export default function Register() {
   const { register } = useAuth();
-  const navigate = useNavigate();
 
   const {
     values,
@@ -67,133 +53,73 @@ export default function Register() {
     }
   };
 
-  if (registeredEmail) {
-    return (
-      <AuthLayout
-        animKey="register-success"
-        marketingPanel={<RegisterMarketingPanel />}
-      >
-        <VerificationStatusCard
-          status="success"
-          title="Check your inbox"
-          message={`We've sent a verification link to ${registeredEmail}. Verify your email to activate your account and sign in.`}
-        >
-          <ResendVerificationForm initialEmail={registeredEmail} />
-          <button
-            onClick={() => navigate(ROUTES.LOGIN)}
-            className="mt-4 w-full text-center text-sm font-semibold text-emerald-400 transition-colors hover:text-emerald-300"
-          >
-            Back to sign in
-          </button>
-        </VerificationStatusCard>
-      </AuthLayout>
-    );
-  }
-
   return (
-    <AuthLayout animKey="register" marketingPanel={<RegisterMarketingPanel />}>
-      <div className="mb-6">
-        <h2 className="mb-1.5 text-2xl font-semibold tracking-tight text-white">
-          Create your account
-        </h2>
-        <p className="text-sm text-text-secondary">
-          Start monitoring in under two minutes.
-        </p>
-      </div>
-
-      <Card>
-        <AuthErrorBanner message={apiError} />
-
-        <form onSubmit={handleSubmit} noValidate className="space-y-4">
-          <FormField label="Full name" error={errors.name} required>
+    <AuthShell
+      title={registeredEmail ? "Check your email" : "Create your account"}
+      description={
+        registeredEmail
+          ? `We sent a verification link to ${registeredEmail}. Verify your email to sign in.`
+          : "Start monitoring your websites in a few minutes."
+      }
+      footer={
+        <>
+          Already have an account? <Link to="/login">Sign in</Link>
+        </>
+      }
+    >
+      <form className="sw-form" onSubmit={handleSubmit} noValidate>
+        {apiError && <Notice tone="error">{apiError}</Notice>}
+        {!registeredEmail && (
+          <>
             <Input
-              type="text"
-              placeholder="Akshar Gupta"
-              value={values.name}
+              label="Full name"
+              autoComplete="name"
+              placeholder="Your name"
+              value={values.name || ""}
               onChange={makeChangeHandler("name")}
               onBlur={handleBlur("name")}
-              error={!!errors.name}
-              autoComplete="name"
-              disabled={submitting}
-              autoFocus
+              error={errors.name}
+              required
             />
-          </FormField>
-
-          <FormField label="Email address" error={errors.email} required>
             <Input
+              label="Email address"
               type="email"
-              placeholder="you@example.com"
-              value={values.email}
+              autoComplete="email"
+              placeholder="you@company.com"
+              value={values.email || ""}
               onChange={makeChangeHandler("email")}
               onBlur={handleBlur("email")}
-              error={!!errors.email}
-              autoComplete="email"
-              disabled={submitting}
+              error={errors.email}
+              required
             />
-          </FormField>
-
-          <div>
-            <PasswordField
+            <Input
               label="Password"
-              placeholder="Create a strong password"
-              value={values.password}
+              type="password"
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              value={values.password || ""}
               onChange={makeChangeHandler("password")}
               onBlur={handleBlur("password")}
               error={errors.password}
-              autoComplete="new-password"
-              disabled={submitting}
+              required
             />
-            <PasswordStrengthMeter
-              password={values.password}
-              show={values.password.length > 0}
-            />
-          </div>
-
-          <div>
-            <PasswordField
+            <Input
               label="Confirm password"
-              placeholder="Repeat your password"
-              value={values.confirmPassword}
+              type="password"
+              autoComplete="new-password"
+              placeholder="Re-enter your password"
+              value={values.confirmPassword || ""}
               onChange={makeChangeHandler("confirmPassword")}
               onBlur={handleBlur("confirmPassword")}
               error={errors.confirmPassword}
-              autoComplete="new-password"
-              disabled={submitting}
+              required
             />
-            {values.confirmPassword &&
-              values.password &&
-              !errors.confirmPassword && (
-                <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-400">
-                  <Check size={11} /> Passwords match
-                </p>
-              )}
-          </div>
-
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            loading={submitting}
-            disabled={submitting}
-            className="w-full"
-          >
-            {submitting ? "Creating account…" : "Create free account"}
-          </Button>
-        </form>
-
-        <AuthDivider />
-        <OAuthButtons disabled={submitting} />
-      </Card>
-
-      <p className="mt-4 text-center text-sm text-text-muted">
-        Already have an account?{" "}
-        <button
-          onClick={() => navigate(ROUTES.LOGIN)}
-          className="inline-flex items-center gap-1 font-semibold text-emerald-400 transition-colors hover:text-emerald-300"
-        >
-          Sign in instead <ArrowRight size={13} />
-        </button>
-      </p>
-    </AuthLayout>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Creating account…" : "Create account"}
+            </Button>
+          </>
+        )}
+      </form>
+    </AuthShell>
   );
 }

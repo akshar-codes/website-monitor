@@ -1,16 +1,5 @@
 import { useState, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Users, RefreshCw } from "lucide-react";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import Button from "../components/ui/Button";
-import ConfirmDialog from "../components/ui/ConfirmDialog";
-import Pagination from "../components/ui/Pagination";
-import EmptyState from "../components/ui/EmptyState";
-import { SkeletonRow } from "../components/ui/Skeleton";
-import UserFilters from "../features/admin/UserFilters";
-import UserRow from "../features/admin/UserRow";
-import ChangePlanDialog from "../features/admin/ChangePlanDialog";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   useUserList,
   useUpdateUserRole,
@@ -21,6 +10,24 @@ import {
 } from "../hooks/useAdmin";
 import { useAuth } from "../hooks/useAuth";
 import { ROLES } from "../constants/roles";
+import { formatPlanName } from "../utils/formatPlanName";
+import {
+  Page,
+  Panel,
+  Button,
+  Input,
+  Select,
+  Status,
+} from "../components/ui/Primitives";
+import {
+  RefreshCw,
+  Shield,
+  CreditCard,
+  Ban,
+  CheckCircle2,
+  Trash2,
+  ExternalLink,
+} from "lucide-react";
 
 const COLUMN_HEADERS = [
   "User",
@@ -82,7 +89,7 @@ export default function AdminUsers() {
 
   const { data: usersData, loading, refetch } = useUserList(listParams);
   const users = useMemo(() => usersData?.data || [], [usersData]);
-  const pagination = usersData?.pagination;
+  const _pagination = usersData?.pagination;
 
   const handleMutationSuccess = () => {
     setPendingRoleChange(null);
@@ -176,173 +183,299 @@ export default function AdminUsers() {
     removeUser(pendingDelete.id, pendingDelete.name);
   };
 
+  const rows = users.map((user) => ({
+    ...user,
+    displayStatus: user.active ? "active" : "suspended",
+  }));
+  const confirmPlan = () => {
+    if (!pendingPlanChange) return;
+    const plan = window.prompt(
+      "Enter plan ID (free, pro, unlimited for Enterprise):",
+      pendingPlanChange.plan || "pro",
+    );
+    if (!plan) return;
+    const reason = window.prompt("Reason for this plan change (required):");
+    if (reason?.trim())
+      handleConfirmPlanChange(plan, { reason: reason.trim() });
+  };
   return (
-    <PageContainer>
-      <PageHeader
-        title="Users"
-        subtitle="Manage accounts, roles, subscription plans, and account status"
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={RefreshCw}
-            onClick={refetch}
-          >
-            Refresh
-          </Button>
-        }
-        className="mb-6"
-      />
-
-      <UserFilters
-        search={search}
-        registeredFrom={registeredFrom}
-        registeredTo={registeredTo}
-        onRegisteredFromChange={(value) => {
-          setRegisteredFrom(value);
-          setPage(1);
-        }}
-        onRegisteredToChange={(value) => {
-          setRegisteredTo(value);
-          setPage(1);
-        }}
-        onSearchChange={handleSearchChange}
-        roleFilter={roleFilter}
-        onRoleFilterChange={handleRoleFilterChange}
-        planFilter={planFilter}
-        onPlanFilterChange={handlePlanFilterChange}
-        statusFilter={statusFilter}
-        onStatusFilterChange={handleStatusFilterChange}
-        totalCount={pagination?.total}
-      />
-
-      {/* Table */}
-      <div className="rounded-xl border border-border-subtle bg-bg-surface">
-        <div className="grid grid-cols-[minmax(140px,1fr)_90px_90px_100px_100px_120px_44px] items-center gap-3 border-b border-border-subtle px-5 py-3">
-          {COLUMN_HEADERS.map((h, i) => (
-            <p
-              key={i}
-              className="text-[11px] font-semibold uppercase tracking-wider text-text-disabled"
-            >
-              {h}
-            </p>
-          ))}
-        </div>
-
-        {loading ? (
-          Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
-        ) : !users.length ? (
-          <EmptyState
-            icon={Users}
-            title={search ? "No users match your search" : "No users found"}
-            description={
-              search
-                ? "Try a different search term or clear your filters."
-                : "Users will appear here once they register."
-            }
-            className="py-16"
+    <Page
+      title="User management"
+      description="Review accounts, roles, subscriptions, and access state."
+      eyebrow="ADMIN"
+      actions={
+        <Button variant="secondary" onClick={refetch}>
+          <RefreshCw size={14} /> Refresh
+        </Button>
+      }
+    >
+      <Panel
+        title="Customer accounts"
+        subtitle={`${usersData?.pagination?.total ?? users.length} users`}
+      >
+        <div className="admin-user-filters">
+          <Input
+            aria-label="Search accounts"
+            placeholder="Search name or email"
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
+          <Select
+            aria-label="Role"
+            value={roleFilter}
+            onChange={(e) => handleRoleFilterChange(e.target.value)}
+          >
+            <option value="all">All roles</option>
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </Select>
+          <Select
+            aria-label="Status"
+            value={statusFilter}
+            onChange={(e) => handleStatusFilterChange(e.target.value)}
+          >
+            <option value="all">All account states</option>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+          </Select>
+          <Select
+            aria-label="Plan"
+            value={planFilter}
+            onChange={(e) => handlePlanFilterChange(e.target.value)}
+          >
+            <option value="all">All plans</option>
+            <option value="free">Free</option>
+            <option value="pro">Pro</option>
+            <option value="unlimited">Enterprise</option>
+          </Select>
+          <Input
+            aria-label="Registered after"
+            type="date"
+            value={registeredFrom}
+            onChange={(e) => setRegisteredFrom(e.target.value)}
+          />
+          <Input
+            aria-label="Registered before"
+            type="date"
+            value={registeredTo}
+            onChange={(e) => setRegisteredTo(e.target.value)}
+          />
+        </div>
+        {loading ? (
+          <div className="sw-loading">Loading users…</div>
         ) : (
-          users.map((u) => (
-            <UserRow
-              key={u.id}
-              user={u}
-              currentUserId={currentUser?.id}
-              onRequestRoleChange={(targetUser, nextRole) =>
-                setPendingRoleChange({ user: targetUser, nextRole })
-              }
-              onRequestPlanChange={(targetUser) =>
-                setPendingPlanChange(targetUser)
-              }
-              onRequestSuspend={(targetUser) => setPendingSuspend(targetUser)}
-              onRequestReactivate={(targetUser) =>
-                setPendingReactivate(targetUser)
-              }
-              onRequestDelete={(targetUser) => setPendingDelete(targetUser)}
-            />
-          ))
+          <div className="sw-table-wrap">
+            <table className="sw-table">
+              <thead>
+                <tr>
+                  {COLUMN_HEADERS.map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((user) => {
+                  const id = user.id || user._id;
+                  return (
+                    <tr key={id}>
+                      <td>
+                        <Link className="user-cell" to={`/admin/users/${id}`}>
+                          <span className="avatar">
+                            {user.name?.[0] || "?"}
+                          </span>
+                          <span>
+                            <b>{user.name || "Unnamed account"}</b>
+                            <small className="table-secondary">
+                              {user.email}
+                            </small>
+                          </span>
+                        </Link>
+                      </td>
+                      <td>
+                        <Status value={user.role} />
+                      </td>
+                      <td>
+                        {user.role === ROLES.ADMIN
+                          ? "Administrator"
+                          : formatPlanName(user.plan)}
+                      </td>
+                      <td>{user.monitorCount ?? user.monitorsCount ?? 0}</td>
+                      <td>
+                        <Status value={user.displayStatus} />
+                      </td>
+                      <td>
+                        {user.createdAt
+                          ? new Date(user.createdAt).toLocaleDateString()
+                          : "—"}
+                      </td>
+                      <td>
+                        <div className="row-actions">
+                          <Link title="Details" to={`/admin/users/${id}`}>
+                            <ExternalLink size={14} />
+                          </Link>
+                          {id !== currentUser?.id && (
+                            <>
+                              <button
+                                title="Change role"
+                                onClick={() =>
+                                  setPendingRoleChange({
+                                    user,
+                                    nextRole:
+                                      user.role === ROLES.ADMIN
+                                        ? ROLES.USER
+                                        : ROLES.ADMIN,
+                                  })
+                                }
+                              >
+                                <Shield size={14} />
+                              </button>
+                              <button
+                                title="Change plan"
+                                onClick={() => setPendingPlanChange(user)}
+                              >
+                                <CreditCard size={14} />
+                              </button>
+                              {user.active ? (
+                                <button
+                                  title="Suspend"
+                                  onClick={() => setPendingSuspend(user)}
+                                >
+                                  <Ban size={14} />
+                                </button>
+                              ) : (
+                                <button
+                                  title="Reactivate"
+                                  onClick={() => setPendingReactivate(user)}
+                                >
+                                  <CheckCircle2 size={14} />
+                                </button>
+                              )}
+                              <button
+                                title="Delete"
+                                onClick={() => setPendingDelete(user)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!rows.length && (
+                  <tr>
+                    <td colSpan="7" className="table-empty">
+                      No accounts match the selected filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
-
-      {pagination && pagination.totalPages > 1 && (
-        <Pagination
-          page={pagination.page}
-          totalPages={pagination.totalPages}
-          onPageChange={setPage}
-          className="mt-4"
+        {usersData?.pagination && (
+          <div className="pagination-bar">
+            <span>
+              Page {usersData.pagination.page} of{" "}
+              {usersData.pagination.totalPages}
+            </span>
+            <div>
+              <Button
+                variant="secondary"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={page >= usersData.pagination.totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </Panel>
+      {pendingRoleChange && (
+        <AdminConfirm
+          title={`Change ${pendingRoleChange.user.name}'s role?`}
+          description={`This changes access to ${pendingRoleChange.nextRole}.`}
+          onCancel={() => setPendingRoleChange(null)}
+          onConfirm={handleConfirmRoleChange}
+          busy={roleSubmitting}
         />
       )}
+      {pendingPlanChange && (
+        <AdminConfirm
+          title={`Change ${pendingPlanChange.name}'s plan?`}
+          description="You will be asked for the target plan and an audit reason."
+          onCancel={() => setPendingPlanChange(null)}
+          onConfirm={confirmPlan}
+          busy={planSubmitting}
+        />
+      )}
+      {pendingSuspend && (
+        <AdminConfirm
+          title={`Suspend ${pendingSuspend.name}?`}
+          description="The user will lose access until reactivated."
+          onCancel={() => setPendingSuspend(null)}
+          onConfirm={handleConfirmSuspend}
+          busy={suspendSubmitting}
+          danger
+        />
+      )}
+      {pendingReactivate && (
+        <AdminConfirm
+          title={`Reactivate ${pendingReactivate.name}?`}
+          description="The user can sign in again after reactivation."
+          onCancel={() => setPendingReactivate(null)}
+          onConfirm={handleConfirmReactivate}
+          busy={reactivateSubmitting}
+        />
+      )}
+      {pendingDelete && (
+        <AdminConfirm
+          title={`Delete ${pendingDelete.name}?`}
+          description="This permanently removes the user account."
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={handleConfirmDelete}
+          busy={deleteSubmitting}
+          danger
+        />
+      )}
+    </Page>
+  );
+}
 
-      {/* Role change confirmation */}
-      <ConfirmDialog
-        open={!!pendingRoleChange}
-        onClose={() => setPendingRoleChange(null)}
-        onConfirm={handleConfirmRoleChange}
-        title={
-          pendingRoleChange?.nextRole === ROLES.ADMIN
-            ? "Grant admin access?"
-            : "Remove admin access?"
-        }
-        description={
-          pendingRoleChange?.nextRole === ROLES.ADMIN
-            ? `"${pendingRoleChange?.user?.name}" will be able to manage all users and their roles.`
-            : `"${pendingRoleChange?.user?.name}" will lose admin access immediately.`
-        }
-        confirmLabel={
-          pendingRoleChange?.nextRole === ROLES.ADMIN
-            ? "Make admin"
-            : "Remove admin"
-        }
-        confirmVariant={
-          pendingRoleChange?.nextRole === ROLES.ADMIN ? "primary" : "danger"
-        }
-        loading={roleSubmitting}
-      />
-
-      {/* Plan change */}
-      <ChangePlanDialog
-        open={!!pendingPlanChange}
-        onClose={() => setPendingPlanChange(null)}
-        onConfirm={handleConfirmPlanChange}
-        targetUser={pendingPlanChange}
-        loading={planSubmitting}
-      />
-
-      {/* Suspend confirmation */}
-      <ConfirmDialog
-        open={!!pendingSuspend}
-        onClose={() => setPendingSuspend(null)}
-        onConfirm={handleConfirmSuspend}
-        title="Suspend this account?"
-        description={`"${pendingSuspend?.name}" will be immediately signed out of every device and won't be able to log back in until reactivated.`}
-        confirmLabel="Suspend account"
-        confirmVariant="danger"
-        loading={suspendSubmitting}
-      />
-
-      {/* Reactivate confirmation */}
-      <ConfirmDialog
-        open={!!pendingReactivate}
-        onClose={() => setPendingReactivate(null)}
-        onConfirm={handleConfirmReactivate}
-        title="Reactivate this account?"
-        description={`"${pendingReactivate?.name}" will be able to log in again.`}
-        confirmLabel="Reactivate account"
-        confirmVariant="primary"
-        loading={reactivateSubmitting}
-      />
-
-      {/* Delete confirmation */}
-      <ConfirmDialog
-        open={!!pendingDelete}
-        onClose={() => setPendingDelete(null)}
-        onConfirm={handleConfirmDelete}
-        title="Delete this user permanently?"
-        description={`"${pendingDelete?.name}" and all of their monitors, incidents, and health-check history will be permanently deleted. This cannot be undone.`}
-        confirmLabel="Delete user"
-        confirmVariant="danger"
-        loading={deleteSubmitting}
-      />
-    </PageContainer>
+function AdminConfirm({
+  title,
+  description,
+  onCancel,
+  onConfirm,
+  busy,
+  danger,
+}) {
+  return (
+    <div className="modal-backdrop">
+      <section className="form-modal">
+        <h2>{title}</h2>
+        <p className="muted-copy">{description}</p>
+        <div className="modal-actions">
+          <Button variant="secondary" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            variant={danger ? "danger" : "primary"}
+            disabled={busy}
+            onClick={onConfirm}
+          >
+            {busy ? "Working…" : "Continue"}
+          </Button>
+        </div>
+      </section>
+    </div>
   );
 }

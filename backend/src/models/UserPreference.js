@@ -116,7 +116,7 @@ const userPreferenceSchema = new mongoose.Schema(
         values: THEME_VALUES,
         message: `Theme must be one of: ${THEME_VALUES.join(", ")}`,
       },
-      default: "dark",
+      default: "light",
     },
 
     timezone: {

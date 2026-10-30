@@ -1,26 +1,24 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
-  ArrowLeft,
-  RefreshCw,
-  Shield,
-  Activity,
-  AlertTriangle,
-} from "lucide-react";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import Button from "../components/ui/Button";
-import EmptyState from "../components/ui/EmptyState";
-import ChangePlanDialog from "../features/admin/ChangePlanDialog";
-import {
   useAdminUser,
   useAdminUserPlan,
   useAdminMonitors,
   useUpdateUserPlan,
 } from "../hooks/useAdmin";
 import { ROLES } from "../constants/roles";
+import { formatPlanName } from "../utils/formatPlanName";
+import {
+  Page,
+  Panel,
+  Button,
+  Metric,
+  Status,
+  Table,
+  Select,
+} from "../components/ui/Primitives";
+import { ArrowLeft, Users, CreditCard, Signal, RefreshCw } from "lucide-react";
 
-const panel = "rounded-xl border border-border-subtle bg-bg-surface p-5";
 export default function AdminUserDetails() {
   const { id } = useParams();
   const { data, loading, error, refetch } = useAdminUser(id);
@@ -30,6 +28,8 @@ export default function AdminUserDetails() {
   const monitors = monitorsQuery.data?.data || [];
 
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [nextPlan, setNextPlan] = useState("");
+  const [reason, setReason] = useState("");
   const { updatePlan, submitting: planSubmitting } = useUpdateUserPlan(() => {
     setPlanDialogOpen(false);
     refetch();
@@ -37,295 +37,233 @@ export default function AdminUserDetails() {
   });
 
   const handleConfirmPlanChange = async ({ plan, reason }) => {
-    await updatePlan(user.id, plan, reason);
+    await updatePlan(user.id, plan, user.name, { reason });
+  };
+  if (loading && !data)
+    return (
+      <Page
+        title="Loading account…"
+        description="Loading user and subscription details."
+      />
+    );
+  if (error || !user)
+    return (
+      <Page
+        title="Account unavailable"
+        description="This customer could not be found."
+        actions={<Link to="/admin/users">Back to users</Link>}
+      />
+    );
+  const planInfo = planQuery.data?.plan || planQuery.data;
+  const confirmPlan = () => {
+    if (!nextPlan || !reason.trim()) return;
+    handleConfirmPlanChange({ plan: nextPlan, reason: reason.trim() });
   };
   return (
-    <PageContainer>
-      <PageHeader
-        title={user?.name || "User details"}
-        subtitle="Account profile, monitor usage, and recent records"
-        actions={
+    <Page
+      eyebrow="ADMIN · CUSTOMER"
+      title={user.name || "Customer account"}
+      description={user.email}
+      actions={
+        <>
+          <Link className="sw-button secondary" to="/admin/users">
+            <ArrowLeft size={14} /> All users
+          </Link>
           <Button
-            variant="secondary"
-            size="sm"
-            icon={RefreshCw}
-            onClick={refetch}
+            onClick={() => {
+              setNextPlan(user.plan || "free");
+              setReason("");
+              setPlanDialogOpen(true);
+            }}
           >
-            Refresh
+            <CreditCard size={14} /> Change plan
+          </Button>
+        </>
+      }
+    >
+      <div className="detail-owner-line">
+        <Status value={user.active ? "active" : "suspended"} />
+        <span>Role: {user.role}</span>
+        <span>
+          Joined{" "}
+          {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}
+        </span>
+      </div>
+      <div className="sw-metric-grid">
+        <Metric
+          label="Current plan"
+          value={formatPlanName(user.plan)}
+          icon={CreditCard}
+          note={
+            planInfo?.expiresAt
+              ? `Expires ${new Date(planInfo.expiresAt).toLocaleDateString()}`
+              : "No expiration date"
+          }
+        />
+        <Metric
+          label="Monitors"
+          value={user.monitorCount ?? monitors.length}
+          icon={Signal}
+          note={`${monitors.filter((m) => m.active).length} active`}
+          tone="blue"
+        />
+        <Metric
+          label="Account role"
+          value={user.role === ROLES.ADMIN ? "Admin" : "User"}
+          icon={Users}
+          note={user.active ? "Access enabled" : "Access suspended"}
+          tone="amber"
+        />
+        <Metric
+          label="Email status"
+          value={user.emailVerified ? "Verified" : "Unverified"}
+          icon={Users}
+          note={
+            user.emailVerifiedAt
+              ? new Date(user.emailVerifiedAt).toLocaleDateString()
+              : ""
+          }
+        />
+      </div>
+      <div className="two-panel-grid">
+        <Panel title="Account profile" subtitle="Customer identity and state">
+          <dl className="detail-list">
+            <dt>Name</dt>
+            <dd>{user.name || "—"}</dd>
+            <dt>Email</dt>
+            <dd>{user.email}</dd>
+            <dt>Role</dt>
+            <dd>{user.role}</dd>
+            <dt>Plan</dt>
+            <dd>{formatPlanName(user.plan)}</dd>
+            <dt>Account created</dt>
+            <dd>
+              {user.createdAt ? new Date(user.createdAt).toLocaleString() : "—"}
+            </dd>
+            <dt>Last active</dt>
+            <dd>
+              {user.lastLoginAt
+                ? new Date(user.lastLoginAt).toLocaleString()
+                : "—"}
+            </dd>
+          </dl>
+        </Panel>
+        <Panel
+          title="Subscription details"
+          subtitle="Plan usage and expiration"
+        >
+          {planQuery.loading ? (
+            <div className="sw-loading">Loading plan…</div>
+          ) : (
+            <dl className="detail-list">
+              <dt>Plan</dt>
+              <dd>
+                {planInfo?.definition?.name ||
+                  formatPlanName(planInfo?.id || user.plan)}
+              </dd>
+              <dt>Monitor limit</dt>
+              <dd>{planInfo?.limits?.monitors ?? "—"}</dd>
+              <dt>Data retention</dt>
+              <dd>{planInfo?.limits?.dataRetentionDays ?? "—"} days</dd>
+              <dt>Plan expires</dt>
+              <dd>
+                {planInfo?.expiresAt
+                  ? new Date(planInfo.expiresAt).toLocaleString()
+                  : "Never"}
+              </dd>
+            </dl>
+          )}
+        </Panel>
+      </div>
+      <Panel
+        title="Customer monitors"
+        subtitle={`${monitors.length} monitor records`}
+        actions={
+          <Button variant="secondary" onClick={() => monitorsQuery.refetch()}>
+            <RefreshCw size={14} /> Refresh
           </Button>
         }
-        className="mb-5"
-      />
-      <Link
-        to="/admin/users"
-        className="mb-5 inline-flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300"
       >
-        <ArrowLeft size={15} />
-        Back to users
-      </Link>
-      {error && (
-        <div
-          role="alert"
-          className="my-4 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300"
-        >
-          Could not load this account.{" "}
-          <button onClick={refetch} className="underline">
-            Retry
-          </button>
-        </div>
-      )}
-      {loading && !data ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {[0, 1, 2, 3].map((n) => (
-            <div key={n} className={`${panel} h-40 animate-pulse`} />
-          ))}
-        </div>
-      ) : (
-        user && (
-          <>
-            <div className="grid gap-4 md:grid-cols-3">
-              <section className={panel}>
-                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
-                  <Shield size={16} className="text-emerald-400" />
-                  Account
-                </h2>
-                <p className="text-sm text-zinc-300">{user.email}</p>
-                <p className="mt-2 text-sm capitalize text-zinc-400">
-                  {user.role === ROLES.ADMIN
-                    ? "Admin access"
-                    : `${user.role} · ${user.plan}`}{" "}
-                  · {user.active ? "Active" : "Suspended"}
-                </p>
-                <p className="mt-2 text-xs text-zinc-500">
-                  Joined {new Date(user.createdAt).toLocaleString()}
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Last login{" "}
-                  {user.lastLoginAt
-                    ? new Date(user.lastLoginAt).toLocaleString()
-                    : "Never"}
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Email {user.emailVerifiedAt ? "verified" : "unverified"}
-                </p>
-              </section>
-              <section className={panel}>
-                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
-                  <Activity size={16} className="text-emerald-400" />
-                  Monitor usage
-                </h2>
-                <p className="text-3xl font-semibold text-white">
-                  {data.monitorUsage.total}
-                </p>
-                <p className="text-sm text-zinc-500">total monitors</p>
-                <p className="mt-3 text-sm text-zinc-400">
-                  {data.monitorUsage.active} active
-                </p>
-              </section>
-              <section className={panel}>
-                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
-                  <AlertTriangle size={16} className="text-emerald-400" />
-                  Relevant incidents
-                </h2>
-                {data.incidents.length ? (
-                  data.incidents.map((incident) => (
-                    <div
-                      key={incident.id}
-                      className="border-t border-zinc-800 py-2"
-                    >
-                      <p className="text-sm text-zinc-300">
-                        {incident.monitor?.name || "Monitor unavailable"}
-                      </p>
-                      <p className="text-xs capitalize text-zinc-500">
-                        {incident.severity} · {incident.status} ·{" "}
-                        {new Date(incident.startedAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-zinc-500">No incidents found.</p>
-                )}
-              </section>
-            </div>
-            <section className={`${panel} mt-4`}>
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold text-white">Monitors</h2>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    {monitorsQuery.data?.pagination?.total ??
-                      data.monitorUsage.total}{" "}
-                    total · {data.monitorUsage.active} active
-                  </p>
-                </div>
+        <Table
+          columns={[
+            {
+              key: "name",
+              label: "Monitor",
+              render: (v, row) => (
+                <>
+                  <b>{v}</b>
+                  <small className="table-secondary">{row.url}</small>
+                </>
+              ),
+            },
+            {
+              key: "status",
+              label: "Status",
+              render: (v, row) => (
+                <Status value={v || (row.active ? "unknown" : "paused")} />
+              ),
+            },
+            {
+              key: "interval",
+              label: "Interval",
+              render: (v) => (v ? `${v}s` : "—"),
+            },
+            {
+              key: "id",
+              label: "",
+              render: (v, row) => (
+                <Link
+                  className="text-link"
+                  to={`/admin/monitors/${v || row._id}`}
+                >
+                  Details
+                </Link>
+              ),
+            },
+          ]}
+          rows={monitors}
+        />
+      </Panel>
+      {planDialogOpen && (
+        <div className="modal-backdrop">
+          <section className="form-modal">
+            <h2>Change customer plan</h2>
+            <div className="sw-form">
+              <Select
+                label="New plan"
+                value={nextPlan}
+                onChange={(e) => setNextPlan(e.target.value)}
+              >
+                <option value="free">Free</option>
+                <option value="pro">Pro</option>
+                <option value="unlimited">Enterprise</option>
+              </Select>
+              <label className="sw-field">
+                Audit reason
+                <textarea
+                  rows="3"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </label>
+              <div className="modal-actions">
                 <Button
                   variant="secondary"
-                  size="sm"
-                  onClick={monitorsQuery.refetch}
+                  onClick={() => setPlanDialogOpen(false)}
                 >
-                  Refresh
+                  Cancel
+                </Button>
+                <Button
+                  disabled={planSubmitting || !reason.trim()}
+                  onClick={confirmPlan}
+                >
+                  {planSubmitting ? "Updating…" : "Update plan"}
                 </Button>
               </div>
-              {monitorsQuery.error ? (
-                <p role="alert" className="text-sm text-red-300">
-                  Could not load this user’s monitors.{" "}
-                  <button onClick={monitorsQuery.refetch} className="underline">
-                    Retry
-                  </button>
-                </p>
-              ) : monitorsQuery.loading && !monitorsQuery.data ? (
-                <div className="h-20 animate-pulse rounded-lg bg-zinc-900/70" />
-              ) : monitors.length ? (
-                <div className="divide-y divide-zinc-800">
-                  {monitors.map((monitor) => (
-                    <Link
-                      key={monitor.id}
-                      to={`/admin/monitors/${monitor.id}`}
-                      className="flex items-center justify-between gap-4 py-3 hover:text-emerald-300"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm text-zinc-200">
-                          {monitor.name}
-                        </span>
-                        <span className="block truncate text-xs text-zinc-500">
-                          {monitor.url}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-xs text-zinc-400">
-                        {monitor.latestCheck?.status || "Pending"} ·{" "}
-                        {monitor.active ? "Active" : "Paused"}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-zinc-500">
-                  This user has no monitors.
-                </p>
-              )}
-            </section>
-            <section className={`${panel} mt-4`}>
-              <h2 className="mb-3 text-sm font-semibold text-white">
-                Recent account activity
-              </h2>
-              {data.recentActivity.length ? (
-                data.recentActivity.map((item) => (
-                  <div key={item.id} className="border-t border-zinc-800 py-3">
-                    <p className="text-sm text-zinc-300">{item.description}</p>
-                    <p className="mt-1 text-xs capitalize text-zinc-500">
-                      {item.category} ·{" "}
-                      {new Date(item.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <EmptyState
-                  title="No recent activity"
-                  description="Activity entries will appear here when the account is used."
-                />
-              )}
-            </section>
-            {user.role !== ROLES.ADMIN && planQuery.error && (
-              <p role="alert" className="mt-4 text-sm text-red-300">
-                Plan details could not be loaded.{" "}
-                <button onClick={planQuery.refetch} className="underline">
-                  Retry
-                </button>
-              </p>
-            )}
-            {user.role !== ROLES.ADMIN && planQuery.data && (
-              <section className={`${panel} mt-4`}>
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-white">
-                    Subscription details
-                  </h2>
-                  <Button
-                    variant="secondary"
-                    size="xs"
-                    onClick={() => setPlanDialogOpen(true)}
-                  >
-                    Change plan
-                  </Button>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <p className="text-xs text-zinc-500">Current plan</p>
-                    <p className="mt-1 capitalize text-white">
-                      {planQuery.data.plan.id} · {planQuery.data.plan.status}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-zinc-500">Monitor usage</p>
-                    <p className="mt-1 text-white">
-                      {planQuery.data.usage.monitors.used} /{" "}
-                      {planQuery.data.usage.monitors.limit ?? "Unlimited"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-zinc-500">
-                      Minimum check interval
-                    </p>
-                    <p className="mt-1 text-white">
-                      {planQuery.data.usage.interval.minSeconds}s
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-zinc-500">Expiry</p>
-                    <p className="mt-1 text-white">
-                      {planQuery.data.plan.expiresAt
-                        ? new Date(
-                            planQuery.data.plan.expiresAt,
-                          ).toLocaleString()
-                        : "No scheduled expiry"}
-                    </p>
-                  </div>
-                </div>
-                <h3 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  Plan change history
-                </h3>
-                {planQuery.data.history.length ? (
-                  planQuery.data.history.map((entry, index) => (
-                    <div
-                      key={`${entry.changedAt}-${index}`}
-                      className="border-t border-zinc-800 py-2 text-sm text-zinc-300"
-                    >
-                      <span className="capitalize">
-                        {entry.from || "New"} → {entry.to}
-                      </span>
-                      <span className="ml-3 text-xs text-zinc-500">
-                        {new Date(entry.changedAt).toLocaleString()}
-                      </span>
-                      {entry.expiresAt && (
-                        <span className="ml-3 text-xs text-zinc-500">
-                          expires{" "}
-                          {new Date(entry.expiresAt).toLocaleDateString()}
-                        </span>
-                      )}
-                      {entry.reason && (
-                        <p className="mt-1 text-xs text-zinc-500">
-                          {entry.reason}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-zinc-500">
-                    No recorded plan changes.
-                  </p>
-                )}
-              </section>
-            )}
-          </>
-        )
+            </div>
+          </section>
+        </div>
       )}
-      {user && (
-        <ChangePlanDialog
-          open={planDialogOpen}
-          onClose={() => setPlanDialogOpen(false)}
-          onConfirm={handleConfirmPlanChange}
-          targetUser={user}
-          loading={planSubmitting}
-        />
-      )}
-    </PageContainer>
+    </Page>
   );
 }

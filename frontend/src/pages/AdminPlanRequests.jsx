@@ -1,20 +1,11 @@
 import { useState, useMemo } from "react";
-import { ClipboardCheck, RefreshCw } from "lucide-react";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import Button from "../components/ui/Button";
-import Pagination from "../components/ui/Pagination";
-import EmptyState from "../components/ui/EmptyState";
-import { SkeletonRow } from "../components/ui/Skeleton";
-import PlanRequestRow from "../features/admin/PlanRequestRow";
-import RejectPlanRequestDialog from "../features/admin/RejectPlanRequestDialog";
-import ApprovePlanRequestDialog from "../features/admin/ApprovePlanRequestDialog";
 import {
   usePlanUpgradeRequestList,
   useApprovePlanUpgradeRequest,
   useRejectPlanUpgradeRequest,
 } from "../hooks/useAdmin";
-import { cn } from "../utils/cn";
+import { Page, Panel, Button, Status } from "../components/ui/Primitives";
+import { Check, X, RefreshCw } from "lucide-react";
 
 const STATUS_FILTERS = [
   { label: "Pending", value: "pending" },
@@ -83,126 +74,191 @@ export default function AdminPlanRequests() {
   };
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Plan Requests"
-        subtitle="Review and act on manual plan upgrade requests"
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={RefreshCw}
-            onClick={refetch}
-          >
-            Refresh
-          </Button>
-        }
-        className="mb-6"
-      />
-
-      <div className="mb-5 flex items-center gap-3">
-        <div className="flex items-center gap-1 rounded-lg border border-border-default bg-bg-elevated p-1">
-          {STATUS_FILTERS.map((f) => (
+    <Page
+      title="Upgrade requests"
+      description="Review customer requests for access to higher plan tiers."
+      eyebrow="ADMIN · BILLING"
+      actions={
+        <Button variant="secondary" onClick={refetch}>
+          <RefreshCw size={14} /> Refresh
+        </Button>
+      }
+    >
+      <Panel
+        title="Plan upgrade queue"
+        subtitle={`${requests.length} requests on this page`}
+      >
+        <div className="filter-pills">
+          {STATUS_FILTERS.map((item) => (
             <button
-              key={f.value}
-              onClick={() => changeStatusFilter(f.value)}
-              className={cn(
-                "rounded-md px-3 py-1 text-xs font-medium transition-all",
-                statusFilter === f.value
-                  ? "bg-bg-subtle text-white"
-                  : "text-text-muted hover:text-text-secondary",
-              )}
+              className={statusFilter === item.value ? "active" : ""}
+              key={item.value}
+              onClick={() => changeStatusFilter(item.value)}
             >
-              {f.label}
+              {item.label}
             </button>
           ))}
         </div>
-        {pagination && (
-          <p className="ml-auto text-xs text-text-muted">
-            {pagination.total} request{pagination.total !== 1 ? "s" : ""}
-          </p>
+        {error && (
+          <div className="sw-notice error">Could not load requests.</div>
         )}
-      </div>
-
-      {error && (
-        <div
-          role="alert"
-          className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-300"
-        >
-          Upgrade requests could not be loaded.{" "}
-          <button onClick={refetch} className="underline">
-            Retry
-          </button>
-        </div>
-      )}
-
-      <div className="rounded-xl border border-border-subtle bg-bg-surface">
-        <div className="grid grid-cols-[1fr_110px_130px_130px_100px_180px] items-center gap-3 border-b border-border-subtle px-5 py-3">
-          {COLUMN_HEADERS.map((h, i) => (
-            <p
-              key={i}
-              className="text-[11px] font-semibold uppercase tracking-wider text-text-disabled"
-            >
-              {h}
-            </p>
-          ))}
-        </div>
-
         {loading ? (
-          Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
-        ) : !requests.length ? (
-          <EmptyState
-            icon={ClipboardCheck}
-            title={
-              statusFilter === "pending"
-                ? "No pending requests"
-                : "No requests found"
-            }
-            description={
-              statusFilter === "pending"
-                ? "New upgrade requests from users will appear here."
-                : "Try a different filter."
-            }
-            className="py-16"
-          />
+          <div className="sw-loading">Loading requests…</div>
         ) : (
-          requests.map((request) => (
-            <PlanRequestRow
-              key={getRequestId(request)}
-              request={request}
-              onApprove={() => setPendingApprove(request)}
-              onReject={() => setPendingReject(request)}
-              approving={approvingId === getRequestId(request)}
-              rejecting={rejectingId === getRequestId(request)}
-            />
-          ))
+          <div className="sw-table-wrap">
+            <table className="sw-table">
+              <thead>
+                <tr>
+                  {COLUMN_HEADERS.map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((request) => {
+                  const id = getRequestId(request);
+                  return (
+                    <tr key={id}>
+                      <td>
+                        <b>
+                          {request.user?.name ||
+                            request.user?.email ||
+                            "Customer"}
+                        </b>
+                        <small className="table-secondary">
+                          {request.user?.email}
+                        </small>
+                      </td>
+                      <td>
+                        {request.currentPlan || request.user?.plan || "—"}
+                      </td>
+                      <td>
+                        <b>{request.requestedPlan}</b>
+                        {request.message && (
+                          <small className="table-secondary">
+                            {request.message}
+                          </small>
+                        )}
+                      </td>
+                      <td>
+                        {request.createdAt
+                          ? new Date(request.createdAt).toLocaleString()
+                          : "—"}
+                      </td>
+                      <td>
+                        <Status value={request.status} />
+                      </td>
+                      <td>
+                        {request.status === "pending" && (
+                          <div className="row-actions">
+                            <button
+                              title="Approve"
+                              onClick={() => setPendingApprove(request)}
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button
+                              title="Reject"
+                              onClick={() => setPendingReject(request)}
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!requests.length && (
+                  <tr>
+                    <td colSpan="6" className="table-empty">
+                      No requests in this queue.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
-
-      {pagination && pagination.totalPages > 1 && (
-        <Pagination
-          page={pagination.page}
-          totalPages={pagination.totalPages}
-          onPageChange={setPage}
-          className="mt-4"
-        />
+        {pagination && (
+          <div className="pagination-bar">
+            <span>
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <div>
+              <Button
+                variant="secondary"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={page >= pagination.totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </Panel>
+      {(pendingApprove || pendingReject) && (
+        <div className="modal-backdrop">
+          <section className="form-modal">
+            <h2>
+              {pendingApprove
+                ? "Approve upgrade request?"
+                : "Reject upgrade request?"}
+            </h2>
+            <p className="muted-copy">
+              {pendingApprove
+                ? `Grant ${pendingApprove.requestedPlan} to ${pendingApprove.user?.name || pendingApprove.user?.email}?`
+                : "The customer will be notified of the decision."}
+            </p>
+            <div className="modal-actions">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setPendingApprove(null);
+                  setPendingReject(null);
+                }}
+              >
+                Cancel
+              </Button>
+              {pendingApprove ? (
+                <Button
+                  disabled={approvingId === getRequestId(pendingApprove)}
+                  onClick={() => {
+                    const reason = window.prompt("Approval reason (required):");
+                    if (reason?.trim())
+                      handleConfirmApprove({
+                        grantedPlan: pendingApprove.requestedPlan,
+                        reason: reason.trim(),
+                      });
+                  }}
+                >
+                  {approvingId ? "Approving…" : "Approve"}
+                </Button>
+              ) : (
+                <Button
+                  variant="danger"
+                  disabled={rejectingId === getRequestId(pendingReject)}
+                  onClick={() => {
+                    const reason = window.prompt(
+                      "Reason for rejection (required):",
+                    );
+                    if (reason?.trim()) handleConfirmReject(reason.trim());
+                  }}
+                >
+                  {rejectingId ? "Rejecting…" : "Reject request"}
+                </Button>
+              )}
+            </div>
+          </section>
+        </div>
       )}
-
-      <ApprovePlanRequestDialog
-        open={!!pendingApprove}
-        onClose={() => setPendingApprove(null)}
-        onConfirm={handleConfirmApprove}
-        targetRequest={pendingApprove}
-        loading={approvingId === getRequestId(pendingApprove)}
-      />
-
-      <RejectPlanRequestDialog
-        open={!!pendingReject}
-        onClose={() => setPendingReject(null)}
-        onConfirm={handleConfirmReject}
-        targetRequest={pendingReject}
-        loading={rejectingId === getRequestId(pendingReject)}
-      />
-    </PageContainer>
+    </Page>
   );
 }

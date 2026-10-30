@@ -1,140 +1,195 @@
-import { RefreshCw, ShieldAlert } from "lucide-react";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import Button from "../components/ui/Button";
-import SectionLabel from "../components/ui/SectionLabel";
-import EmptyState from "../components/ui/EmptyState";
-import { Skeleton } from "../components/ui/Skeleton";
-import SslOverviewStats from "../features/ssl/SslOverviewStats";
-import SslMonitorsTable from "../features/ssl/SslMonitorsTable";
 import { useSslOverview } from "../hooks/useSsl";
-import { formatDate } from "../utils/format";
+import {
+  Page,
+  Panel,
+  Metric,
+  Status,
+  Button,
+  Table,
+  Empty,
+} from "../components/ui/Primitives";
+import { RefreshCw, ShieldCheck, ShieldAlert, Globe2 } from "lucide-react";
+
+const getDomainLabel = (record) => {
+  const domain = record?.domain;
+  if (typeof domain === "string") return domain;
+  return (
+    domain?.name || record?.hostname || record?.monitor?.url || "Unknown domain"
+  );
+};
 
 export default function SslMonitoring() {
   const { data, loading, error, refetch } = useSslOverview();
   const overview = data?.data;
 
-  const isInitialLoad = loading && !data;
+  const _isInitialLoad = loading && !data;
 
   const expiringSoonCertificates = overview?.expiringSoonCertificates || [];
   const expiringSoonDomains = overview?.expiringSoonDomains || [];
 
+  const certificates = overview?.monitors || [];
+  const certRows = certificates.map((item) => ({
+    ...item,
+    host: getDomainLabel(item),
+    monitorName: item.monitor?.name || "Monitor",
+    issuer:
+      item.certificate?.issuer ||
+      item.certificate?.issuerOrganization ||
+      "Unknown issuer",
+    expiry:
+      item.certificate?.validTo || item.expiresAt || item.certificateExpiry,
+    days: item.daysRemaining,
+    state: item.status || "unknown",
+  }));
+  const columns = [
+    { key: "host", label: "Domain" },
+    { key: "monitorName", label: "Monitor" },
+    { key: "issuer", label: "Issuer" },
+    {
+      key: "days",
+      label: "Expires",
+      render: (value) =>
+        value == null
+          ? "Unknown"
+          : value < 0
+            ? `${Math.abs(value)} days overdue`
+            : `${value} days`,
+    },
+    {
+      key: "state",
+      label: "Certificate status",
+      render: (value) => <Status value={value} />,
+    },
+  ];
   return (
-    <PageContainer>
-      <PageHeader
-        title="SSL & Domain Monitoring"
-        subtitle="Certificate validity, expiry tracking, and domain registration status across your monitors"
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={RefreshCw}
-            onClick={refetch}
-          >
-            Refresh
-          </Button>
-        }
-        className="mb-6"
-      />
-
-      {error && !data ? (
-        <EmptyState
-          icon={ShieldAlert}
-          title="Couldn't load SSL overview"
-          description="Something went wrong while fetching SSL data. Check your connection and try again."
-          action={
-            <Button variant="secondary" size="sm" onClick={refetch}>
-              Try again
-            </Button>
-          }
-          className="py-16"
+    <Page
+      title="SSL monitoring"
+      description="Track certificate health and expiration for your monitored domains."
+      actions={
+        <Button variant="secondary" onClick={refetch}>
+          <RefreshCw size={14} /> Refresh
+        </Button>
+      }
+    >
+      <div className="sw-metric-grid">
+        <Metric
+          label="Eligible websites"
+          value={overview?.totals?.eligibleMonitors ?? "—"}
+          icon={Globe2}
+          note="HTTPS monitors"
         />
-      ) : (
-        <>
-          <div className="mb-6">
-            <SectionLabel className="mb-3">Overview</SectionLabel>
-            <SslOverviewStats overview={overview} loading={isInitialLoad} />
-          </div>
-
-          {!isInitialLoad &&
-            (expiringSoonCertificates.length > 0 ||
-              expiringSoonDomains.length > 0) && (
-              <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {expiringSoonCertificates.length > 0 && (
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
-                    <p className="mb-3 text-sm font-semibold text-amber-200">
-                      Certificates needing attention
-                    </p>
-                    <div className="space-y-2">
-                      {expiringSoonCertificates.map((item) => (
-                        <div
-                          key={item.id || item._id}
-                          className="flex items-center justify-between gap-3 text-xs"
-                        >
-                          <span className="truncate text-text-secondary">
-                            {item.monitor?.name || item.hostname}
-                          </span>
-                          <span className="shrink-0 font-medium text-amber-300">
-                            {item.daysRemaining != null
-                              ? item.daysRemaining < 0
-                                ? `Expired ${formatDate(item.certificate?.validTo)}`
-                                : `${item.daysRemaining}d left`
-                              : "—"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {expiringSoonDomains.length > 0 && (
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
-                    <p className="mb-3 text-sm font-semibold text-amber-200">
-                      Domains needing attention
-                    </p>
-                    <div className="space-y-2">
-                      {expiringSoonDomains.map((item) => (
-                        <div
-                          key={item.id || item._id}
-                          className="flex items-center justify-between gap-3 text-xs"
-                        >
-                          <span className="truncate text-text-secondary">
-                            {item.monitor?.name || item.domain?.name}
-                          </span>
-                          <span className="shrink-0 font-medium text-amber-300">
-                            {item.domain?.daysRemaining != null
-                              ? item.domain.daysRemaining < 0
-                                ? `Expired ${formatDate(item.domain?.expiresAt)}`
-                                : `${item.domain.daysRemaining}d left`
-                              : "—"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-          <div>
-            <SectionLabel className="mb-3">
-              All Monitored Endpoints
-            </SectionLabel>
-            {isInitialLoad ? (
-              <div className="space-y-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
-                ))}
-              </div>
-            ) : (
-              <SslMonitorsTable
-                items={overview?.monitors || []}
-                loading={false}
-              />
-            )}
-          </div>
-        </>
+        <Metric
+          label="Certificates monitored"
+          value={overview?.totals?.monitoredCount ?? "—"}
+          icon={ShieldCheck}
+          note={`${overview?.totals?.notMonitoredCount ?? 0} not enabled`}
+          tone="blue"
+        />
+        <Metric
+          label="Healthy"
+          value={
+            overview?.statusCounts?.valid ??
+            overview?.statusCounts?.healthy ??
+            0
+          }
+          icon={ShieldCheck}
+          note="Certificates in good standing"
+        />
+        <Metric
+          label="Needs attention"
+          value={
+            expiringSoonCertificates.length + expiringSoonDomains.length || 0
+          }
+          icon={ShieldAlert}
+          tone="amber"
+          note="Expired or expiring soon"
+        />
+      </div>
+      {error && (
+        <div className="sw-notice error">
+          SSL information could not be loaded.{" "}
+          <button onClick={refetch}>Try again</button>
+        </div>
       )}
-    </PageContainer>
+      <Panel
+        title="Certificates"
+        subtitle="The latest certificate check for each domain"
+      >
+        {loading && !data ? (
+          <div className="sw-loading">Loading certificate data…</div>
+        ) : certRows.length ? (
+          <Table columns={columns} rows={certRows} />
+        ) : (
+          <Empty title="No certificates found">
+            Add an HTTPS monitor to begin tracking certificates.
+          </Empty>
+        )}
+      </Panel>
+      <div className="two-panel-grid">
+        <Panel
+          title="Certificates expiring soon"
+          subtitle="Renew before visitors encounter security warnings"
+        >
+          <Table
+            columns={[
+              { key: "host", label: "Domain" },
+              {
+                key: "days",
+                label: "Time remaining",
+                render: (value) =>
+                  value == null
+                    ? "Unknown"
+                    : value < 0
+                      ? "Expired"
+                      : `${value} days`,
+              },
+              {
+                key: "status",
+                label: "Status",
+                render: (value) => <Status value={value} />,
+              },
+            ]}
+            rows={expiringSoonCertificates.map((c) => ({
+              ...c,
+              host: getDomainLabel(c),
+            }))}
+            empty="No certificates are close to expiry."
+          />
+        </Panel>
+        <Panel
+          title="Domain renewals"
+          subtitle="Domain registration expiration"
+        >
+          <Table
+            columns={[
+              { key: "host", label: "Domain" },
+              {
+                key: "days",
+                label: "Time remaining",
+                render: (value) =>
+                  value == null
+                    ? "Unknown"
+                    : value < 0
+                      ? "Expired"
+                      : `${value} days`,
+              },
+              {
+                key: "state",
+                label: "Status",
+                render: (_, row) => (
+                  <Status value={row.domain?.status || row.status} />
+                ),
+              },
+            ]}
+            rows={expiringSoonDomains.map((c) => ({
+              ...c,
+              host: getDomainLabel(c),
+              days: c.domain?.daysRemaining,
+            }))}
+            empty="No domain expiration warnings."
+          />
+        </Panel>
+      </div>
+    </Page>
   );
 }

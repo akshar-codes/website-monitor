@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, RefreshCw } from "lucide-react";
-import PageContainer from "../components/layout/PageContainer";
-import PageHeader from "../components/layout/PageHeader";
-import Button from "../components/ui/Button";
-import EmptyState from "../components/ui/EmptyState";
-import Pagination from "../components/ui/Pagination";
-import { SkeletonRow } from "../components/ui/Skeleton";
-import { Input, Select } from "../components/ui/Input";
 import { useAdminIncidents } from "../hooks/useAdmin";
+import {
+  Page,
+  Panel,
+  Button,
+  Input,
+  Select,
+  Status,
+  Table,
+  Notice,
+} from "../components/ui/Primitives";
+import { RefreshCw } from "lucide-react";
 
 export default function AdminIncidents() {
   const [page, setPage] = useState(1);
@@ -27,143 +30,131 @@ export default function AdminIncidents() {
   );
   const { data, loading, error, refetch } = useAdminIncidents(params);
   const incidents = data?.data || [];
+  const rows = incidents.map((item) => ({
+    ...item,
+    monitorName: item.monitor?.name || "Unknown monitor",
+    ownerName: item.owner?.name || item.user?.name || "Unknown",
+    summary:
+      item.title || item.message || item.description || "Service interruption",
+    when: item.startedAt || item.createdAt,
+  }));
   return (
-    <PageContainer>
-      <PageHeader
-        title="Incident oversight"
-        subtitle="Investigate incidents across monitored accounts"
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={RefreshCw}
-            onClick={refetch}
+    <Page
+      title="Incident oversight"
+      description="Review outages across customer monitors and follow resolution."
+      eyebrow="ADMIN"
+      actions={
+        <Button variant="secondary" onClick={refetch}>
+          <RefreshCw size={14} /> Refresh
+        </Button>
+      }
+    >
+      <Panel
+        title="All incidents"
+        subtitle={`${data?.pagination?.total ?? incidents.length} records`}
+      >
+        <div className="filter-toolbar">
+          <Input
+            aria-label="Search incidents"
+            placeholder="Search monitor, owner, or incident"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+          <Select
+            aria-label="Severity"
+            value={severity}
+            onChange={(e) => {
+              setSeverity(e.target.value);
+              setPage(1);
+            }}
           >
-            Refresh
-          </Button>
-        }
-        className="mb-5"
-      />
-      <div className="mb-4 grid gap-2 sm:grid-cols-3">
-        <Input
-          placeholder="Search monitor, root cause, or notes"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <Select
-          value={severity}
-          onChange={(e) => {
-            setSeverity(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">All severities</option>
-          <option value="critical">Critical</option>
-          <option value="major">Major</option>
-          <option value="minor">Minor</option>
-        </Select>
-        <Select
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">All statuses</option>
-          <option value="ongoing">Ongoing</option>
-          <option value="investigating">Investigating</option>
-          <option value="identified">Identified</option>
-          <option value="resolved">Resolved</option>
-        </Select>
-      </div>
-      {error && (
-        <div
-          role="alert"
-          className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-300"
-        >
-          Incident list could not be loaded.{" "}
-          <button onClick={refetch} className="underline">
-            Retry
-          </button>
+            <option value="">All severity</option>
+            {["critical", "high", "medium", "low"].map((x) => (
+              <option key={x}>{x}</option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Status"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All status</option>
+            {["open", "investigating", "resolved"].map((x) => (
+              <option key={x}>{x}</option>
+            ))}
+          </Select>
         </div>
-      )}
-      <div className="overflow-x-auto rounded-xl border border-border-subtle bg-bg-surface">
-        <table className="w-full min-w-212.5 text-left text-sm">
-          <thead>
-            <tr className="border-b border-border-subtle text-[11px] uppercase text-text-disabled">
-              <th className="px-4 py-3">Incident</th>
-              <th className="px-4 py-3">Owner</th>
-              <th className="px-4 py-3">Severity</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Started</th>
-              <th className="px-4 py-3">Duration</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading
-              ? Array.from({ length: 5 }, (_, i) => (
-                  <tr key={i}>
-                    <td colSpan="6">
-                      <SkeletonRow />
-                    </td>
-                  </tr>
-                ))
-              : incidents.map((item) => (
-                  <tr key={item._id} className="border-b border-zinc-800/70">
-                    <td className="px-4 py-3">
-                      <Link
-                        to={`/admin/incidents/${item._id}`}
-                        className="font-medium text-zinc-200 hover:text-emerald-400"
-                      >
-                        {item.monitor?.name || "Monitor unavailable"}
-                      </Link>
-                      <p className="text-xs text-zinc-500">
-                        {item.monitor?.url}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-300">
-                      {item.monitor?.owner?.name || "Unknown"}
-                      <p className="text-xs text-zinc-500">
-                        {item.monitor?.owner?.email}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 capitalize text-zinc-300">
-                      {item.severity}
-                    </td>
-                    <td className="px-4 py-3 capitalize text-zinc-300">
-                      {item.status}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-zinc-500">
-                      {new Date(item.startedAt).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-zinc-400">
-                      {item.duration == null
-                        ? "Unavailable"
-                        : `${item.duration}s`}
-                    </td>
-                  </tr>
-                ))}
-          </tbody>
-        </table>
-        {!loading && !incidents.length && (
-          <EmptyState
-            icon={AlertTriangle}
-            title="No incidents found"
-            description="Try changing the filters or search term."
+        {error && <Notice tone="error">Could not load incidents.</Notice>}
+        {loading ? (
+          <div className="sw-loading">Loading incidents…</div>
+        ) : (
+          <Table
+            columns={[
+              { key: "monitorName", label: "Monitor" },
+              { key: "summary", label: "Incident" },
+              { key: "ownerName", label: "Owner" },
+              {
+                key: "severity",
+                label: "Severity",
+                render: (v) => <Status value={v} />,
+              },
+              {
+                key: "status",
+                label: "Status",
+                render: (v) => <Status value={v} />,
+              },
+              {
+                key: "when",
+                label: "Started",
+                render: (v) => (v ? new Date(v).toLocaleString() : "—"),
+              },
+              {
+                key: "open",
+                label: "",
+                render: (_, row) => (
+                  <Link
+                    className="text-link"
+                    to={`/admin/incidents/${row.id || row._id}`}
+                  >
+                    Review
+                  </Link>
+                ),
+              },
+            ]}
+            rows={rows}
+            empty="No incidents match these filters."
           />
         )}
-      </div>
-      {data?.pagination?.totalPages > 1 && (
-        <Pagination
-          page={data.pagination.page}
-          totalPages={data.pagination.totalPages}
-          onPageChange={setPage}
-          className="mt-4"
-        />
-      )}
-    </PageContainer>
+        {data?.pagination && (
+          <div className="pagination-bar">
+            <span>
+              Page {data.pagination.page} of {data.pagination.totalPages}
+            </span>
+            <div>
+              <Button
+                variant="secondary"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={page >= data.pagination.totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </Panel>
+    </Page>
   );
 }
