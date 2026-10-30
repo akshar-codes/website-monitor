@@ -5,6 +5,8 @@ import useAuthForm from "../hooks/useAuthForm";
 import { ROUTES } from "../constants/routes";
 import { ROLES } from "../constants/roles";
 import { mapAuthError, getAuthErrorCode } from "../utils/AuthErrors";
+import { AuthShell, Button, Input, Notice } from "../components/ui/Primitives";
+import { Link } from "react-router-dom";
 
 export default function Login() {
   const { login } = useAuth();
@@ -57,5 +59,61 @@ export default function Login() {
     }
   };
 
-  return null;
+  return (
+    <AuthShell
+      title="Welcome back"
+      description="Sign in to check in on your websites."
+      footer={
+        <>
+          New to SiteWatch? <Link to="/register">Create an account</Link>
+        </>
+      }
+    >
+      <form className="sw-form" onSubmit={handleSubmit} noValidate>
+        {apiError && <Notice tone="error">{apiError}</Notice>}
+        {unverifiedEmail && (
+          <Notice tone="warning">
+            Your email needs verification. Check your inbox for a verification
+            link, or request a new one from the sign up flow.
+          </Notice>
+        )}
+        <Input
+          label="Email address"
+          type="email"
+          autoComplete="email"
+          placeholder="you@company.com"
+          value={values.email || ""}
+          onChange={makeChangeHandler("email")}
+          onBlur={handleBlur("email")}
+          error={errors.email}
+          required
+        />
+        <Input
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          placeholder="Enter your password"
+          value={values.password || ""}
+          onChange={makeChangeHandler("password")}
+          onBlur={handleBlur("password")}
+          error={errors.password}
+          required
+        />
+        <div className="form-inline">
+          <label className="check-label">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(event) => setRememberMe(event.target.checked)}
+            />{" "}
+            Remember me
+          </label>
+          <Link to="/forgot-password">Forgot password?</Link>
+        </div>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? "Signing in…" : "Sign in"}
+        </Button>
+      </form>
+    </AuthShell>
+  );
 }

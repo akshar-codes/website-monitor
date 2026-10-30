@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import useAuthForm from "../hooks/useAuthForm";
-import { ROUTES } from "../constants/routes";
 import { mapAuthError } from "../utils/AuthErrors";
+import { AuthShell, Button, Input, Notice } from "../components/ui/Primitives";
+import { Link } from "react-router-dom";
 
 export default function Register() {
   const { register } = useAuth();
-  const navigate = useNavigate();
 
   const {
     values,
@@ -54,5 +53,73 @@ export default function Register() {
     }
   };
 
-  return null;
+  return (
+    <AuthShell
+      title={registeredEmail ? "Check your email" : "Create your account"}
+      description={
+        registeredEmail
+          ? `We sent a verification link to ${registeredEmail}. Verify your email to sign in.`
+          : "Start monitoring your websites in a few minutes."
+      }
+      footer={
+        <>
+          Already have an account? <Link to="/login">Sign in</Link>
+        </>
+      }
+    >
+      <form className="sw-form" onSubmit={handleSubmit} noValidate>
+        {apiError && <Notice tone="error">{apiError}</Notice>}
+        {!registeredEmail && (
+          <>
+            <Input
+              label="Full name"
+              autoComplete="name"
+              placeholder="Your name"
+              value={values.name || ""}
+              onChange={makeChangeHandler("name")}
+              onBlur={handleBlur("name")}
+              error={errors.name}
+              required
+            />
+            <Input
+              label="Email address"
+              type="email"
+              autoComplete="email"
+              placeholder="you@company.com"
+              value={values.email || ""}
+              onChange={makeChangeHandler("email")}
+              onBlur={handleBlur("email")}
+              error={errors.email}
+              required
+            />
+            <Input
+              label="Password"
+              type="password"
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              value={values.password || ""}
+              onChange={makeChangeHandler("password")}
+              onBlur={handleBlur("password")}
+              error={errors.password}
+              required
+            />
+            <Input
+              label="Confirm password"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Re-enter your password"
+              value={values.confirmPassword || ""}
+              onChange={makeChangeHandler("confirmPassword")}
+              onBlur={handleBlur("confirmPassword")}
+              error={errors.confirmPassword}
+              required
+            />
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Creating account…" : "Create account"}
+            </Button>
+          </>
+        )}
+      </form>
+    </AuthShell>
+  );
 }

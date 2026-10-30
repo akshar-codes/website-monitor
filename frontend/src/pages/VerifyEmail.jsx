@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { ROUTES } from "../constants/routes";
 import { mapAuthError } from "../utils/AuthErrors";
 import * as authApi from "../services/api/auth";
+import { AuthShell, Button, Notice } from "../components/ui/Primitives";
+import { Link } from "react-router-dom";
 
 /**
  * Lands here from the link in the verification email:
@@ -43,5 +45,43 @@ export default function VerifyEmail() {
     })();
   }, [token]);
 
-  return null;
+  return (
+    <AuthShell
+      title={
+        status === "success"
+          ? "Email verified"
+          : status === "pending"
+            ? "Verifying your email"
+            : "Email verification"
+      }
+      description={
+        message ||
+        (status === "pending"
+          ? "Confirming your email address…"
+          : "Use the link in your verification email to activate your account.")
+      }
+      footer={
+        status === "success" ? (
+          <Link to={ROUTES.LOGIN}>Continue to sign in</Link>
+        ) : (
+          <Link to={ROUTES.REGISTER}>Create an account</Link>
+        )
+      }
+    >
+      <Notice
+        tone={
+          status === "failed" || status === "missing" ? "warning" : "success"
+        }
+      >
+        {status === "pending"
+          ? "Please wait while we confirm your address."
+          : message || "The verification link is missing or invalid."}
+      </Notice>
+      {status === "success" && (
+        <Button type="button" onClick={() => navigate(ROUTES.LOGIN)}>
+          Sign in
+        </Button>
+      )}
+    </AuthShell>
+  );
 }
