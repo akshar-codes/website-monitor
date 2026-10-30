@@ -255,6 +255,33 @@ button {
   margin: 0 auto;
   padding: 20px 28px 28px;
 }
+
+.compact-dashboard .dashboard-layout {
+  gap: 14px;
+}
+.compact-dashboard .metric-grid {
+  gap: 10px;
+}
+.compact-dashboard .panel {
+  padding: 16px;
+}
+.compact-dashboard .chart-area {
+  height: 210px;
+}
+.compact-dashboard .monitor-table td,
+.compact-dashboard .monitor-table th {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+.approval-form-fields {
+  display: grid;
+  gap: 14px;
+  margin: 18px 0;
+}
+.approval-form-fields textarea {
+  min-height: 84px;
+  resize: vertical;
+}
 .welcome-row {
   display: flex;
   align-items: center;

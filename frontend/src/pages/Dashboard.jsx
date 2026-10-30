@@ -31,6 +31,7 @@ import {
   YAxis,
 } from "recharts";
 import { useDashboardSummary } from "../hooks/useMonitors";
+import { useActivitySummary } from "../hooks/useActivity";
 import { usePreferences } from "../hooks/usePreferences";
 import { useAuth } from "../hooks/useAuth";
 import { useNotificationsCenter } from "../hooks/useNotifications";
@@ -38,6 +39,9 @@ import {
   formatResponseTime,
   formatUptime,
   formatRelative,
+  formatDate,
+  formatDateTime,
+  formatChartDate,
 } from "../utils/format";
 import { useQuery } from "../hooks/useQuery";
 import * as healthApi from "../services/api/health";
@@ -116,7 +120,11 @@ export default function Dashboard() {
   const { data, loading, error, refetch } = useDashboardSummary(
     (dashboardPrefs?.autoRefreshInterval || 30) * 1000,
   );
-  const [windowKey, setWindowKey] = useState("7d");
+  const [selectedWindowKey, setWindowKey] = useState(null);
+  const windowKey =
+    selectedWindowKey ?? (dashboardPrefs?.defaultWindow || "24h");
+  const { data: activityData } = useActivitySummary(5);
+  const recentActivities = activityData?.data?.recent || [];
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const summary = data?.data || data || {};
@@ -132,20 +140,14 @@ export default function Dashboard() {
   const chartRows = chartData[windowKey] || [];
   const uptimeData = chartRows
     .map((point) => ({
-      day: new Date(point.timestamp).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      }),
+      day: formatChartDate(point.timestamp, windowKey),
       value: point.uptimePercentage,
     }))
     .filter((point) => point.value != null);
   const responseData = chartRows
     .filter((point) => point.avgResponseTime != null)
     .map((point) => ({
-      day: new Date(point.timestamp).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      }),
+      day: formatChartDate(point.timestamp, windowKey),
       value: point.avgResponseTime,
     }));
   const uptime = overview.uptime?.percentage;
@@ -221,7 +223,9 @@ export default function Dashboard() {
             </Link>
           </div>
         </header>
-        <main className="dashboard-page">
+        <main
+          className={`dashboard-page${dashboardPrefs?.compactMode ? " compact-dashboard" : ""}`}
+        >
           <div className="welcome-row">
             <div>
               <h1>
@@ -230,17 +234,9 @@ export default function Dashboard() {
               <p>Here’s what’s happening with your websites today.</p>
             </div>
             <div className="date-stamp">
-              {new Date().toLocaleDateString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
+              {formatDate(new Date())}
               <small>
-                {new Date().toLocaleTimeString(undefined, {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
+                {formatDateTime(new Date()).split(" ").slice(-2).join(" ")}
               </small>
             </div>
           </div>
@@ -279,317 +275,361 @@ export default function Dashboard() {
                 />
               </div>
 
-              <div className="chart-grid">
-                <article className="panel chart-panel uptime-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Uptime Overview</h2>
-                      <p>Uptime across your monitors</p>
+              {dashboardPrefs?.widgets?.showOverviewChart !== false && (
+                <div className="chart-grid">
+                  <article className="panel chart-panel uptime-panel">
+                    <div className="panel-heading">
+                      <div>
+                        <h2>Uptime Overview</h2>
+                        <p>Uptime across your monitors</p>
+                      </div>
+                      <SegmentedControl
+                        label="Chart time range"
+                        value={windowKey}
+                        onChange={setWindowKey}
+                        options={[
+                          { value: "24h", label: "24H" },
+                          { value: "7d", label: "7D" },
+                          { value: "30d", label: "30D" },
+                        ]}
+                      />
                     </div>
-                    <SegmentedControl
-                      label="Chart time range"
-                      value={windowKey}
-                      onChange={setWindowKey}
-                      options={[
-                        { value: "24h", label: "24H" },
-                        { value: "7d", label: "7D" },
-                        { value: "30d", label: "30D" },
-                      ]}
-                    />
-                  </div>
-                  <div className="chart-area">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart
-                        data={uptimeData}
-                        margin={{ top: 12, right: 6, left: -18, bottom: 0 }}
-                      >
-                        <defs>
-                          <linearGradient
-                            id="uptimeFill"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="0%"
-                              stopColor="#10b981"
-                              stopOpacity={0.18}
-                            />
-                            <stop
-                              offset="100%"
-                              stopColor="#10b981"
-                              stopOpacity={0.015}
-                            />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid vertical stroke="#edf2f6" />
-                        <XAxis
-                          dataKey="day"
-                          tickLine={false}
-                          axisLine={false}
-                          tick={{ fill: "#687d95", fontSize: 11 }}
-                        />
-                        <YAxis
-                          domain={[98, 100]}
-                          ticks={[98, 98.5, 99, 99.5, 100]}
-                          tickFormatter={(v) => `${v}%`}
-                          tickLine={false}
-                          axisLine={false}
-                          tick={{ fill: "#687d95", fontSize: 11 }}
-                        />
-                        <Tooltip content={<ChartTooltip suffix="%" />} />
-                        <Area
-                          dataKey="value"
-                          type="monotone"
-                          stroke="#08ad7c"
-                          strokeWidth={2.2}
-                          fill="url(#uptimeFill)"
-                          dot={{ r: 2, fill: "#08ad7c", strokeWidth: 0 }}
-                          activeDot={{ r: 4 }}
-                          isAnimationActive={false}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </article>
-                <article className="panel chart-panel response-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Response Time</h2>
-                      <p>Average response time (ms)</p>
+                    <div className="chart-area">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart
+                          data={uptimeData}
+                          margin={{ top: 12, right: 6, left: -18, bottom: 0 }}
+                        >
+                          <defs>
+                            <linearGradient
+                              id="uptimeFill"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor="#10b981"
+                                stopOpacity={0.18}
+                              />
+                              <stop
+                                offset="100%"
+                                stopColor="#10b981"
+                                stopOpacity={0.015}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid vertical stroke="#edf2f6" />
+                          <XAxis
+                            dataKey="day"
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fill: "#687d95", fontSize: 11 }}
+                          />
+                          <YAxis
+                            domain={[98, 100]}
+                            ticks={[98, 98.5, 99, 99.5, 100]}
+                            tickFormatter={(v) => `${v}%`}
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fill: "#687d95", fontSize: 11 }}
+                          />
+                          <Tooltip content={<ChartTooltip suffix="%" />} />
+                          <Area
+                            dataKey="value"
+                            type="monotone"
+                            stroke="#08ad7c"
+                            strokeWidth={2.2}
+                            fill="url(#uptimeFill)"
+                            dot={{ r: 2, fill: "#08ad7c", strokeWidth: 0 }}
+                            activeDot={{ r: 4 }}
+                            isAnimationActive={false}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
                     </div>
-                    <div className="chart-current">
-                      <b>
-                        {response == null ? "—" : formatResponseTime(response)}
-                      </b>
-                      <span>{windowKey.toUpperCase()} window</span>
+                  </article>
+                  <article className="panel chart-panel response-panel">
+                    <div className="panel-heading">
+                      <div>
+                        <h2>Response Time</h2>
+                        <p>Average response time (ms)</p>
+                      </div>
+                      <div className="chart-current">
+                        <b>
+                          {response == null
+                            ? "—"
+                            : formatResponseTime(response)}
+                        </b>
+                        <span>{windowKey.toUpperCase()} window</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="chart-area">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={responseData}
-                        margin={{ top: 12, right: 8, left: -16, bottom: 0 }}
-                      >
-                        <CartesianGrid stroke="#edf2f6" />
-                        <XAxis
-                          dataKey="day"
-                          tickLine={false}
-                          axisLine={false}
-                          tick={{ fill: "#687d95", fontSize: 11 }}
-                        />
-                        <YAxis
-                          domain={[0, "auto"]}
-                          tickLine={false}
-                          axisLine={false}
-                          tick={{ fill: "#687d95", fontSize: 11 }}
-                        />
-                        <Tooltip content={<ChartTooltip suffix=" ms" />} />
-                        <Line
-                          dataKey="value"
-                          type="monotone"
-                          stroke="#08ad7c"
-                          strokeWidth={2.2}
-                          dot={{ r: 2, fill: "#08ad7c", strokeWidth: 0 }}
-                          activeDot={{ r: 4 }}
-                          isAnimationActive={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </article>
-              </div>
+                    <div className="chart-area">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={responseData}
+                          margin={{ top: 12, right: 8, left: -16, bottom: 0 }}
+                        >
+                          <CartesianGrid stroke="#edf2f6" />
+                          <XAxis
+                            dataKey="day"
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fill: "#687d95", fontSize: 11 }}
+                          />
+                          <YAxis
+                            domain={[0, "auto"]}
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fill: "#687d95", fontSize: 11 }}
+                          />
+                          <Tooltip content={<ChartTooltip suffix=" ms" />} />
+                          <Line
+                            dataKey="value"
+                            type="monotone"
+                            stroke="#08ad7c"
+                            strokeWidth={2.2}
+                            dot={{ r: 2, fill: "#08ad7c", strokeWidth: 0 }}
+                            activeDot={{ r: 4 }}
+                            isAnimationActive={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </article>
+                </div>
+              )}
 
-              <article className="panel monitors-panel">
-                <div className="panel-heading monitors-heading">
-                  <div>
-                    <h2>Monitors</h2>
-                    <p>Your website monitors at a glance</p>
+              {dashboardPrefs?.widgets?.showMonitorStatusGrid !== false && (
+                <article className="panel monitors-panel">
+                  <div className="panel-heading monitors-heading">
+                    <div>
+                      <h2>Monitors</h2>
+                      <p>Your website monitors at a glance</p>
+                    </div>
+                    <Link className="view-all" to="/monitors">
+                      View all <ArrowRight size={14} />
+                    </Link>
                   </div>
-                  <Link className="view-all" to="/monitors">
-                    View all <ArrowRight size={14} />
-                  </Link>
-                </div>
-                <label className="monitor-search">
-                  <Search size={15} />
-                  <input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search monitors..."
-                  />
-                </label>
-                <div className="filter-pills">
-                  {[
-                    ["All", monitors.length],
-                    ["Up", currentStatus.up ?? 0],
-                    [
-                      "Down",
-                      (currentStatus.down ?? 0) + (currentStatus.degraded ?? 0),
-                    ],
-                    ["Paused", overview.monitors?.inactive ?? 0],
-                  ].map(([label, count]) => (
-                    <button
-                      key={label}
-                      onClick={() => setFilter(label)}
-                      className={filter === label ? "active" : ""}
-                    >
-                      {label} ({count})
-                    </button>
-                  ))}
-                </div>
-                <div className="table-scroll">
-                  <table className="monitor-table">
-                    <thead>
-                      <tr>
-                        <th>
-                          Name <ChevronDown size={11} />
-                        </th>
-                        <th>Status</th>
-                        <th>Uptime (24h)</th>
-                        <th>Response Time</th>
-                        <th>Last Check</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loading && !data ? (
+                  <label className="monitor-search">
+                    <Search size={15} />
+                    <input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Search monitors..."
+                    />
+                  </label>
+                  <div className="filter-pills">
+                    {[
+                      ["All", monitors.length],
+                      ["Up", currentStatus.up ?? 0],
+                      [
+                        "Down",
+                        (currentStatus.down ?? 0) +
+                          (currentStatus.degraded ?? 0),
+                      ],
+                      ["Paused", overview.monitors?.inactive ?? 0],
+                    ].map(([label, count]) => (
+                      <button
+                        key={label}
+                        onClick={() => setFilter(label)}
+                        className={filter === label ? "active" : ""}
+                      >
+                        {label} ({count})
+                      </button>
+                    ))}
+                  </div>
+                  <div className="table-scroll">
+                    <table className="monitor-table">
+                      <thead>
                         <tr>
-                          <td colSpan="6" className="table-message">
-                            Loading monitors…
-                          </td>
+                          <th>
+                            Name <ChevronDown size={11} />
+                          </th>
+                          <th>Status</th>
+                          <th>Uptime (24h)</th>
+                          <th>Response Time</th>
+                          <th>Last Check</th>
+                          <th />
                         </tr>
-                      ) : filteredMonitors.length ? (
-                        filteredMonitors.slice(0, 8).map((monitor) => (
-                          <tr key={monitor.id}>
-                            <td>
-                              <div className="monitor-name">
-                                <span className="monitor-symbol">
-                                  <Globe2 size={15} />
-                                </span>
-                                <span>
-                                  <b>{monitor.name}</b>
-                                  <small>{shortUrl(monitor.url)}</small>
-                                </span>
-                              </div>
-                            </td>
-                            <td>
-                              <span
-                                className={`status-text ${statusLabel(monitor.status).toLowerCase()}`}
-                              >
-                                <i />
-                                {statusLabel(monitor.status)}
-                              </span>
-                            </td>
-                            <td>
-                              {monitor.uptimePercentage == null
-                                ? "—"
-                                : formatUptime(monitor.uptimePercentage)}
-                            </td>
-                            <td>
-                              {monitor.responseTime == null
-                                ? "—"
-                                : formatResponseTime(monitor.responseTime)}
-                            </td>
-                            <td>
-                              {monitor.checkedAt
-                                ? formatRelative(monitor.checkedAt)
-                                : "—"}
-                            </td>
-                            <td>
-                              <Link
-                                className="row-more"
-                                to={`/monitors/${monitor.id}`}
-                                aria-label={`Open ${monitor.name}`}
-                              >
-                                <ChevronRight size={15} />
-                              </Link>
+                      </thead>
+                      <tbody>
+                        {loading && !data ? (
+                          <tr>
+                            <td colSpan="6" className="table-message">
+                              Loading monitors…
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="6" className="table-message">
-                            {monitors.length
-                              ? "No monitors match this filter."
-                              : "No monitors yet. Add your first monitor to start tracking uptime."}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
+                        ) : filteredMonitors.length ? (
+                          filteredMonitors.slice(0, 8).map((monitor) => (
+                            <tr key={monitor.id}>
+                              <td>
+                                <div className="monitor-name">
+                                  <span className="monitor-symbol">
+                                    <Globe2 size={15} />
+                                  </span>
+                                  <span>
+                                    <b>{monitor.name}</b>
+                                    <small>{shortUrl(monitor.url)}</small>
+                                  </span>
+                                </div>
+                              </td>
+                              <td>
+                                <span
+                                  className={`status-text ${statusLabel(monitor.status).toLowerCase()}`}
+                                >
+                                  <i />
+                                  {statusLabel(monitor.status)}
+                                </span>
+                              </td>
+                              <td>
+                                {monitor.uptimePercentage == null
+                                  ? "—"
+                                  : formatUptime(monitor.uptimePercentage)}
+                              </td>
+                              <td>
+                                {monitor.responseTime == null
+                                  ? "—"
+                                  : formatResponseTime(monitor.responseTime)}
+                              </td>
+                              <td>
+                                {monitor.checkedAt
+                                  ? formatRelative(monitor.checkedAt)
+                                  : "—"}
+                              </td>
+                              <td>
+                                <Link
+                                  className="row-more"
+                                  to={`/monitors/${monitor.id}`}
+                                  aria-label={`Open ${monitor.name}`}
+                                >
+                                  <ChevronRight size={15} />
+                                </Link>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="6" className="table-message">
+                              {monitors.length
+                                ? "No monitors match this filter."
+                                : "No monitors yet. Add your first monitor to start tracking uptime."}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              )}
+              {dashboardPrefs?.widgets?.showRecentActivity !== false && (
+                <article className="panel">
+                  <div className="panel-heading">
+                    <div>
+                      <h2>Recent Activity</h2>
+                      <p>Latest changes across your account</p>
+                    </div>
+                    <Link className="view-all" to="/activity">
+                      View all <ArrowRight size={14} />
+                    </Link>
+                  </div>
+                  {recentActivities.length ? (
+                    recentActivities.slice(0, 5).map((item) => (
+                      <div
+                        className="health-row"
+                        key={item.id || item._id || item.createdAt}
+                      >
+                        <b>
+                          {item.description ||
+                            item.message ||
+                            item.action ||
+                            "Account activity"}
+                        </b>
+                        <small>
+                          {formatRelative(item.createdAt || item.timestamp)}
+                        </small>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="muted-copy">No recent activity.</p>
+                  )}
+                </article>
+              )}
             </section>
 
             <aside className="dashboard-rail">
-              <article className="panel incident-panel">
-                <div className="rail-title">
-                  <span
-                    className={incidentCount ? "incident-dot" : "healthy-dot"}
-                  />{" "}
-                  <b>
-                    {incidentCount} Active{" "}
-                    {incidentCount === 1 ? "Incident" : "Incidents"}
-                  </b>
-                  <Link to="/incidents" aria-label="View incidents">
-                    <ChevronRight size={16} />
-                  </Link>
-                </div>
-                {incidents.length ? (
-                  incidents.slice(0, 1).map((incident) => (
-                    <Link
-                      className="incident-callout"
-                      key={incident.id || incident._id}
-                      to={`/incidents`}
-                    >
-                      <b>
-                        {incident.monitorName ||
-                          incident.monitor?.name ||
-                          "Monitor issue"}
-                      </b>
-                      <span>
-                        {incident.title ||
-                          incident.message ||
-                          "Website is not responding"}
-                      </span>
-                      <small>
-                        {incident.startedAt
-                          ? formatRelative(incident.startedAt)
-                          : "Active now"}
-                      </small>
+              {dashboardPrefs?.widgets?.showActiveIncidents !== false && (
+                <article className="panel incident-panel">
+                  <div className="rail-title">
+                    <span
+                      className={incidentCount ? "incident-dot" : "healthy-dot"}
+                    />{" "}
+                    <b>
+                      {incidentCount} Active{" "}
+                      {incidentCount === 1 ? "Incident" : "Incidents"}
+                    </b>
+                    <Link to="/incidents" aria-label="View incidents">
+                      <ChevronRight size={16} />
                     </Link>
-                  ))
-                ) : (
-                  <div className="all-clear">
-                    <ShieldCheck size={17} /> No active incidents
                   </div>
-                )}
-              </article>
-              <article className="panel quick-panel">
-                <h2>Quick Actions</h2>
-                <Link to="/monitors" className="quick-action">
-                  <span>
-                    <Plus size={20} />
-                  </span>
-                  <b>Add Monitor</b>
-                  <ChevronRight size={15} />
-                </Link>
-                <Link to="/insights" className="quick-action">
-                  <span>
-                    <FileText size={18} />
-                  </span>
-                  <b>View Reports</b>
-                  <ChevronRight size={15} />
-                </Link>
-                <Link to="/incidents" className="quick-action">
-                  <span>
-                    <TriangleAlert size={18} />
-                  </span>
-                  <b>Check Incidents</b>
-                  <ChevronRight size={15} />
-                </Link>
-              </article>
+                  {incidents.length ? (
+                    incidents.slice(0, 1).map((incident) => (
+                      <Link
+                        className="incident-callout"
+                        key={incident.id || incident._id}
+                        to={`/incidents`}
+                      >
+                        <b>
+                          {incident.monitorName ||
+                            incident.monitor?.name ||
+                            "Monitor issue"}
+                        </b>
+                        <span>
+                          {incident.title ||
+                            incident.message ||
+                            "Website is not responding"}
+                        </span>
+                        <small>
+                          {incident.startedAt
+                            ? formatRelative(incident.startedAt)
+                            : "Active now"}
+                        </small>
+                      </Link>
+                    ))
+                  ) : (
+                    <div className="all-clear">
+                      <ShieldCheck size={17} /> No active incidents
+                    </div>
+                  )}
+                </article>
+              )}
+              {dashboardPrefs?.widgets?.showQuickActions !== false && (
+                <article className="panel quick-panel">
+                  <h2>Quick Actions</h2>
+                  <Link to="/monitors" className="quick-action">
+                    <span>
+                      <Plus size={20} />
+                    </span>
+                    <b>Add Monitor</b>
+                    <ChevronRight size={15} />
+                  </Link>
+                  <Link to="/insights" className="quick-action">
+                    <span>
+                      <FileText size={18} />
+                    </span>
+                    <b>View Reports</b>
+                    <ChevronRight size={15} />
+                  </Link>
+                  <Link to="/incidents" className="quick-action">
+                    <span>
+                      <TriangleAlert size={18} />
+                    </span>
+                    <b>Check Incidents</b>
+                    <ChevronRight size={15} />
+                  </Link>
+                </article>
+              )}
               <article className="panel health-panel">
                 <h2>System Health</h2>
                 {[
