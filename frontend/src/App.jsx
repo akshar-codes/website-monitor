@@ -16,6 +16,8 @@ const IntegrationGuide = lazy(() => import("./pages/IntegrationGuide"));
 const Suggestions = lazy(() => import("./pages/Suggestions"));
 const AdminSuggestions = lazy(() => import("./pages/AdminSuggestions"));
 const Monitors = lazy(() => import("./pages/Monitors"));
+const StatusPages = lazy(() => import("./pages/StatusPages"));
+const PublicStatus = lazy(() => import("./pages/PublicStatus"));
 const MonitorDetails = lazy(() => import("./pages/MonitorDetails"));
 const SslMonitoring = lazy(() => import("./pages/SslMonitoring"));
 const Insights = lazy(() => import("./pages/Insights"));
@@ -87,6 +89,7 @@ export default function App() {
                   <Route path="/verify-email" element={<VerifyEmail />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/oauth/callback" element={<OAuthCallback />} />
+                  <Route path="/status/:slug" element={<PublicStatus />} />
 
                   {/* Requires an authenticated session */}
                   <Route element={<ProtectedRoute />}>
@@ -125,6 +128,7 @@ export default function App() {
                             </Suspense>
                           }
                         />
+                        <Route path="/status-pages" element={<StatusPages />} />
                         <Route
                           path="/ssl"
                           element={

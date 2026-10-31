@@ -15,6 +15,7 @@ import {
   PanelLeftOpen,
   Shield,
   Signal,
+  Globe2,
   TrendingUp,
   TriangleAlert,
   UserRound,
@@ -29,6 +30,7 @@ import { useTranslation } from "../../i18n";
 const userLinks = [
   ["Dashboard", "/", LayoutDashboard],
   ["Monitors", "/monitors", Signal],
+  ["Status pages", "/status-pages", Globe2],
   ["Integration Guide", "/integration-guide", BookOpen],
   ["Suggestions", "/suggestions", Lightbulb],
   ["Incidents", "/incidents", TriangleAlert],
