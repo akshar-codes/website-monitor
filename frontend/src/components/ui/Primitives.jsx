@@ -1,62 +1,78 @@
 import { Link } from "react-router-dom";
 import { Activity, ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
+import { translateNode, useTranslation } from "../../i18n";
 
 export function Page({ title, description, actions, children, eyebrow }) {
+  const t = useTranslation();
   return (
     <main className="app-page">
       <header className="page-heading">
         <div>
-          {eyebrow && <span className="page-eyebrow">{eyebrow}</span>}
-          <h1>{title}</h1>
-          {description && <p>{description}</p>}
+          {eyebrow && <span className="page-eyebrow">{t(eyebrow)}</span>}
+          <h1>{t(title)}</h1>
+          {description && <p>{t(description)}</p>}
         </div>
-        {actions && <div className="page-actions">{actions}</div>}
+        {actions && (
+          <div className="page-actions">
+            {translateNode(actions, t.language)}
+          </div>
+        )}
       </header>
-      {children}
+      {translateNode(children, t.language)}
     </main>
   );
 }
 
 export function Button({ children, variant = "primary", ...props }) {
+  const t = useTranslation();
   return (
     <button className={`sw-button ${variant}`} {...props}>
-      {children}
+      {translateNode(children, t.language)}
     </button>
   );
 }
 
 export function Input({ label, error, className = "", ...props }) {
+  const t = useTranslation();
   return (
     <label className={`sw-field ${className}`}>
-      {label && <span>{label}</span>}
+      {label && (
+        <span>
+          {typeof label === "string"
+            ? t(label)
+            : translateNode(label, t.language)}
+        </span>
+      )}
       <input className={error ? "invalid" : ""} {...props} />
-      {error && <small className="field-error">{error}</small>}
+      {error && <small className="field-error">{t(error)}</small>}
     </label>
   );
 }
 
 export function Select({ label, children, ...props }) {
+  const t = useTranslation();
   return (
     <label className="sw-field">
-      {label && <span>{label}</span>}
-      <select {...props}>{children}</select>
+      {label && <span>{t(label)}</span>}
+      <select {...props}>{translateNode(children, t.language)}</select>
     </label>
   );
 }
 
 export function Panel({ title, subtitle, actions, children, className = "" }) {
+  const t = useTranslation();
   return (
     <section className={`sw-panel ${className}`}>
       {(title || actions) && (
         <div className="sw-panel-heading">
           <div>
-            {title && <h2>{title}</h2>}
-            {subtitle && <p>{subtitle}</p>}
+            {title && <h2>{t(title)}</h2>}
+            {subtitle && <p>{t(subtitle)}</p>}
           </div>
           {actions}
         </div>
       )}
-      {children}
+      {translateNode(children, t.language)}
     </section>
   );
 }
@@ -68,36 +84,43 @@ export function Metric({
   icon: Icon = Activity,
   tone = "green",
 }) {
+  const t = useTranslation();
   return (
     <article className="sw-metric">
       <span className={`sw-metric-icon ${tone}`}>
         <Icon size={17} />
       </span>
-      <span className="sw-metric-label">{label}</span>
+      <span className="sw-metric-label">{t(label)}</span>
       <strong>{value ?? "—"}</strong>
-      {note && <small>{note}</small>}
+      {note && <small>{t(note)}</small>}
     </article>
   );
 }
 
 export function Status({ value }) {
+  const t = useTranslation();
   const status = String(value || "unknown").toLowerCase();
   return (
     <span className={`sw-status ${status}`}>
       <i />
-      {value || "Unknown"}
+      {t(
+        value
+          ? `${String(value).charAt(0).toUpperCase()}${String(value).slice(1)}`
+          : "Unknown",
+      )}
     </span>
   );
 }
 
 export function Empty({ title = "Nothing here yet", children, action }) {
+  const t = useTranslation();
   return (
     <div className="sw-empty">
       <span>
         <CheckCircle2 size={20} />
       </span>
-      <b>{title}</b>
-      {children && <p>{children}</p>}
+      <b>{t(title)}</b>
+      {children && <p>{translateNode(children, t.language)}</p>}
       {action}
     </div>
   );
@@ -109,13 +132,14 @@ export function Table({
   empty = "No records found",
   onRowClick,
 }) {
+  const t = useTranslation();
   return (
     <div className="sw-table-wrap">
       <table className="sw-table">
         <thead>
           <tr>
             {columns.map((col) => (
-              <th key={col.key}>{col.label}</th>
+              <th key={col.key}>{t(col.label)}</th>
             ))}
           </tr>
         </thead>
@@ -138,7 +162,7 @@ export function Table({
           ) : (
             <tr>
               <td colSpan={columns.length}>
-                <Empty>{empty}</Empty>
+                <Empty>{t(empty)}</Empty>
               </td>
             </tr>
           )}
@@ -149,7 +173,12 @@ export function Table({
 }
 
 export function Notice({ children, tone = "info" }) {
-  return <div className={`sw-notice ${tone}`}>{children}</div>;
+  const t = useTranslation();
+  return (
+    <div className={`sw-notice ${tone}`}>
+      {translateNode(children, t.language)}
+    </div>
+  );
 }
 
 export function AuthShell({
@@ -160,6 +189,7 @@ export function AuthShell({
   backTo = "/login",
   compact = false,
 }) {
+  const t = useTranslation();
   return (
     <main className={`auth-page ${compact ? "compact" : ""}`}>
       <div className="auth-aside">
@@ -170,29 +200,33 @@ export function AuthShell({
         <div className="auth-pitch">
           <span className="auth-kicker">SITEWATCH MONITORING</span>
           <h1>
-            Your websites.
+            {t("Your websites.")}
             <br />
-            Always in sight.
+            {t("Always in sight.")}
           </h1>
-          <p>Clear, timely signals for every service you depend on.</p>
+          <p>{t("Clear, timely signals for every service you depend on.")}</p>
           <div className="auth-proof">
             <i />
-            <span>Monitoring systems are operational</span>
+            <span>{t("Monitoring systems are operational")}</span>
           </div>
         </div>
         <small className="auth-aside-foot">
-          Reliable checks. Clear answers.
+          {t("Reliable checks. Clear answers.")}
         </small>
       </div>
       <section className="auth-content">
         <div className="auth-card">
           <Link className="auth-back" to={backTo}>
-            <ArrowLeft size={14} /> Back
+            <ArrowLeft size={14} /> {t("Back")}
           </Link>
-          <h2>{title}</h2>
-          {description && <p className="auth-description">{description}</p>}
-          {children}
-          {footer && <div className="auth-footer">{footer}</div>}
+          <h2>{t(title)}</h2>
+          {description && <p className="auth-description">{t(description)}</p>}
+          {translateNode(children, t.language)}
+          {footer && (
+            <div className="auth-footer">
+              {translateNode(footer, t.language)}
+            </div>
+          )}
         </div>
         <small className="auth-legal">
           © {new Date().getFullYear()} SiteWatch · Secure website monitoring
@@ -203,12 +237,13 @@ export function AuthShell({
 }
 
 export function FormActions({ children, backTo }) {
+  const t = useTranslation();
   return (
     <div className="form-actions">
       {children}
       {backTo && (
         <Link to={backTo} className="text-link">
-          Back <ArrowRight size={13} />
+          {t("Back")} <ArrowRight size={13} />
         </Link>
       )}
     </div>

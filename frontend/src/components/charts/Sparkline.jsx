@@ -1,8 +1,11 @@
+import { useTranslation } from "../../i18n";
+
 export default function Sparkline({
   values = [],
   color = "#08a879",
   label = "Trend",
 }) {
+  const t = useTranslation();
   if (values.length < 2) return null;
   const width = 100;
   const height = 40;
@@ -22,7 +25,7 @@ export default function Sparkline({
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
       role="img"
-      aria-label={label}
+      aria-label={t(label)}
     >
       <polyline
         points={points}

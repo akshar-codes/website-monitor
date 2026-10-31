@@ -1,6 +1,9 @@
+import { useTranslation } from "../../i18n";
+
 export default function SegmentedControl({ options, value, onChange, label }) {
+  const t = useTranslation();
   return (
-    <div className="segmented-control" role="group" aria-label={label}>
+    <div className="segmented-control" role="group" aria-label={t(label)}>
       {options.map((option) => (
         <button
           key={option.value}
@@ -9,7 +12,7 @@ export default function SegmentedControl({ options, value, onChange, label }) {
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
         >
-          {option.label}
+          {t(option.label)}
         </button>
       ))}
     </div>
