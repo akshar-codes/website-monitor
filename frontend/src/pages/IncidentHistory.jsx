@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import {
   useIncidentHistory,
   useIncidentDetails,
@@ -24,6 +24,8 @@ import {
   AlertTriangle,
   Clock3,
 } from "lucide-react";
+import * as alertingApi from "../services/api/alerting";
+import { toast } from "sonner";
 
 export default function IncidentHistory() {
   const { plan } = useAuth();
@@ -40,6 +42,8 @@ export default function IncidentHistory() {
   });
   const [viewMode] = useState("timeline");
   const [selectedIncidentId, setSelectedIncidentId] = useState(null);
+  const [escalationData, setEscalationData] = useState(null);
+  const [acknowledging, setAcknowledging] = useState(false);
 
   const { data: usageData } = useUsage();
   const _retentionDays = usageData?.data?.retention?.days;
@@ -77,6 +81,56 @@ export default function IncidentHistory() {
     refetch: refetchIncidentDetail,
   } = useIncidentDetails(selectedIncidentId);
   const selectedIncident = incidentDetailData?.data;
+  useEffect(() => {
+    if (!selectedIncidentId) return undefined;
+    let current = true;
+    alertingApi
+      .getIncidentEscalations(selectedIncidentId)
+      .then((data) => {
+        if (current)
+          setEscalationData({ incidentId: selectedIncidentId, data });
+      })
+      .catch(() => {
+        if (current)
+          setEscalationData({ incidentId: selectedIncidentId, data: null });
+      });
+    return () => {
+      current = false;
+    };
+  }, [selectedIncidentId]);
+  const refreshEscalations = async () => {
+    try {
+      setEscalationData({
+        incidentId: selectedIncidentId,
+        data: await alertingApi.getIncidentEscalations(selectedIncidentId),
+      });
+    } catch {
+      toast.error("Could not refresh acknowledgement details");
+    }
+  };
+  const currentEscalationData =
+    escalationData?.incidentId === selectedIncidentId
+      ? escalationData.data
+      : null;
+  const setAcknowledgement = async (acknowledge) => {
+    if (!selectedIncidentId) return;
+    setAcknowledging(true);
+    try {
+      if (acknowledge)
+        await alertingApi.acknowledgeIncident(selectedIncidentId);
+      else await alertingApi.removeIncidentAcknowledgement(selectedIncidentId);
+      toast.success(
+        acknowledge ? "Incident acknowledged" : "Acknowledgement removed",
+      );
+      await refreshEscalations();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Could not update acknowledgement",
+      );
+    } finally {
+      setAcknowledging(false);
+    }
+  };
 
   const handleUpdateSuccess = useCallback(() => {
     refetchIncidentDetail();
@@ -341,6 +395,48 @@ export default function IncidentHistory() {
             <p>
               <Status value={selectedIncident.status} />
             </p>
+            {currentEscalationData?.acknowledgement ? (
+              <p className="text-sm text-emerald-800">
+                Acknowledged{" "}
+                {new Date(
+                  currentEscalationData.acknowledgement.acknowledgedAt,
+                ).toLocaleString()}
+                {currentEscalationData.acknowledgement.acknowledgedBy?.name
+                  ? ` by ${currentEscalationData.acknowledgement.acknowledgedBy.name}`
+                  : ""}
+              </p>
+            ) : null}
+            {selectedIncident.status !== "resolved" && (
+              <Button
+                variant="secondary"
+                disabled={acknowledging}
+                onClick={() =>
+                  setAcknowledgement(!currentEscalationData?.acknowledgement)
+                }
+              >
+                {acknowledging
+                  ? "Saving…"
+                  : currentEscalationData?.acknowledgement
+                    ? "Remove acknowledgement"
+                    : "Acknowledge incident"}
+              </Button>
+            )}
+            {currentEscalationData?.executions?.length > 0 && (
+              <section className="mt-4 rounded-lg border p-3">
+                <h3 className="font-semibold">Escalation history</h3>
+                <ul className="mt-2 grid gap-2 text-sm">
+                  {currentEscalationData.executions.map((execution) => (
+                    <li key={execution._id}>
+                      {execution.policy?.name || "Policy"}: {execution.status} ·
+                      step {execution.currentStep}
+                      {execution.repeatCount
+                        ? ` · ${execution.repeatCount} repeat(s)`
+                        : ""}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             {selectedIncident.status !== "resolved" && (
               <Button
                 disabled={updatingStatus}

@@ -13,6 +13,8 @@ import AccessErrorListener from "./components/access/AccessErrorListener";
 import AppLayout from "./components/layout/AppLayout";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const IntegrationGuide = lazy(() => import("./pages/IntegrationGuide"));
+const Integrations = lazy(() => import("./pages/Integrations"));
+const IntegrationForm = lazy(() => import("./pages/IntegrationForm"));
 const Suggestions = lazy(() => import("./pages/Suggestions"));
 const AdminSuggestions = lazy(() => import("./pages/AdminSuggestions"));
 const Monitors = lazy(() => import("./pages/Monitors"));
@@ -142,6 +144,22 @@ export default function App() {
                         />
                         <Route path="/status-pages" element={<StatusPages />} />
                         <Route
+                          path="/integrations"
+                          element={<Integrations />}
+                        />
+                        <Route
+                          path="/integrations/deliveries"
+                          element={<Integrations />}
+                        />
+                        <Route
+                          path="/integrations/new/:provider"
+                          element={<IntegrationForm />}
+                        />
+                        <Route
+                          path="/integrations/:provider/:id/edit"
+                          element={<IntegrationForm />}
+                        />
+                        <Route
                           path="/status-pages/:id/manage"
                           element={<StatusPageManage />}
                         />
@@ -242,6 +260,11 @@ export default function App() {
                           path="notifications"
                           element={<NotificationSettings />}
                         />
+                        <Route
+                          path="notifications/rules"
+                          element={<Integrations />}
+                        />
+                        <Route path="escalations" element={<Integrations />} />
                         <Route path="api-keys" element={<ApiKeysSettings />} />
                       </Route>
 
