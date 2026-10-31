@@ -14,6 +14,7 @@ import {
 import { logActivity } from "../utils/activityLogger.js";
 import { createHealthResponseSnapshot } from "../utils/healthResponseSnapshot.js";
 import { pruneMonitorResponseSnapshots } from "../services/healthResponseRetention.service.js";
+import { evaluatePerformanceCheck } from "../services/performanceAnomaly.service.js";
 import {
   ACTIVITY_CATEGORIES,
   ACTIVITY_ACTIONS,
@@ -81,8 +82,9 @@ const processMonitor = async (
           backendStatus: classification.backendStatus,
           databaseStatus: classification.databaseStatus,
           responseTime: pollResult.responseTime,
+          timings: pollResult.timings || pollResult.diagnostics?.timing || null,
           intervalSeconds: monitor.interval,
-          scheduled: true,
+          scheduled: !initiatedBy,
           httpStatus: pollResult.httpStatus,
           failureReason: classification.failureReason,
           ...(responseSnapshot ? { rawResponse: responseSnapshot } : {}),
@@ -98,6 +100,16 @@ const processMonitor = async (
     );
     await pruneMonitorResponseSnapshots(monitor._id);
     await handleIncident(monitor, healthCheck);
+    if (!initiatedBy) {
+      try {
+        await evaluatePerformanceCheck(monitor, healthCheck);
+      } catch (error) {
+        logger.error("Performance anomaly evaluation failed", {
+          monitorId: id,
+          error: error.message,
+        });
+      }
+    }
     await updateDailyStat(monitor, healthCheck);
     await pruneMonitorHealthChecks(monitor._id);
     if (initiatedBy) {
