@@ -1220,9 +1220,11 @@ export const getMonitorAnalytics = async (monitorId, query, user) => {
     performanceAlert: performanceAlert
       ? {
           status:
-            performanceAlert.baselineMedianMs == null
-              ? "warming_up"
-              : performanceAlert.status,
+            monitor.performanceAlerts?.enabled === false
+              ? "disabled"
+              : performanceAlert.baselineMedianMs == null
+                ? "warming_up"
+                : performanceAlert.status,
           baselineMedianMs: performanceAlert.baselineMedianMs,
           baselineMadMs: performanceAlert.baselineMadMs,
           consecutiveBreaches: performanceAlert.consecutiveBreaches,
@@ -1230,7 +1232,10 @@ export const getMonitorAnalytics = async (monitorId, query, user) => {
           settings: monitor.performanceAlerts,
         }
       : {
-          status: "warming_up",
+          status:
+            monitor.performanceAlerts?.enabled === false
+              ? "disabled"
+              : "warming_up",
           baselineMedianMs: null,
           baselineMadMs: null,
           consecutiveBreaches: 0,

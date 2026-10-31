@@ -615,9 +615,11 @@ export default function MonitorInsights({ monitorId, details, retentionDays }) {
                   </Notice>
                 ) : (
                   <Notice tone="info">
-                    {analytics.performanceAlert?.status === "warming_up"
-                      ? "Collecting baseline samples. At least 20 scheduled HTTP samples are needed."
-                      : "No active response-time anomaly."}
+                    {analytics.performanceAlert?.status === "disabled"
+                      ? "Performance degradation alerts are disabled for this monitor."
+                      : analytics.performanceAlert?.status === "warming_up"
+                        ? "Collecting baseline samples. At least 20 scheduled HTTP samples are needed."
+                        : "No active response-time anomaly."}
                   </Notice>
                 )}
               </section>

@@ -1,7 +1,7 @@
 import HealthCheck from "../models/HealthCheck.js";
 import Monitor from "../models/Monitor.js";
 import PerformanceAlertState from "../models/PerformanceAlertState.js";
-import { createNotification } from "./notification.service.js";
+import { enqueuePerformanceNotification } from "./performanceNotificationOutbox.service.js";
 
 export const median = (values) => {
   if (!values.length) return null;
@@ -41,7 +41,15 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
     return null;
   const State = deps.PerformanceAlertState || PerformanceAlertState;
   const Checks = deps.HealthCheck || HealthCheck;
-  const notify = deps.createNotification || createNotification;
+  const enqueue =
+    deps.enqueueNotification ||
+    (deps.createNotification
+      ? (payload) =>
+          deps.createNotification({
+            ownerId: payload.monitor.owner,
+            ...payload,
+          })
+      : enqueuePerformanceNotification);
   const settings = monitor.performanceAlerts || {};
   const preset = sensitivity[settings.sensitivity] || sensitivity.normal;
   const state = await State.findOneAndUpdate(
@@ -57,7 +65,20 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
   );
   if (String(state.lastEvaluatedCheckId || "") === String(check._id))
     return state;
-  let baselineValues = state.baselineSamples || [];
+  if (state.baselineUrl && state.baselineUrl !== monitor.url) {
+    state.status = "normal";
+    state.baselineMedianMs = null;
+    state.baselineMadMs = null;
+    state.baselineSamples = [];
+    state.recentSamples = [];
+    state.consecutiveBreaches = 0;
+    state.consecutiveRecoveries = 0;
+    state.lastAlertAt = null;
+    state.lastNotifiedAt = null;
+    state.baselineStartedAt = check.checkedAt;
+  }
+  state.baselineUrl = monitor.url;
+  let baselineValues = [...(state.baselineSamples || [])];
   if (!baselineValues.length) {
     const previous = await Checks.find({
       monitor: monitor._id,
@@ -65,6 +86,9 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
       httpStatus: { $ne: null },
       _id: { $ne: check._id },
       checkedAt: { $lt: check.checkedAt },
+      ...(state.baselineStartedAt
+        ? { checkedAt: { $gte: state.baselineStartedAt, $lt: check.checkedAt } }
+        : {}),
     })
       .sort({ checkedAt: -1 })
       .limit(50)
@@ -75,6 +99,25 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
       .map((sample) => sample.responseTime)
       .filter(Number.isFinite);
   }
+  // Persist every warm-up sample in compact state. Raw checks are intentionally
+  // capped at ten, so relying on history here prevents the baseline ever
+  // reaching the twenty-sample minimum.
+  const collectingBaseline =
+    state.status !== "degraded" &&
+    baselineValues.length < DEFAULTS.minBaselineSamples;
+  if (collectingBaseline) {
+    baselineValues = [...baselineValues, check.responseTime].slice(-50);
+    state.baselineSamples = baselineValues;
+    state.recentSamples = [
+      ...(state.recentSamples || []),
+      check.responseTime,
+    ].slice(-DEFAULTS.currentWindow);
+    state.lastEvaluatedCheckId = check._id;
+    if (baselineValues.length < DEFAULTS.minBaselineSamples) {
+      await state.save();
+      return state;
+    }
+  }
   if (
     state.status !== "degraded" &&
     baselineValues.length >= DEFAULTS.minBaselineSamples
@@ -83,10 +126,12 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
     state.baselineMedianMs = median(state.baselineSamples);
     state.baselineMadMs = medianAbsoluteDeviation(state.baselineSamples);
   }
-  state.recentSamples = [
-    ...(state.recentSamples || []),
-    check.responseTime,
-  ].slice(-DEFAULTS.currentWindow);
+  if (String(state.lastEvaluatedCheckId || "") !== String(check._id)) {
+    state.recentSamples = [
+      ...(state.recentSamples || []),
+      check.responseTime,
+    ].slice(-DEFAULTS.currentWindow);
+  }
   const currentMedian = median(state.recentSamples);
   state.lastEvaluatedCheckId = check._id;
   if (
@@ -109,7 +154,7 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
     const breached = currentMedian >= threshold;
     state.consecutiveBreaches = breached ? state.consecutiveBreaches + 1 : 0;
     state.consecutiveRecoveries = 0;
-    if (!breached) {
+    if (!breached && !collectingBaseline) {
       state.baselineSamples = [
         ...(state.baselineSamples || []),
         check.responseTime,
@@ -124,10 +169,10 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
       state.status = "degraded";
       state.lastAlertAt = now;
       state.lastNotifiedAt = now;
-      await state.save();
-      await notify({
-        ownerId: monitor.owner,
+      await enqueue({
+        monitor,
         type: "performance_degraded",
+        eventKey: `${monitor._id}:performance_degraded:${check._id}`,
         title: "Performance degradation detected",
         message: `${monitor.name} is responding significantly slower than its normal baseline. Baseline: ${Math.round(baseline)} ms; current median: ${Math.round(currentMedian)} ms.`,
         priority: "high",
@@ -141,6 +186,7 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
             : null,
         },
       });
+      await state.save();
       return state;
     }
   } else {
@@ -158,16 +204,17 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
       ].slice(-50);
       state.baselineMedianMs = median(state.baselineSamples);
       state.baselineMadMs = medianAbsoluteDeviation(state.baselineSamples);
-      await state.save();
-      await notify({
-        ownerId: monitor.owner,
+      await enqueue({
+        monitor,
         type: "performance_recovered",
+        eventKey: `${monitor._id}:performance_recovered:${check._id}`,
         title: "Performance has recovered",
         message: `${monitor.name} response times have returned near their baseline of ${Math.round(baseline)} ms.`,
         priority: "normal",
         link: `/monitors/${monitor._id}`,
         relatedResource: { resourceType: "Monitor", resourceId: monitor._id },
       });
+      await state.save();
       return state;
     }
     if (
@@ -177,9 +224,10 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
     ) {
       state.lastNotifiedAt = now;
       state.lastAlertAt = now;
-      await notify({
-        ownerId: monitor.owner,
+      await enqueue({
+        monitor,
         type: "performance_degraded",
+        eventKey: `${monitor._id}:performance_degraded_repeat:${check._id}`,
         title: "Performance degradation continues",
         message: `${monitor.name} remains above its response-time baseline.`,
         priority: "high",

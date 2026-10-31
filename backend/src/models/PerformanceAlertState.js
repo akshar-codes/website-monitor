@@ -11,6 +11,8 @@ const schema = new mongoose.Schema(
     status: { type: String, enum: ["normal", "degraded"], default: "normal" },
     baselineMedianMs: { type: Number, default: null },
     baselineMadMs: { type: Number, default: null },
+    baselineUrl: { type: String, default: null },
+    baselineStartedAt: { type: Date, default: null },
     baselineSamples: { type: [Number], default: [] },
     recentSamples: { type: [Number], default: [] },
     consecutiveBreaches: { type: Number, default: 0 },

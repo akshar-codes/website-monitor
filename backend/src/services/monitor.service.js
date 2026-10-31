@@ -215,7 +215,7 @@ export const updateMonitor = async (id, data, user) => {
   }
 
   const previous = await Monitor.findOne({ _id: id, owner: ownerId })
-    .select("active")
+    .select("active url")
     .lean();
 
   // Reactivating a monitor schedules an immediate re-check.
@@ -233,6 +233,30 @@ export const updateMonitor = async (id, data, user) => {
 
   if (!monitor) {
     throw ApiError.notFound(`Monitor not found with id: ${id}`);
+  }
+
+  if (data.url !== undefined && previous?.url !== monitor.url) {
+    await PerformanceAlertState.updateOne(
+      { monitor: monitor._id, metric: "responseTime" },
+      {
+        $set: {
+          status: "normal",
+          baselineMedianMs: null,
+          baselineMadMs: null,
+          baselineUrl: monitor.url,
+          baselineStartedAt: new Date(),
+          baselineSamples: [],
+          recentSamples: [],
+          consecutiveBreaches: 0,
+          consecutiveRecoveries: 0,
+          lastEvaluatedCheckId: null,
+          lastAlertAt: null,
+          lastNotifiedAt: null,
+        },
+        $setOnInsert: { monitor: monitor._id, metric: "responseTime" },
+      },
+      { upsert: true },
+    );
   }
 
   // Distinguish a pause/resume toggle from a general field edit so the

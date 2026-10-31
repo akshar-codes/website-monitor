@@ -693,3 +693,116 @@ test("anomaly detector requires sustained breaches, supports recovery, and ignor
     1,
   );
 });
+
+test("anomaly warm-up persists samples even after raw checks are capped", async () => {
+  const state = {
+    _id: "warmup-state",
+    status: "normal",
+    baselineSamples: [],
+    recentSamples: [],
+    consecutiveBreaches: 0,
+    consecutiveRecoveries: 0,
+    save: async () => {},
+  };
+  const deps = {
+    PerformanceAlertState: {
+      findOneAndUpdate: async () => state,
+    },
+    HealthCheck: {
+      find: () => ({
+        sort() {
+          return this;
+        },
+        limit() {
+          return this;
+        },
+        select() {
+          return this;
+        },
+        lean: async () => [],
+      }),
+    },
+    enqueueNotification: async () => {},
+  };
+  const monitor = {
+    _id: "64b000000000000000000050",
+    owner: "64b000000000000000000051",
+    name: "API",
+    performanceAlerts: { enabled: true },
+  };
+
+  for (let index = 0; index < 20; index += 1) {
+    await evaluatePerformanceCheck(
+      monitor,
+      {
+        _id: `warmup-${index}`,
+        scheduled: true,
+        httpStatus: 200,
+        responseTime: 200 + (index % 3),
+        checkedAt: new Date(Date.now() + index),
+      },
+      deps,
+    );
+  }
+
+  assert.equal(state.baselineSamples.length, 20);
+  assert.ok(state.baselineMedianMs >= 200);
+  assert.equal(state.lastEvaluatedCheckId, "warmup-19");
+});
+
+test("anomaly baseline reset ignores checks from the previous monitor URL", async () => {
+  const baselineStartedAt = new Date("2026-10-31T00:10:00Z");
+  const state = {
+    status: "degraded",
+    baselineUrl: "https://old.example/health",
+    baselineStartedAt: null,
+    baselineSamples: [900, 920],
+    recentSamples: [900, 920],
+    consecutiveBreaches: 3,
+    consecutiveRecoveries: 0,
+    save: async () => {},
+  };
+  const deps = {
+    PerformanceAlertState: { findOneAndUpdate: async () => state },
+    HealthCheck: {
+      find: (filter) => {
+        assert.equal(filter.checkedAt.$gte, baselineStartedAt);
+        return {
+          sort() {
+            return this;
+          },
+          limit() {
+            return this;
+          },
+          select() {
+            return this;
+          },
+          lean: async () => [],
+        };
+      },
+    },
+    enqueueNotification: async () => {},
+  };
+
+  await evaluatePerformanceCheck(
+    {
+      _id: "64b000000000000000000060",
+      owner: "64b000000000000000000061",
+      name: "API",
+      url: "https://new.example/health",
+      performanceAlerts: { enabled: true },
+    },
+    {
+      _id: "new-endpoint-check",
+      scheduled: true,
+      httpStatus: 200,
+      responseTime: 180,
+      checkedAt: baselineStartedAt,
+    },
+    deps,
+  );
+
+  assert.equal(state.status, "normal");
+  assert.deepEqual(state.baselineSamples, [180]);
+  assert.equal(state.baselineUrl, "https://new.example/health");
+});
