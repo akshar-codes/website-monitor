@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PreferencesContext } from "../contexts/PreferencesContext";
 import { useAuth } from "../hooks/useAuth";
 import * as preferencesApi from "../services/api/preferences";
+import { LanguageContext } from "../i18n";
 
 /**
  * Fetched ONCE at the app root — mirrors PermissionsContext's pattern —
@@ -83,7 +84,9 @@ export function PreferencesProvider({ children }) {
 
   return (
     <PreferencesContext.Provider value={value}>
-      {children}
+      <LanguageContext.Provider value={preferences?.language || "en"}>
+        {children}
+      </LanguageContext.Provider>
     </PreferencesContext.Provider>
   );
 }

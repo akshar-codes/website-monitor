@@ -11,10 +11,8 @@ export const THEME_VALUES = Object.freeze(Object.values(THEMES));
 // ── Language ─────────────────────────────────────────────────────────────────
 
 /**
- * Supported interface languages. Adding a new one is a one-line addition
- * here — nothing else needs to change until actual translation strings
- * are wired up (out of scope for this feature; the value is persisted and
- * exposed so future i18n work has a source of truth to read from).
+ * Supported interface locale codes. Keep these in sync with the frontend
+ * preference options; ja-Latn selects Japanese copy rendered in Romaji.
  */
 export const LANGUAGES = Object.freeze({
   EN: "en",
@@ -24,6 +22,7 @@ export const LANGUAGES = Object.freeze({
   PT: "pt",
   HI: "hi",
   JA: "ja",
+  JA_LATN: "ja-Latn",
   ZH: "zh",
 });
 

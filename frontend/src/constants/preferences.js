@@ -21,6 +21,7 @@ export const LANGUAGES = Object.freeze({
   PT: "pt",
   HI: "hi",
   JA: "ja",
+  JA_LATN: "ja-Latn",
   ZH: "zh",
 });
 
@@ -32,6 +33,7 @@ export const LANGUAGE_OPTIONS = [
   { value: LANGUAGES.PT, label: "Português" },
   { value: LANGUAGES.HI, label: "हिन्दी" },
   { value: LANGUAGES.JA, label: "日本語" },
+  { value: LANGUAGES.JA_LATN, label: "Japanese (Romaji)" },
   { value: LANGUAGES.ZH, label: "中文" },
 ];
 
