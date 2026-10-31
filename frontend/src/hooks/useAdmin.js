@@ -40,9 +40,11 @@ export function useAdminMonitorCheck(onSuccess) {
   );
   return { check, submitting };
 }
-export function useAdminIncidents(params = {}) {
+export function useAdminIncidents(params = {}, enabled = true) {
   const paramsKey = JSON.stringify(params);
-  return useQuery(() => adminApi.getAdminIncidents(params), [paramsKey]);
+  return useQuery(() => adminApi.getAdminIncidents(params), [paramsKey], {
+    immediate: enabled,
+  });
 }
 export function useAdminAuditEvents(params = {}) {
   const paramsKey = JSON.stringify(params);
@@ -74,9 +76,11 @@ export function useResolveAdminIncident(onSuccess) {
   return { resolve, submitting };
 }
 
-export function useUserList(params = {}) {
+export function useUserList(params = {}, enabled = true) {
   const paramsKey = JSON.stringify(params);
-  return useQuery(() => adminApi.getUsers(params), [paramsKey]);
+  return useQuery(() => adminApi.getUsers(params), [paramsKey], {
+    immediate: enabled,
+  });
 }
 
 export function useAdminUser(userId) {

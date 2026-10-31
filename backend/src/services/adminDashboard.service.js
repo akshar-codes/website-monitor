@@ -1,17 +1,10 @@
-import { HEALTH_STATUS, INCIDENT_STATUS, ROLES } from "../config/constants.js";
+import { HEALTH_STATUS, ROLES } from "../config/constants.js";
 import User from "../models/User.js";
 import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
-import Incident from "../models/Incident.js";
 import Activity from "../models/Activity.js";
 
 const PLANS = ["free", "pro", "unlimited"];
-const ACTIVE_INCIDENTS = [
-  INCIDENT_STATUS.ONGOING,
-  INCIDENT_STATUS.INVESTIGATING,
-  INCIDENT_STATUS.IDENTIFIED,
-];
-
 export async function getAdminDashboard({ startDate, endDate }) {
   const range = { $gte: startDate, $lte: endDate };
   const [
@@ -22,7 +15,6 @@ export async function getAdminDashboard({ startDate, endDate }) {
     latestChecks,
     checks,
     recentRegistrations,
-    incidents,
     activity,
   ] = await Promise.all([
     User.aggregate([
@@ -93,14 +85,26 @@ export async function getAdminDashboard({ startDate, endDate }) {
       { $match: { createdAt: range } },
       { $sort: { createdAt: -1 } },
       { $limit: 8 },
-      { $project: { name: 1, plan: 1, role: 1, active: 1, createdAt: 1 } },
+      {
+        $lookup: {
+          from: Monitor.collection.name,
+          localField: "_id",
+          foreignField: "owner",
+          as: "customerMonitors",
+        },
+      },
+      { $addFields: { monitorCount: { $size: "$customerMonitors" } } },
+      {
+        $project: {
+          name: 1,
+          plan: 1,
+          role: 1,
+          active: 1,
+          createdAt: 1,
+          monitorCount: 1,
+        },
+      },
     ]),
-    Incident.find({ status: { $in: ACTIVE_INCIDENTS } })
-      .sort({ startedAt: -1 })
-      .limit(8)
-      .select("monitor startedAt status severity")
-      .populate("monitor", "name url")
-      .lean(),
     Activity.find({ category: "admin", createdAt: range })
       .sort({ createdAt: -1 })
       .limit(10)
@@ -153,20 +157,6 @@ export async function getAdminDashboard({ startDate, endDate }) {
       active: monitors[0]?.active || 0,
       statuses: statusCounts,
     },
-    incidents: {
-      activeCount: await Incident.countDocuments({
-        status: { $in: ACTIVE_INCIDENTS },
-      }),
-      active: incidents.map((i) => ({
-        id: String(i._id),
-        monitor: i.monitor
-          ? { name: i.monitor.name, url: i.monitor.url }
-          : null,
-        startedAt: i.startedAt,
-        status: i.status,
-        severity: i.severity,
-      })),
-    },
     system: {
       checksInRange: checkStats.total,
       failedChecksInRange: checkStats.failed,
@@ -176,13 +166,14 @@ export async function getAdminDashboard({ startDate, endDate }) {
       averageResponseTime: Math.round(checkStats.averageResponseTime || 0),
     },
     recentRegistrations: recentRegistrations.map(
-      ({ _id, name, plan, role, active, createdAt }) => ({
+      ({ _id, name, plan, role, active, createdAt, monitorCount }) => ({
         id: String(_id),
         name,
         plan,
         role,
         active,
         createdAt,
+        monitorCount,
       }),
     ),
     recentAdminActivity: activity.map(

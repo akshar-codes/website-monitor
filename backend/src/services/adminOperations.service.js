@@ -353,10 +353,19 @@ export const listAdminIncidents = async ({
   page,
   limit,
   search,
+  ownerId,
+  activeOnly,
   severity,
   status,
 }) => {
   const match = {};
+  if (ownerId) {
+    const ownedMonitorIds = await Monitor.find({
+      owner: new mongoose.Types.ObjectId(ownerId),
+    }).distinct("_id");
+    match.monitor = { $in: ownedMonitorIds };
+  }
+  if (activeOnly) match.status = { $in: activeIncidentStatuses };
   if (severity) match.severity = severity;
   if (status) match.status = status;
   if (search) {

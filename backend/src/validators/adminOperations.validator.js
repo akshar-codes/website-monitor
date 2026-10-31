@@ -27,6 +27,8 @@ export const adminIncidentListSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().max(150).optional(),
+  ownerId: objectId,
+  activeOnly: z.coerce.boolean().optional(),
   severity: z.enum(Object.values(INCIDENT_SEVERITY)).optional(),
   status: z.enum(Object.values(INCIDENT_STATUS)).optional(),
 });
