@@ -84,6 +84,7 @@ export default function MonitorInsights({ monitorId, details, retentionDays }) {
     endDate: todayUtc(),
   });
   const [rangeMessage, setRangeMessage] = useState("");
+  const [latencySeries, setLatencySeries] = useState("p95ResponseTime");
   const earliestDate = shiftDate(todayUtc(), -(availableRetention - 1));
   const analyticsParams = customMode
     ? appliedCustomRange
@@ -438,8 +439,31 @@ export default function MonitorInsights({ monitorId, details, retentionDays }) {
                   tone="blue"
                 />
                 <Metric
-                  label="95th percentile"
-                  value={`${Math.round(analytics.overview?.p95ResponseTime || 0)} ms`}
+                  label="P50 response"
+                  value={
+                    analytics.overview?.p50ResponseTime == null
+                      ? "N/A"
+                      : `${Math.round(analytics.overview.p50ResponseTime)} ms`
+                  }
+                  icon={Activity}
+                  tone="blue"
+                />
+                <Metric
+                  label="P95 response"
+                  value={
+                    analytics.overview?.responseTimeSampleCount
+                      ? `${Math.round(analytics.overview.p95ResponseTime)} ms`
+                      : "N/A"
+                  }
+                  icon={Activity}
+                />
+                <Metric
+                  label="P99 response"
+                  value={
+                    analytics.overview?.p99ResponseTime == null
+                      ? "N/A"
+                      : `${Math.round(analytics.overview.p99ResponseTime)} ms`
+                  }
                   icon={Activity}
                 />
                 <Metric
@@ -469,7 +493,19 @@ export default function MonitorInsights({ monitorId, details, retentionDays }) {
                   </ResponsiveContainer>
                 </section>
                 <section>
-                  <h3>Response time trend</h3>
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3>Response time trend</h3>
+                    <Select
+                      aria-label="Latency percentile"
+                      value={latencySeries}
+                      onChange={(event) => setLatencySeries(event.target.value)}
+                    >
+                      <option value="p50ResponseTime">P50</option>
+                      <option value="p95ResponseTime">P95</option>
+                      <option value="p99ResponseTime">P99</option>
+                      <option value="avgResponseTime">Average</option>
+                    </Select>
+                  </div>
                   <ResponsiveContainer width="100%" height={220}>
                     <LineChart data={analyticsChart}>
                       <CartesianGrid stroke="#edf2f6" />
@@ -477,8 +513,8 @@ export default function MonitorInsights({ monitorId, details, retentionDays }) {
                       <YAxis tick={{ fontSize: 9 }} />
                       <Tooltip />
                       <Line
-                        dataKey="avgResponseTime"
-                        name="Response time (ms)"
+                        dataKey={latencySeries}
+                        name={`${latencySeries.replace("ResponseTime", "").toUpperCase()} response time (ms)`}
                         stroke="#3a8ddd"
                         dot={false}
                       />
@@ -486,6 +522,105 @@ export default function MonitorInsights({ monitorId, details, retentionDays }) {
                   </ResponsiveContainer>
                 </section>
               </div>
+              <section className="mt-5">
+                <h3 className="subsection-title">Network timing percentiles</h3>
+                <p className="mb-3 text-sm text-slate-500">
+                  Percentiles are histogram bucket estimates. Phase sample
+                  counts include only checks with that measurement; unavailable
+                  values are not treated as zero. TTFB includes connection setup
+                  and should not be added to DNS/TCP/TLS.
+                </p>
+                <div className="sw-metric-grid">
+                  {Object.entries(
+                    analytics.overview?.latencyPercentiles?.timings || {},
+                  ).map(([key, metric]) => {
+                    const names = {
+                      dns: "DNS lookup",
+                      tcpConnect: "TCP connection",
+                      tlsHandshake: "TLS handshake",
+                      ttfb: "Time to first byte",
+                    };
+                    return (
+                      <Metric
+                        key={key}
+                        label={`${names[key] || key} P50 / P95`}
+                        value={
+                          metric.sampleCount
+                            ? `${metric.p50 ?? "N/A"} / ${metric.p95 ?? "N/A"} ms`
+                            : "No samples"
+                        }
+                        icon={Clock3}
+                        tone="blue"
+                      />
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Response percentile sample count:{" "}
+                  {analytics.overview?.responseTimeSampleCount || 0}
+                </p>
+              </section>
+              <section className="mt-5">
+                <h3 className="subsection-title">
+                  Network phase timing trends (P95)
+                </h3>
+                <ResponsiveContainer width="100%" height={240}>
+                  <LineChart data={analyticsChart}>
+                    <CartesianGrid stroke="#edf2f6" />
+                    <XAxis dataKey="label" tick={{ fontSize: 9 }} />
+                    <YAxis tick={{ fontSize: 9 }} />
+                    <Tooltip />
+                    <Line
+                      dataKey="phaseTimings.dns.p95"
+                      name="DNS lookup"
+                      stroke="#0f766e"
+                      dot={false}
+                      connectNulls={false}
+                    />
+                    <Line
+                      dataKey="phaseTimings.tcpConnect.p95"
+                      name="TCP connection"
+                      stroke="#2563eb"
+                      dot={false}
+                      connectNulls={false}
+                    />
+                    <Line
+                      dataKey="phaseTimings.tlsHandshake.p95"
+                      name="TLS handshake"
+                      stroke="#7c3aed"
+                      dot={false}
+                      connectNulls={false}
+                    />
+                    <Line
+                      dataKey="phaseTimings.ttfb.p95"
+                      name="Time to first byte"
+                      stroke="#c2410c"
+                      dot={false}
+                      connectNulls={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </section>
+              <section className="mt-5">
+                <h3 className="subsection-title">Performance degradation</h3>
+                {analytics.performanceAlert?.status === "degraded" ? (
+                  <Notice tone="warning">
+                    Sustained response-time degradation detected. Baseline
+                    median:{" "}
+                    {analytics.performanceAlert.baselineMedianMs == null
+                      ? "warming up"
+                      : `${Math.round(analytics.performanceAlert.baselineMedianMs)} ms`}{" "}
+                    · consecutive breaches:{" "}
+                    {analytics.performanceAlert.consecutiveBreaches}
+                  </Notice>
+                ) : (
+                  <Notice tone="info">
+                    {analytics.performanceAlert?.status === "warming_up"
+                      ? "Collecting baseline samples. At least 20 scheduled HTTP samples are needed."
+                      : "No active response-time anomaly."}
+                  </Notice>
+                )}
+              </section>
               <h3 className="subsection-title">Component availability</h3>
               <div className="sw-metric-grid">
                 <Metric

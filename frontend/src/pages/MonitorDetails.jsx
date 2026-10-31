@@ -306,6 +306,20 @@ export default function MonitorDetails() {
                     name: f.get("name"),
                     url: f.get("url"),
                     interval: Number(f.get("interval")),
+                    performanceAlerts: {
+                      enabled: f.get("performanceAlerts.enabled") === "on",
+                      ...(usage?.features?.performanceAlertConfig
+                        ? {
+                            sensitivity: f.get("performanceAlerts.sensitivity"),
+                            consecutiveBreaches: Number(
+                              f.get("performanceAlerts.consecutiveBreaches"),
+                            ),
+                            cooldownMinutes: Number(
+                              f.get("performanceAlerts.cooldownMinutes"),
+                            ),
+                          }
+                        : {}),
+                    },
                   });
                 }}
               >
@@ -331,6 +345,59 @@ export default function MonitorDetails() {
                   <option value="300">300 seconds</option>
                   <option value="600">600 seconds</option>
                 </Select>
+                <fieldset className="settings-grid rounded-lg border p-3 md:col-span-2">
+                  <legend>Performance degradation alerts</legend>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      name="performanceAlerts.enabled"
+                      defaultChecked={
+                        monitor.performanceAlerts?.enabled !== false
+                      }
+                    />{" "}
+                    Enable sustained latency alerts
+                  </label>
+                  <Select
+                    label="Sensitivity"
+                    name="performanceAlerts.sensitivity"
+                    defaultValue={
+                      monitor.performanceAlerts?.sensitivity || "normal"
+                    }
+                    disabled={!usage?.features?.performanceAlertConfig}
+                  >
+                    <option value="low">Low · substantial changes</option>
+                    <option value="normal">Normal · balanced</option>
+                    <option value="high">High · smaller changes</option>
+                  </Select>
+                  <Input
+                    label="Consecutive breaches"
+                    name="performanceAlerts.consecutiveBreaches"
+                    type="number"
+                    min="2"
+                    max="10"
+                    defaultValue={
+                      monitor.performanceAlerts?.consecutiveBreaches || 3
+                    }
+                    disabled={!usage?.features?.performanceAlertConfig}
+                  />
+                  <Input
+                    label="Repeat cooldown (minutes)"
+                    name="performanceAlerts.cooldownMinutes"
+                    type="number"
+                    min="5"
+                    max="1440"
+                    defaultValue={
+                      monitor.performanceAlerts?.cooldownMinutes || 30
+                    }
+                    disabled={!usage?.features?.performanceAlertConfig}
+                  />
+                  {!usage?.features?.performanceAlertConfig && (
+                    <p className="text-sm text-slate-500 md:col-span-2">
+                      Custom sensitivity is available on Pro and Enterprise.
+                      Upgrade to configure it.
+                    </p>
+                  )}
+                </fieldset>
                 <div className="modal-actions">
                   <Button
                     variant="secondary"

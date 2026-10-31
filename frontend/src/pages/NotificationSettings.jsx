@@ -10,6 +10,7 @@ const DEFAULTS = {
   inApp: {
     monitorDown: true,
     monitorRecovery: true,
+    performanceAlerts: true,
     sslExpiry: true,
     incidents: true,
     billing: true,
@@ -20,6 +21,7 @@ const DEFAULTS = {
     enabled: false,
     monitorDown: true,
     monitorRecovery: true,
+    performanceAlerts: true,
     sslExpiry: true,
     incidents: true,
   },
@@ -45,6 +47,11 @@ const sections = [
     key: "incidents",
     label: "Incidents",
     help: "Incident opened and resolved updates.",
+  },
+  {
+    key: "performanceAlerts",
+    label: "Performance degradation",
+    help: "Sustained response-time degradation and recovery.",
   },
 ];
 
