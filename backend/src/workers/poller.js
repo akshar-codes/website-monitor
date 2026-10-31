@@ -3,11 +3,17 @@ import { isIP } from "node:net";
 import http from "node:http";
 import https from "node:https";
 import { performance } from "node:perf_hooks";
-import env from "../config/env.js";
-import logger from "../utils/logger.js";
 import { FAILURE_REASONS } from "../config/constants.js";
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
+const pollerConfig = {
+  HEALTH_CHECK_MAX_RESPONSE_BYTES:
+    Number(process.env.HEALTH_CHECK_MAX_RESPONSE_BYTES) || 1_048_576,
+  POLL_TIMEOUT_MS: Number(process.env.POLL_TIMEOUT_MS) || 10_000,
+  POLL_TOTAL_TIMEOUT_MS: Number(process.env.POLL_TOTAL_TIMEOUT_MS) || 30_000,
+  MONITOR_RETRY_COUNT: Number(process.env.MONITOR_RETRY_COUNT) || 2,
+  MONITOR_RETRY_DELAY: Number(process.env.MONITOR_RETRY_DELAY) || 1_000,
+};
 const MAX_REDIRECTS = 5;
 const SAFE_RESPONSE_HEADERS = [
   "content-type",
@@ -173,7 +179,7 @@ export const requestOnce = (url, addresses, timeoutMs, requestOptions = {}) =>
         let size = 0;
         response.on("data", (chunk) => {
           size += chunk.length;
-          if (size > env.HEALTH_CHECK_MAX_RESPONSE_BYTES) {
+          if (size > pollerConfig.HEALTH_CHECK_MAX_RESPONSE_BYTES) {
             request.destroy(
               Object.assign(new Error("Response exceeds allowed size"), {
                 code: "ERR_RESPONSE_TOO_LARGE",
@@ -420,10 +426,10 @@ const singlePoll = async (inputUrl, timeoutMs) => {
 };
 
 export const poll = async (url, opts = {}) => {
-  const timeout = opts.timeout ?? env.POLL_TIMEOUT_MS;
-  const totalTimeout = opts.totalTimeout ?? env.POLL_TOTAL_TIMEOUT_MS;
-  const maxRetries = opts.maxRetries ?? env.MONITOR_RETRY_COUNT;
-  const retryDelay = opts.retryDelay ?? env.MONITOR_RETRY_DELAY;
+  const timeout = opts.timeout ?? pollerConfig.POLL_TIMEOUT_MS;
+  const totalTimeout = opts.totalTimeout ?? pollerConfig.POLL_TOTAL_TIMEOUT_MS;
+  const maxRetries = opts.maxRetries ?? pollerConfig.MONITOR_RETRY_COUNT;
+  const retryDelay = opts.retryDelay ?? pollerConfig.MONITOR_RETRY_DELAY;
   const deadline = Date.now() + totalTimeout;
   let result;
   for (let attempt = 0; attempt <= Math.min(5, maxRetries); attempt++) {
@@ -435,7 +441,7 @@ export const poll = async (url, opts = {}) => {
         retryDelay * 2 ** (attempt - 1),
         remaining,
       );
-      logger.debug("Retrying monitor request", {
+      console.debug("Retrying monitor request", {
         attempt,
         maxRetries,
         delayMs: delay,

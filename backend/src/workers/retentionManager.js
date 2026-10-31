@@ -3,6 +3,11 @@ import HealthCheck from "../models/HealthCheck.js";
 import Incident from "../models/Incident.js";
 import DailyStat from "../models/DailyStat.js";
 import HourlyStat from "../models/HourlyStat.js";
+import RegionalCheck from "../models/RegionalCheck.js";
+import RegionalProbeRun from "../models/RegionalProbeRun.js";
+import RegionalIncident from "../models/RegionalIncident.js";
+import RegionalDailyStat from "../models/RegionalDailyStat.js";
+import RegionalHourlyStat from "../models/RegionalHourlyStat.js";
 import Monitor from "../models/Monitor.js";
 import env from "../config/env.js";
 import { getPlanDefinition } from "../config/plans.js";
@@ -124,6 +129,8 @@ export const runRetentionPass = async (deps = {}) => {
 
   let hourlyStatsDeleted = 0;
   let dailyStatsDeleted = 0;
+  let regionalChecksDeleted = 0;
+  let regionalStatsDeleted = 0;
 
   if (isDbAvailable) {
     // Keep aggregate history for the plan attached to each monitor owner.
@@ -167,6 +174,30 @@ export const runRetentionPass = async (deps = {}) => {
         monitor._id,
         cutoff,
       );
+      regionalChecksDeleted +=
+        (
+          await RegionalCheck.deleteMany({
+            monitor: monitor._id,
+            completedAt: { $lt: cutoff },
+          })
+        ).deletedCount || 0;
+      await RegionalProbeRun.deleteMany({
+        monitor: monitor._id,
+        scheduledAt: { $lt: cutoff },
+        status: { $ne: "pending" },
+      });
+      await RegionalIncident.deleteMany({
+        monitor: monitor._id,
+        status: "resolved",
+        recoveredAt: { $lt: cutoff },
+      });
+      for (const model of [RegionalHourlyStat, RegionalDailyStat]) {
+        const removed = await model.deleteMany({
+          monitor: monitor._id,
+          date: { $lt: cutoff },
+        });
+        regionalStatsDeleted += removed.deletedCount || 0;
+      }
     }
   } else {
     // Fallback for tests or disconnected environments
@@ -230,6 +261,8 @@ export const runRetentionPass = async (deps = {}) => {
       responseSnapshotsPruned,
       dailyStatsDeleted,
       hourlyStatsDeleted,
+      regionalChecksDeleted,
+      regionalStatsDeleted,
       checksDeleted: 0,
       excessChecksDeleted,
     };
@@ -260,6 +293,8 @@ export const runRetentionPass = async (deps = {}) => {
     responseSnapshotsPruned,
     dailyStatsDeleted,
     hourlyStatsDeleted,
+    regionalChecksDeleted,
+    regionalStatsDeleted,
     checksDeleted: deleted.deletedCount || 0,
     excessChecksDeleted,
     checksProtected: protectedIds.size,

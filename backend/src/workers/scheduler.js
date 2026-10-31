@@ -16,6 +16,10 @@ import { createHealthResponseSnapshot } from "../utils/healthResponseSnapshot.js
 import { pruneMonitorResponseSnapshots } from "../services/healthResponseRetention.service.js";
 import { evaluatePerformanceCheck } from "../services/performanceAnomaly.service.js";
 import {
+  createRegionalProbeRun,
+  finalizeExpiredRegionalRuns,
+} from "../services/regionalProbe.service.js";
+import {
   ACTIVITY_CATEGORIES,
   ACTIVITY_ACTIONS,
 } from "../config/activityConstants.js";
@@ -50,6 +54,18 @@ const processMonitor = async (
   inFlightMonitorIds.add(id);
   const startedAt = Date.now();
   try {
+    if (
+      !initiatedBy &&
+      monitor.regionalMonitoring?.enabled &&
+      monitor.regionalMonitoring.regions?.length
+    ) {
+      await createRegionalProbeRun(monitor);
+      logger.info("Regional probe run dispatched", {
+        monitorId: id,
+        regions: monitor.regionalMonitoring.regions,
+      });
+      return null;
+    }
     const pollResult = await poll(monitor.url);
     if (leaseToken) {
       const current = await Monitor.findOne({
@@ -277,6 +293,11 @@ const runClaimedMonitor = async ({ monitor, token }) => {
 const tick = async () => {
   if (stopped || tickPromise) return tickPromise;
   tickPromise = (async () => {
+    void finalizeExpiredRegionalRuns().catch((error) =>
+      logger.error("Regional probe run finalization failed", {
+        error: error.message,
+      }),
+    );
     const available = Math.max(
       0,
       env.MONITOR_JOB_CONCURRENCY - activeTasks.size,
