@@ -1,4 +1,6 @@
 import Monitor from "../models/Monitor.js";
+import StatusPage from "../models/StatusPage.js";
+import StatusSubscriber from "../models/StatusSubscriber.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { hasFeature, FEATURES } from "../config/features.js";
 
@@ -21,6 +23,26 @@ export const getUsageForUser = async (user) => {
   const definition = getPlanDefinition(plan);
 
   const monitorCount = await Monitor.countDocuments({ owner: ownerId });
+  const statusPages = await StatusPage.find({ owner: ownerId })
+    .select("services")
+    .sort({ createdAt: -1 })
+    .lean();
+  const statusSubscribers = statusPages.length
+    ? await StatusSubscriber.aggregate([
+        {
+          $match: {
+            statusPage: { $in: statusPages.map((page) => page._id) },
+            isVerified: true,
+            isActive: true,
+          },
+        },
+        { $group: { _id: "$statusPage", count: { $sum: 1 } } },
+      ])
+    : [];
+  const subscribersByPage = new Map(
+    statusSubscribers.map((row) => [String(row._id), row.count]),
+  );
+  const statusPageLimits = definition.limits;
   const monitorLimit = definition.limits.maxMonitors; // null = unlimited
 
   const unlimited = monitorLimit == null;
@@ -51,6 +73,17 @@ export const getUsageForUser = async (user) => {
     team: {
       limit: definition.limits.teamMembers,
       unlimited: definition.limits.teamMembers == null,
+    },
+    statusPages: {
+      used: statusPages.length,
+      limit: statusPageLimits.maxStatusPages,
+      servicesPerPageLimit: statusPageLimits.maxStatusServicesPerPage,
+      subscribersPerPageLimit: statusPageLimits.maxStatusSubscribersPerPage,
+      pages: statusPages.map((page) => ({
+        id: String(page._id),
+        services: page.services.length,
+        subscribers: subscribersByPage.get(String(page._id)) || 0,
+      })),
     },
     features: {
       [FEATURES.TEAM_ACCESS]: hasFeature(plan, FEATURES.TEAM_ACCESS),

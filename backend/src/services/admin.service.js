@@ -14,6 +14,7 @@ import { getUsageForUser } from "./usage.service.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { getPricedPlanCatalog } from "./billingSettings.service.js";
 import { destroyAllUserSessions } from "./session.service.js";
+import { deleteStatusPagesForOwner } from "./statusPageCleanup.service.js";
 import { logActivity } from "../utils/activityLogger.js";
 import {
   ACTIVITY_CATEGORIES,
@@ -559,6 +560,7 @@ export const deleteUser = async (targetUserId, actingUser) => {
   }
 
   await destroyAllUserSessions(targetUserId);
+  await deleteStatusPagesForOwner(targetUserId);
   await ApiKey.deleteMany({ owner: targetUserId });
   await User.findByIdAndDelete(targetUserId);
 

@@ -2,6 +2,7 @@ import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import DailyStat from "../models/DailyStat.js";
 import Incident from "../models/Incident.js";
+import StatusPage from "../models/StatusPage.js";
 import ApiError from "../utils/ApiError.js";
 import { ROLES } from "../config/constants.js";
 import {
@@ -283,6 +284,10 @@ export const deleteMonitor = async (id, user) => {
     HealthCheck.deleteMany({ monitor: monitor._id }),
     DailyStat.deleteMany({ monitor: monitor._id }),
     Incident.deleteMany({ monitor: monitor._id }),
+    StatusPage.updateMany(
+      { "services.monitor": monitor._id },
+      { $pull: { services: { monitor: monitor._id } } },
+    ),
   ]);
   await monitor.deleteOne();
 

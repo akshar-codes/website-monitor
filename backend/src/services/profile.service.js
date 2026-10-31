@@ -23,6 +23,7 @@ import UserPreference from "../models/UserPreference.js";
 import ApiKey from "../models/ApiKey.js";
 import PlanUpgradeRequest from "../models/PlanUpgradeRequest.js";
 import { destroyAllUserSessions } from "./session.service.js";
+import { deleteStatusPagesForOwner } from "./statusPageCleanup.service.js";
 
 // ── Profile completion ──────────────────────────────────────────────────────
 
@@ -116,6 +117,8 @@ export const deleteAccount = async (userId, confirmationEmail) => {
     .select("_id")
     .lean();
   const monitorIds = monitorDocs.map(({ _id }) => _id);
+
+  await deleteStatusPagesForOwner(account._id);
 
   await Promise.all([
     HealthCheck.deleteMany({ monitor: { $in: monitorIds } }),
