@@ -32,7 +32,7 @@ export function Button({ children, variant = "primary", ...props }) {
   );
 }
 
-export function Input({ label, error, className = "", ...props }) {
+export function Input({ label, error, hint, className = "", ...props }) {
   const t = useTranslation();
   return (
     <label className={`sw-field ${className}`}>
@@ -44,6 +44,11 @@ export function Input({ label, error, className = "", ...props }) {
         </span>
       )}
       <input className={error ? "invalid" : ""} {...props} />
+      {hint && !error && (
+        <small className="field-hint">
+          {typeof hint === "string" ? t(hint) : translateNode(hint, t.language)}
+        </small>
+      )}
       {error && <small className="field-error">{t(error)}</small>}
     </label>
   );

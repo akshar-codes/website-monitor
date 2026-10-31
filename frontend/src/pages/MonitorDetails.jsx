@@ -335,6 +335,7 @@ export default function MonitorDetails() {
                 <Input
                   label="Monitor name"
                   name="name"
+                  placeholder="e.g. My Website"
                   defaultValue={monitor.name}
                   required
                 />
@@ -342,6 +343,7 @@ export default function MonitorDetails() {
                   label="URL"
                   name="url"
                   type="url"
+                  placeholder="https://example.com"
                   defaultValue={monitor.url}
                   required
                 />
@@ -397,6 +399,7 @@ export default function MonitorDetails() {
                     type="number"
                     min="2"
                     max="10"
+                    placeholder="e.g. 3"
                     defaultValue={
                       monitor.performanceAlerts?.consecutiveBreaches || 3
                     }
@@ -408,6 +411,7 @@ export default function MonitorDetails() {
                     type="number"
                     min="5"
                     max="1440"
+                    placeholder="e.g. 30"
                     defaultValue={
                       monitor.performanceAlerts?.cooldownMinutes || 30
                     }

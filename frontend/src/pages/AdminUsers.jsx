@@ -251,12 +251,14 @@ export default function AdminUsers() {
           <Input
             aria-label="Registered after"
             type="date"
+            placeholder="Registered after (YYYY-MM-DD)"
             value={registeredFrom}
             onChange={(e) => setRegisteredFrom(e.target.value)}
           />
           <Input
             aria-label="Registered before"
             type="date"
+            placeholder="Registered before (YYYY-MM-DD)"
             value={registeredTo}
             onChange={(e) => setRegisteredTo(e.target.value)}
           />

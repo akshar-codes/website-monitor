@@ -452,6 +452,7 @@ export default function Monitors() {
               <Input
                 label="Monitor name"
                 name="name"
+                placeholder="e.g. Production Web App"
                 defaultValue={duplicateSource?.name || editMonitor?.name}
                 required
               />

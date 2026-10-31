@@ -12,6 +12,39 @@ import {
 import * as api from "../services/api/statusPages";
 import { getMonitors } from "../services/api/monitors";
 
+function sanitizeSlug(value = "") {
+  return value
+    .toLowerCase()
+    .replace(/^https?:\/\/[^/]+\/(?:status\/)?/, "")
+    .replace(/^\/status\/?/, "")
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-");
+}
+
+const RESERVED_SLUGS = new Set([
+  "api",
+  "admin",
+  "login",
+  "register",
+  "status",
+  "settings",
+  "dashboard",
+  "monitors",
+]);
+const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function validateSlug(rawSlug) {
+  if (!rawSlug) return "";
+  const slug = rawSlug.trim().toLowerCase();
+  if (slug.length < 3 || slug.length > 60 || !SLUG_REGEX.test(slug)) {
+    return "Only lowercase letters, numbers, and hyphens (3-60 chars).";
+  }
+  if (RESERVED_SLUGS.has(slug)) {
+    return "This slug is reserved and cannot be used.";
+  }
+  return "";
+}
+
 export default function StatusPages() {
   const [pages, setPages] = useState([]);
   const [form, setForm] = useState({
@@ -22,6 +55,8 @@ export default function StatusPages() {
     logo: "",
     branding: { theme: "light", accentColor: "#15803d" },
   });
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [editSlugTouched, setEditSlugTouched] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [monitors, setMonitors] = useState([]);
@@ -72,8 +107,18 @@ export default function StatusPages() {
   const submit = async (event) => {
     event.preventDefault();
     setError("");
+    const slugErr = validateSlug(form.slug);
+    if (slugErr) {
+      setSlugTouched(true);
+      setError(slugErr);
+      return;
+    }
     try {
-      await api.createStatusPage(form);
+      const cleanedSlug = form.slug
+        .trim()
+        .toLowerCase()
+        .replace(/^-+|-+$/g, "");
+      await api.createStatusPage({ ...form, slug: cleanedSlug });
       setForm({
         name: "",
         slug: "",
@@ -82,6 +127,7 @@ export default function StatusPages() {
         logo: "",
         branding: { theme: "light", accentColor: "#15803d" },
       });
+      setSlugTouched(false);
       await refresh();
     } catch (e) {
       setError(e.response?.data?.message || "Could not create status page");
@@ -169,7 +215,8 @@ export default function StatusPages() {
                   )}
                   <Button
                     variant="secondary"
-                    onClick={() =>
+                    onClick={() => {
+                      setEditSlugTouched(false);
                       setEditingPage(
                         editingPage?.id === page.id
                           ? null
@@ -186,8 +233,8 @@ export default function StatusPages() {
                                   page.branding?.accentColor || "#15803d",
                               },
                             },
-                      )
-                    }
+                      );
+                    }}
                   >
                     <Pencil size={15} /> Edit
                   </Button>
@@ -251,15 +298,23 @@ export default function StatusPages() {
                     className="grid w-full gap-3 border-t border-slate-100 pt-4 md:grid-cols-2"
                     onSubmit={(event) => {
                       event.preventDefault();
+                      const slugErr = validateSlug(editingPage.slug);
+                      if (slugErr) {
+                        setEditSlugTouched(true);
+                        setError(slugErr);
+                        return;
+                      }
                       act(async () => {
+                        const cleanedSlug = editingPage.slug
+                          .trim()
+                          .toLowerCase()
+                          .replace(/^-+|-+$/g, "");
                         await api.updateStatusPage(page.id, {
                           ...editingPage,
-                          slug: editingPage.slug
-                            .toLowerCase()
-                            .trim()
-                            .replace(/\s+/g, "-"),
+                          slug: cleanedSlug,
                         });
                         setEditingPage(null);
+                        setEditSlugTouched(false);
                       });
                     }}
                   >
@@ -267,6 +322,7 @@ export default function StatusPages() {
                       label="Page name"
                       required
                       maxLength={120}
+                      placeholder="e.g. Acme Production Services"
                       value={editingPage.name}
                       onChange={(e) =>
                         setEditingPage({ ...editingPage, name: e.target.value })
@@ -278,14 +334,39 @@ export default function StatusPages() {
                       minLength={3}
                       maxLength={60}
                       pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-                      value={editingPage.slug}
-                      onChange={(e) =>
-                        setEditingPage({ ...editingPage, slug: e.target.value })
+                      placeholder="e.g. acme-status"
+                      title="Only lowercase letters, numbers, and hyphens (3-60 chars)."
+                      error={
+                        editSlugTouched ? validateSlug(editingPage.slug) : ""
                       }
+                      value={editingPage.slug}
+                      onInvalid={(e) => {
+                        e.target.setCustomValidity(
+                          "Only lowercase letters, numbers, and hyphens (3-60 chars).",
+                        );
+                      }}
+                      onInput={(e) => {
+                        e.target.setCustomValidity("");
+                      }}
+                      onChange={(e) => {
+                        setEditSlugTouched(true);
+                        setEditingPage({
+                          ...editingPage,
+                          slug: sanitizeSlug(e.target.value),
+                        });
+                      }}
+                      onBlur={() => {
+                        setEditSlugTouched(true);
+                        setEditingPage((prev) => ({
+                          ...prev,
+                          slug: prev.slug.replace(/^-+|-+$/g, ""),
+                        }));
+                      }}
                     />
                     <Input
                       label="Description"
                       maxLength={500}
+                      placeholder="e.g. Real-time status and incident updates for our services"
                       value={editingPage.description}
                       onChange={(e) =>
                         setEditingPage({
@@ -297,6 +378,7 @@ export default function StatusPages() {
                     <Input
                       label="Timezone"
                       required
+                      placeholder="e.g. America/New_York or UTC"
                       value={editingPage.timezone}
                       onChange={(e) =>
                         setEditingPage({
@@ -308,6 +390,7 @@ export default function StatusPages() {
                     <Input
                       label="Logo URL"
                       type="url"
+                      placeholder="https://example.com/logo.png"
                       value={editingPage.logo}
                       onChange={(e) =>
                         setEditingPage({ ...editingPage, logo: e.target.value })
@@ -494,6 +577,7 @@ export default function StatusPages() {
                         label="Public service name"
                         required
                         maxLength={120}
+                        placeholder="e.g. Web API or Authentication"
                         value={editingService.displayName}
                         onChange={(e) =>
                           setEditingService({
@@ -505,6 +589,7 @@ export default function StatusPages() {
                       <Input
                         label="Public description"
                         maxLength={500}
+                        placeholder="e.g. Handles user login, registration, and tokens"
                         value={editingService.description}
                         onChange={(e) =>
                           setEditingService({
@@ -588,24 +673,53 @@ export default function StatusPages() {
             value={form.name}
             maxLength={120}
             required
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="e.g. Acme Production Services"
+            onChange={(e) => {
+              const newName = e.target.value;
+              const updates = { name: newName };
+              if (!slugTouched) {
+                updates.slug = sanitizeSlug(newName).replace(/^-+|-+$/g, "");
+              }
+              setForm((prev) => ({ ...prev, ...updates }));
+            }}
           />
           <Input
             label="Public URL slug"
             value={form.slug}
+            minLength={3}
             maxLength={60}
-            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+            pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
             required
-            onChange={(e) =>
+            placeholder="e.g. acme-status"
+            title="Only lowercase letters, numbers, and hyphens (3-60 chars)."
+            error={slugTouched ? validateSlug(form.slug) : ""}
+            onInvalid={(e) => {
+              e.target.setCustomValidity(
+                "Only lowercase letters, numbers, and hyphens (3-60 chars).",
+              );
+            }}
+            onInput={(e) => {
+              e.target.setCustomValidity("");
+            }}
+            onChange={(e) => {
+              setSlugTouched(true);
               setForm({
                 ...form,
-                slug: e.target.value.toLowerCase().replace(/\s+/g, "-"),
-              })
-            }
+                slug: sanitizeSlug(e.target.value),
+              });
+            }}
+            onBlur={() => {
+              setSlugTouched(true);
+              setForm((prev) => ({
+                ...prev,
+                slug: prev.slug.replace(/^-+|-+$/g, ""),
+              }));
+            }}
           />
           <div className="md:col-span-2">
             <Input
               label="Description (optional)"
+              placeholder="e.g. Real-time status and incident updates for our services"
               value={form.description}
               maxLength={500}
               onChange={(e) =>
@@ -616,11 +730,13 @@ export default function StatusPages() {
           <Input
             label="Logo URL (optional)"
             type="url"
+            placeholder="https://example.com/logo.png"
             value={form.logo}
             onChange={(e) => setForm({ ...form, logo: e.target.value })}
           />
           <Input
             label="Display timezone (IANA)"
+            placeholder="e.g. America/New_York or UTC"
             value={form.timezone}
             maxLength={80}
             required

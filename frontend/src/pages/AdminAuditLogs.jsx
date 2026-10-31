@@ -124,12 +124,14 @@ export default function AdminAuditLogs() {
           <Input
             aria-label="From date"
             type="date"
+            placeholder="From date (YYYY-MM-DD)"
             value={startDate}
             onChange={(e) => resetPage(setStartDate)(e.target.value)}
           />
           <Input
             aria-label="To date"
             type="date"
+            placeholder="To date (YYYY-MM-DD)"
             value={endDate}
             onChange={(e) => resetPage(setEndDate)(e.target.value)}
           />

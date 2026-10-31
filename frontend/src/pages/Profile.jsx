@@ -94,6 +94,7 @@ export default function Profile() {
               <Input
                 label="Display name"
                 name="name"
+                placeholder="e.g. Alex Morgan"
                 defaultValue={profile?.name}
                 required
               />
@@ -102,6 +103,7 @@ export default function Profile() {
                 <textarea
                   rows="4"
                   name="bio"
+                  placeholder="Tell us a little about yourself or your team..."
                   defaultValue={profile?.bio || ""}
                   maxLength={500}
                 />
@@ -109,13 +111,14 @@ export default function Profile() {
               <Input
                 label="Location"
                 name="location"
+                placeholder="e.g. London, UK or Remote"
                 defaultValue={profile?.location || ""}
               />
               <Input
                 label="Website"
                 name="website"
                 type="url"
-                placeholder="https://"
+                placeholder="https://example.com"
                 defaultValue={profile?.website || ""}
               />
               <Notice tone="info">

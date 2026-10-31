@@ -142,6 +142,7 @@ export default function AdminBillingSettings({ onSaved }) {
                 min="0"
                 step="0.01"
                 label="Monthly"
+                placeholder="e.g. 29.00"
                 value={settings.prices[id]?.monthly ?? ""}
                 onChange={(e) => setPrice(id, "monthly", e.target.value)}
               />
@@ -150,6 +151,7 @@ export default function AdminBillingSettings({ onSaved }) {
                 min="0"
                 step="0.01"
                 label="Yearly"
+                placeholder="e.g. 290.00"
                 value={settings.prices[id]?.yearly ?? ""}
                 onChange={(e) => setPrice(id, "yearly", e.target.value)}
               />

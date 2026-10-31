@@ -213,6 +213,7 @@ export default function PublicStatus() {
                   label="Email address"
                   type="email"
                   autoComplete="email"
+                  placeholder="you@company.com"
                   required
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}

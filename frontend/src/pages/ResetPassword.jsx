@@ -82,6 +82,7 @@ export default function ResetPassword() {
         <Input
           label="New password"
           type="password"
+          placeholder="At least 8 characters"
           autoComplete="new-password"
           value={values.password || ""}
           onChange={makeChangeHandler("password")}
@@ -92,6 +93,7 @@ export default function ResetPassword() {
         <Input
           label="Confirm password"
           type="password"
+          placeholder="Re-enter your new password"
           autoComplete="new-password"
           value={values.confirmPassword || ""}
           onChange={makeChangeHandler("confirmPassword")}

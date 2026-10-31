@@ -158,21 +158,28 @@ export default function AccountSettings() {
             <form className="settings-form" onSubmit={handleSubmit(onSave)}>
               <label className="sw-field">
                 Name
-                <input {...register("name")} />
+                <input placeholder="e.g. Jane Doe" {...register("name")} />
                 {errors.name && (
                   <small className="field-error">{errors.name.message}</small>
                 )}
               </label>
               <label className="sw-field">
                 Bio
-                <textarea rows="3" {...register("bio")} />
+                <textarea
+                  rows="3"
+                  placeholder="Tell us a little about yourself or your team..."
+                  {...register("bio")}
+                />
                 {errors.bio && (
                   <small className="field-error">{errors.bio.message}</small>
                 )}
               </label>
               <label className="sw-field">
                 Location
-                <input {...register("location")} />
+                <input
+                  placeholder="e.g. San Francisco, CA or Remote"
+                  {...register("location")}
+                />
                 {errors.location && (
                   <small className="field-error">
                     {errors.location.message}
@@ -183,7 +190,7 @@ export default function AccountSettings() {
                 Website
                 <input
                   type="url"
-                  placeholder="https://"
+                  placeholder="https://example.com"
                   {...register("website")}
                 />
                 {errors.website && (
@@ -194,7 +201,11 @@ export default function AccountSettings() {
               </label>
               <label className="sw-field">
                 Phone
-                <input type="tel" {...register("phone")} />
+                <input
+                  type="tel"
+                  placeholder="e.g. +1 (555) 000-0000"
+                  {...register("phone")}
+                />
                 {errors.phone && (
                   <small className="field-error">{errors.phone.message}</small>
                 )}
@@ -231,6 +242,7 @@ export default function AccountSettings() {
               <Input
                 label="Account email"
                 type="email"
+                placeholder="you@company.com"
                 value={confirmationEmail}
                 onChange={(e) => setConfirmationEmail(e.target.value)}
                 required

@@ -242,6 +242,7 @@ export default function AdminUserDetails() {
                 Audit reason
                 <textarea
                   rows="3"
+                  placeholder="Explain why this user's plan is being changed (required for audit logs)..."
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                 />

@@ -137,6 +137,7 @@ export default function StatusPageManage() {
             label="Incident title"
             required
             maxLength={160}
+            placeholder="e.g. Elevated latency on API endpoints"
             value={incident.title}
             onChange={(e) =>
               setIncident({ ...incident, title: e.target.value })
@@ -157,6 +158,7 @@ export default function StatusPageManage() {
             <Input
               label="Public description"
               maxLength={3000}
+              placeholder="Describe what happened, current impact, and next steps..."
               value={incident.description}
               onChange={(e) =>
                 setIncident({ ...incident, description: e.target.value })
@@ -251,6 +253,7 @@ export default function StatusPageManage() {
                     label="Incident title"
                     required
                     maxLength={160}
+                    placeholder="e.g. Elevated latency on API endpoints"
                     value={editingIncident.title}
                     onChange={(e) =>
                       setEditingIncident({
@@ -276,6 +279,7 @@ export default function StatusPageManage() {
                   <Input
                     label="Public description"
                     maxLength={3000}
+                    placeholder="Describe what happened, current impact, and next steps..."
                     value={editingIncident.description}
                     onChange={(e) =>
                       setEditingIncident({
@@ -388,6 +392,7 @@ export default function StatusPageManage() {
           <Input
             label="Maintenance title"
             required
+            placeholder="e.g. Scheduled database maintenance"
             value={windowForm.title}
             onChange={(e) =>
               setWindowForm({ ...windowForm, title: e.target.value })
@@ -395,6 +400,7 @@ export default function StatusPageManage() {
           />
           <Input
             label="Description"
+            placeholder="e.g. Upgrading database clusters to improve performance"
             value={windowForm.description}
             onChange={(e) =>
               setWindowForm({ ...windowForm, description: e.target.value })
@@ -403,6 +409,7 @@ export default function StatusPageManage() {
           <Input
             label="Start (local time)"
             type="datetime-local"
+            placeholder="YYYY-MM-DDTHH:mm"
             required
             value={windowForm.scheduledStart}
             onChange={(e) =>
@@ -412,6 +419,7 @@ export default function StatusPageManage() {
           <Input
             label="End (local time)"
             type="datetime-local"
+            placeholder="YYYY-MM-DDTHH:mm"
             required
             value={windowForm.scheduledEnd}
             onChange={(e) =>
@@ -558,6 +566,7 @@ export default function StatusPageManage() {
                     label="Maintenance title"
                     required
                     maxLength={160}
+                    placeholder="e.g. Scheduled database maintenance"
                     value={editingMaintenance.title}
                     onChange={(e) =>
                       setEditingMaintenance({
@@ -569,6 +578,7 @@ export default function StatusPageManage() {
                   <Input
                     label="Description"
                     maxLength={3000}
+                    placeholder="e.g. Upgrading database clusters to improve performance"
                     value={editingMaintenance.description}
                     onChange={(e) =>
                       setEditingMaintenance({
@@ -580,6 +590,7 @@ export default function StatusPageManage() {
                   <Input
                     label="Start (local time)"
                     type="datetime-local"
+                    placeholder="YYYY-MM-DDTHH:mm"
                     required
                     value={editingMaintenance.scheduledStart}
                     onChange={(e) =>
@@ -592,6 +603,7 @@ export default function StatusPageManage() {
                   <Input
                     label="End (local time)"
                     type="datetime-local"
+                    placeholder="YYYY-MM-DDTHH:mm"
                     required
                     min={editingMaintenance.scheduledStart}
                     value={editingMaintenance.scheduledEnd}

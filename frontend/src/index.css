@@ -1262,6 +1262,13 @@ button {
   font-size: 9px;
   font-weight: 500;
 }
+.field-hint {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.4;
+  margin-top: 1px;
+}
 .sw-panel {
   min-width: 0;
   margin-bottom: 14px;
@@ -2638,6 +2645,9 @@ button {
 }
 .field-error {
   font-size: 11px;
+}
+.field-hint {
+  font-size: 12px;
 }
 .sw-status {
   font-size: 13px;

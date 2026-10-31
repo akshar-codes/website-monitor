@@ -362,6 +362,7 @@ export default function AdminPlanRequests() {
                         min="0"
                         max="99"
                         step="1"
+                        placeholder="e.g. 15"
                         value={discountPercent}
                         onChange={(event) =>
                           setDiscountPercent(
@@ -382,6 +383,7 @@ export default function AdminPlanRequests() {
                   Plan expires at <span className="muted-copy">(optional)</span>
                   <input
                     type="datetime-local"
+                    placeholder="YYYY-MM-DDTHH:mm"
                     value={expiresAt}
                     onChange={(event) => setExpiresAt(event.target.value)}
                   />

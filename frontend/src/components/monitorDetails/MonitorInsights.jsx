@@ -393,6 +393,7 @@ export default function MonitorInsights({ monitorId, details, retentionDays }) {
                 Start date
                 <input
                   type="date"
+                  placeholder="YYYY-MM-DD"
                   min={earliestDate}
                   max={todayUtc()}
                   value={customStart}
@@ -403,6 +404,7 @@ export default function MonitorInsights({ monitorId, details, retentionDays }) {
                 End date
                 <input
                   type="date"
+                  placeholder="YYYY-MM-DD"
                   min={earliestDate}
                   max={todayUtc()}
                   value={customEnd}

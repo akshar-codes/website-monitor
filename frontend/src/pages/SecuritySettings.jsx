@@ -196,6 +196,7 @@ export default function SecuritySettings() {
                 <div className="password-field">
                   <input
                     type={visible.current ? "text" : "password"}
+                    placeholder="Enter current password"
                     autoComplete="current-password"
                     {...register("currentPassword")}
                   />
@@ -217,6 +218,7 @@ export default function SecuritySettings() {
                 <div className="password-field">
                   <input
                     type={visible.password ? "text" : "password"}
+                    placeholder="Enter new password (min. 8 characters)"
                     autoComplete="new-password"
                     {...register("password")}
                   />
@@ -251,6 +253,7 @@ export default function SecuritySettings() {
                 Confirm new password
                 <input
                   type="password"
+                  placeholder="Re-enter new password"
                   autoComplete="new-password"
                   {...register("confirmPassword")}
                 />
