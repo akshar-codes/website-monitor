@@ -23,6 +23,8 @@ import apiKeyRoutes from "./apiKey.routes.js";
 import apiV1Routes from "./apiV1.routes.js";
 import adminRoutes from "./admin.routes.js";
 import suggestionRoutes from "./suggestion.routes.js";
+import statusPageRoutes from "./statusPage.routes.js";
+import publicStatusRoutes from "./publicStatus.routes.js";
 import { isAuthenticated } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
 import { ROLES } from "../config/constants.js";
@@ -43,6 +45,7 @@ router.use("/profile", profileRoutes);
 router.use("/account", accountRoutes);
 router.use("/plans", planRoutes);
 router.use("/payments", paymentRoutes);
+router.use("/public/status", publicStatusRoutes);
 
 // API key access is isolated to read-only v1 endpoints and rate-limited per key.
 router.use("/v1", requireApiKey, apiKeyLimiter, recordApiKeyUsage, apiV1Routes);
@@ -52,6 +55,7 @@ router.use("/preferences", isAuthenticated, preferenceRoutes);
 router.use("/api-keys", isAuthenticated, apiKeyRoutes);
 router.use("/usage", isAuthenticated, usageRoutes);
 router.use("/monitors", isAuthenticated, monitorRoutes);
+router.use("/status-pages", isAuthenticated, statusPageRoutes);
 router.use("/dashboard", isAuthenticated, dashboardRoutes);
 router.use("/incidents", isAuthenticated, incidentRoutes);
 router.use("/ssl", isAuthenticated, sslRoutes);
