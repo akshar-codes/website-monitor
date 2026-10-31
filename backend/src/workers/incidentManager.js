@@ -30,6 +30,17 @@ const deriveSeverity = (status) => {
   return INCIDENT_SEVERITY.MAJOR;
 };
 
+const checkSnapshot = (check) => ({
+  checkedAt: check.checkedAt,
+  status: check.status,
+  responseTime: check.responseTime,
+  httpStatus: check.httpStatus,
+  failureReason: check.failureReason,
+  frontendStatus: check.frontendStatus,
+  backendStatus: check.backendStatus,
+  databaseStatus: check.databaseStatus,
+});
+
 const writeActivity = (
   monitor,
   incident,
@@ -55,6 +66,7 @@ const openIncident = async (monitor, healthCheck, failureCount, deps) => {
   const incident = {
     monitor: monitor._id,
     triggerCheck: healthCheck._id,
+    triggerCheckSnapshot: checkSnapshot(healthCheck),
     status: INCIDENT_STATUS.ONGOING,
     severity: deriveSeverity(healthCheck.status),
     startedAt,
@@ -144,6 +156,7 @@ const resolveIncident = async (monitor, healthCheck, deps) => {
         endedAt,
         duration,
         recoveryCheck: healthCheck._id,
+        recoveryCheckSnapshot: checkSnapshot(healthCheck),
         resolutionNotes: `Auto-resolved after ${env.CONSECUTIVE_SUCCESS_THRESHOLD} consecutive healthy checks.`,
       },
       $push: {

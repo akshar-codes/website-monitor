@@ -7,7 +7,10 @@ import { poll } from "./poller.js";
 import { classify } from "./classifier.js";
 import { handleIncident } from "./incidentManager.js";
 import { updateDailyStat } from "./aggregationManager.js";
-import { runRetentionPass } from "./retentionManager.js";
+import {
+  pruneMonitorHealthChecks,
+  runRetentionPass,
+} from "./retentionManager.js";
 import { logActivity } from "../utils/activityLogger.js";
 import { createHealthResponseSnapshot } from "../utils/healthResponseSnapshot.js";
 import { pruneMonitorResponseSnapshots } from "../services/healthResponseRetention.service.js";
@@ -96,6 +99,7 @@ const processMonitor = async (
     await pruneMonitorResponseSnapshots(monitor._id);
     await handleIncident(monitor, healthCheck);
     await updateDailyStat(monitor, healthCheck);
+    await pruneMonitorHealthChecks(monitor._id);
     if (initiatedBy) {
       await Monitor.findByIdAndUpdate(monitor._id, {
         lastCheckedAt: new Date(),

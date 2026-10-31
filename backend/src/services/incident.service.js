@@ -44,6 +44,13 @@ const resolveMonitorFilter = (ownedIds, monitorId) => {
   return ownedIds.some((id) => id.equals(requested)) ? requested : { $in: [] };
 };
 
+const restoreCheckSnapshots = (incident) => ({
+  ...incident,
+  triggerCheck: incident.triggerCheck || incident.triggerCheckSnapshot || null,
+  recoveryCheck:
+    incident.recoveryCheck || incident.recoveryCheckSnapshot || null,
+});
+
 // ── List incidents ────────────────────────────────────────────────────────────
 
 export const getIncidents = async (
@@ -120,7 +127,7 @@ export const getIncidents = async (
   ]);
 
   return {
-    incidents,
+    incidents: incidents.map(restoreCheckSnapshots),
     total,
     page,
     totalPages: Math.ceil(total / limit) || 1,
@@ -145,7 +152,7 @@ export const getIncidentById = async (id, user) => {
     throw ApiError.notFound(`Incident not found with id: ${id}`);
   }
 
-  return incident;
+  return restoreCheckSnapshots(incident);
 };
 
 // ── Update status ─────────────────────────────────────────────────────────────
@@ -225,11 +232,12 @@ export const updateIncidentStatus = async (
   }
   await logStatusChange();
 
-  return Incident.findById(updatedIncident._id)
+  const result = await Incident.findById(updatedIncident._id)
     .populate("monitor", MONITOR_POPULATE_FIELDS)
     .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
     .populate("recoveryCheck", TRIGGER_CHECK_POPULATE_FIELDS)
     .lean();
+  return restoreCheckSnapshots(result);
 };
 
 // ── Downtime statistics ───────────────────────────────────────────────────────

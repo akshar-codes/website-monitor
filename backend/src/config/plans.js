@@ -48,13 +48,13 @@ export const PLAN_DEFINITIONS = Object.freeze({
     limits: Object.freeze({
       maxMonitors: 25,
       minCheckIntervalSeconds: 30,
-      dataRetentionDays: 90,
+      dataRetentionDays: 30,
       teamMembers: 5,
     }),
     features: Object.freeze([
       "Up to 25 monitors",
       "30-second check interval",
-      "90-day data retention",
+      "30-day data retention",
       "Team access — up to 5 members",
       "Priority email support",
     ]),

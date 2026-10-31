@@ -39,6 +39,8 @@ const incidentSchema = new mongoose.Schema(
       ref: "HealthCheck",
       default: null,
     },
+    triggerCheckSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+    recoveryCheckSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
 
     // ── Timing ──
 
