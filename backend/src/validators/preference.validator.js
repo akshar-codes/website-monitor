@@ -74,6 +74,8 @@ export const updateDashboardPreferencesSchema = z
 const notificationSwitchesSchema = z.object({
   monitorDown: z.boolean().optional(),
   monitorRecovery: z.boolean().optional(),
+  performanceAlerts: z.boolean().optional(),
+  regionalMonitoring: z.boolean().optional(),
   sslExpiry: z.boolean().optional(),
   incidents: z.boolean().optional(),
   billing: z.boolean().optional(),
@@ -88,6 +90,8 @@ export const updateNotificationPreferencesSchema = z
         enabled: z.boolean().optional(),
         monitorDown: z.boolean().optional(),
         monitorRecovery: z.boolean().optional(),
+        performanceAlerts: z.boolean().optional(),
+        regionalMonitoring: z.boolean().optional(),
         sslExpiry: z.boolean().optional(),
         incidents: z.boolean().optional(),
       })

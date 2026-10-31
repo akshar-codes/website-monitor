@@ -45,6 +45,18 @@ const performanceAlertsField = z
     cooldownMinutes: z.number().int().min(5).max(1440).optional(),
   })
   .strict();
+const regionalMonitoringField = z
+  .object({
+    enabled: z.boolean(),
+    regions: z
+      .array(z.enum(["india-mumbai", "us-east", "eu-west", "singapore"]))
+      .max(4)
+      .refine(
+        (regions) => new Set(regions).size === regions.length,
+        "Regions must be unique",
+      ),
+  })
+  .strict();
 
 // ── Create schema — all required fields ──
 
@@ -53,6 +65,7 @@ export const createMonitorSchema = z.object({
   url: urlField,
   interval: intervalField.optional().default(300),
   active: activeField.optional().default(true),
+  regionalMonitoring: regionalMonitoringField.optional(),
 });
 
 // ── Update schema — all fields optional, at least one required ──
@@ -64,6 +77,7 @@ export const updateMonitorSchema = z
     interval: intervalField.optional(),
     active: activeField.optional(),
     performanceAlerts: performanceAlertsField.optional(),
+    regionalMonitoring: regionalMonitoringField.optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided for update",
