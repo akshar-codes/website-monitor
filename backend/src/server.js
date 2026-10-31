@@ -18,6 +18,10 @@ import {
   startPerformanceNotificationWorker,
   stopPerformanceNotificationWorker,
 } from "./services/performanceNotificationOutbox.service.js";
+import {
+  startAlertingWorker,
+  stopAlertingWorker,
+} from "./services/alerting/alerting.service.js";
 
 let server = null;
 let shuttingDown = false;
@@ -47,6 +51,7 @@ const shutdown = async (signal, exitCode = 0) => {
   await stopSslScheduler();
   await stopStatusNotifications();
   await stopPerformanceNotificationWorker();
+  await stopAlertingWorker();
   if (digestTimer) clearInterval(digestTimer);
 
   if (!server) {
@@ -80,6 +85,7 @@ const startServer = async () => {
   startSslScheduler();
   startStatusNotifications();
   startPerformanceNotificationWorker();
+  startAlertingWorker();
   digestTimer = setInterval(
     () =>
       dispatchNotificationDigests().catch((error) =>

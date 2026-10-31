@@ -21,6 +21,7 @@ import {
   ACTIVITY_ACTIONS,
 } from "../config/activityConstants.js";
 import { syncIncidentById } from "./statusIncidentSync.service.js";
+import { createNotification } from "./notification.service.js";
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
@@ -236,6 +237,24 @@ export const updateIncidentStatus = async (
     updatedIncident._id,
     status === INCIDENT_STATUS.RESOLVED ? "resolved" : "updated",
   );
+  await createNotification({
+    ownerId: incident.monitor?.owner || ownerId,
+    type:
+      status === INCIDENT_STATUS.RESOLVED
+        ? "incident_resolved"
+        : "incident_updated",
+    title:
+      status === INCIDENT_STATUS.RESOLVED
+        ? `Incident resolved: ${monitorName}`
+        : `Incident update: ${monitorName}`,
+    message:
+      status === INCIDENT_STATUS.RESOLVED
+        ? `The incident for ${monitorName} was marked resolved.`
+        : `Incident status changed to ${status}.`,
+    priority: incident.severity === "critical" ? "critical" : "high",
+    link: "/incidents",
+    relatedResource: { resourceType: "Incident", resourceId: incident._id },
+  });
 
   const result = await Incident.findById(updatedIncident._id)
     .populate("monitor", MONITOR_POPULATE_FIELDS)

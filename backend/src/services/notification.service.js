@@ -41,6 +41,7 @@ const alertPreferenceKey = (type) => {
   if (
     [
       "incident_opened",
+      "incident_updated",
       "incident_resolved",
       "global_outage_confirmed",
     ].includes(type)
@@ -73,6 +74,19 @@ const emailPreferenceKey = (type) =>
     : null;
 
 const resolveOwnerId = (user) => user.id || user._id.toString();
+const ALERTABLE_NOTIFICATION_TYPES = new Set([
+  "monitor_down",
+  "monitor_up",
+  "monitor_degraded",
+  "incident_opened",
+  "incident_updated",
+  "incident_resolved",
+  "ssl_expiring_soon",
+  "ssl_expired",
+  "domain_expiring_soon",
+  "domain_expired",
+  "ssl_invalid",
+]);
 
 // ── Dispatch (in-app now; email/push are future extension points) ──────────
 
@@ -189,7 +203,12 @@ export const createNotification = async ({
       preferences.email.enabled &&
       emailKey &&
       preferences.email[emailKey] !== false;
-    if (!inAppEnabled && !emailEnabled) return null;
+    if (
+      !inAppEnabled &&
+      !emailEnabled &&
+      !ALERTABLE_NOTIFICATION_TYPES.has(type)
+    )
+      return null;
     const needsImmediateEmail =
       emailEnabled && preferences.frequency === "immediate";
     const user = needsImmediateEmail
@@ -371,6 +390,7 @@ export const dispatchNotificationDigests = async () => {
     "monitor_up",
     "monitor_degraded",
     "incident_opened",
+    "incident_updated",
     "incident_resolved",
     "performance_degraded",
     "performance_recovered",
