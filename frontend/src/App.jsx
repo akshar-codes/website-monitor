@@ -12,6 +12,9 @@ import BlockRoleRoute from "./components/routing/BlockRoleRoute";
 import AccessErrorListener from "./components/access/AccessErrorListener";
 import AppLayout from "./components/layout/AppLayout";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const IntegrationGuide = lazy(() => import("./pages/IntegrationGuide"));
+const Suggestions = lazy(() => import("./pages/Suggestions"));
+const AdminSuggestions = lazy(() => import("./pages/AdminSuggestions"));
 const Monitors = lazy(() => import("./pages/Monitors"));
 const MonitorDetails = lazy(() => import("./pages/MonitorDetails"));
 const SslMonitoring = lazy(() => import("./pages/SslMonitoring"));
@@ -166,6 +169,22 @@ export default function App() {
                         }
                       />
                       <Route
+                        path="/integration-guide"
+                        element={
+                          <Suspense fallback={null}>
+                            <IntegrationGuide />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/suggestions"
+                        element={
+                          <Suspense fallback={null}>
+                            <Suggestions />
+                          </Suspense>
+                        }
+                      />
+                      <Route
                         path="/notifications"
                         element={
                           <Suspense fallback={null}>
@@ -220,6 +239,14 @@ export default function App() {
                           <RoleProtectedRoute allowedRoles={[ROLES.ADMIN]} />
                         }
                       >
+                        <Route
+                          path="/admin/suggestions"
+                          element={
+                            <Suspense fallback={null}>
+                              <AdminSuggestions />
+                            </Suspense>
+                          }
+                        />
                         <Route
                           path="/admin"
                           element={

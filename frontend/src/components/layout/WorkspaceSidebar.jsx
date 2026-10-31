@@ -20,6 +20,8 @@ import {
   UserRound,
   Users,
   ClipboardList,
+  BookOpen,
+  Lightbulb,
 } from "lucide-react";
 import { formatPlanName } from "../../utils/formatPlanName";
 import { useTranslation } from "../../i18n";
@@ -27,6 +29,8 @@ import { useTranslation } from "../../i18n";
 const userLinks = [
   ["Dashboard", "/", LayoutDashboard],
   ["Monitors", "/monitors", Signal],
+  ["Integration Guide", "/integration-guide", BookOpen],
+  ["Suggestions", "/suggestions", Lightbulb],
   ["Incidents", "/incidents", TriangleAlert],
   ["Insights", "/insights", TrendingUp],
   ["SSL Monitoring", "/ssl", Shield],
@@ -41,6 +45,7 @@ const adminLinks = [
   ["Plans", "/admin/plans", CreditCard],
   ["Plan requests", "/admin/plan-requests", ClipboardList],
   ["Audit logs", "/admin/audit-logs", FileText],
+  ["Suggestions", "/admin/suggestions", Lightbulb],
 ];
 
 const accountLinks = [

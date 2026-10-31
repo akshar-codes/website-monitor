@@ -43,6 +43,12 @@ const shiftDate = (value, days) => {
 
 const formatDate = (value) => (value ? new Date(value).toLocaleString() : "—");
 
+const formatIncidentText = (value) =>
+  String(value || "")
+    .replace(/\b[a-z]+(?:_[a-z]+)+\b/gi, (code) => code.replaceAll("_", " "))
+    .replace(/\s+/g, " ")
+    .trim();
+
 export default function MonitorInsights({ monitorId, details, retentionDays }) {
   const t = useTranslation();
   const { hasFeature } = usePermissions();
@@ -152,8 +158,9 @@ export default function MonitorInsights({ monitorId, details, retentionDays }) {
           <Notice tone="error">
             <strong>Active incident · {details.activeIncident.severity}</strong>
             <span>
-              {details.activeIncident.rootCause ||
-                `This monitor has been in an incident since ${formatDate(details.activeIncident.startedAt)}.`}
+              {details.activeIncident.rootCause
+                ? formatIncidentText(details.activeIncident.rootCause)
+                : `This monitor has been in an incident since ${formatDate(details.activeIncident.startedAt)}.`}
             </span>
           </Notice>
         )}

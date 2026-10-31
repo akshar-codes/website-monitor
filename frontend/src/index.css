@@ -1541,6 +1541,9 @@ button {
 .nav-link[data-tooltip]:focus-visible::after {
   transform: translate(0, -50%);
 }
+.monitor-insights-sections > .sw-notice strong {
+  text-transform: capitalize;
+}
 .sw-empty > span {
   display: grid;
   place-items: center;
