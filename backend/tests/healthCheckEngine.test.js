@@ -5,11 +5,22 @@ import { isPublicAddress, poll, requestOnce } from "../src/workers/poller.js";
 import { FAILURE_REASONS, HEALTH_STATUS } from "../src/config/constants.js";
 import dns from "node:dns/promises";
 import http from "node:http";
+import https from "node:https";
+import { readFileSync } from "node:fs";
 
 const healthyBody = {
   status: "ok",
   services: { frontend: "up", backend: "healthy", database: "operational" },
 };
+
+const TLS_TEST_CERT = readFileSync(
+  new URL("./fixtures/performance-test-cert.pem", import.meta.url),
+  "utf8",
+);
+const TLS_TEST_KEY = readFileSync(
+  new URL("./fixtures/performance-test-key.pem", import.meta.url),
+  "utf8",
+);
 
 test("classifies a supported all-healthy response", () => {
   const result = classify({ ok: true, httpStatus: 200, body: healthyBody });
@@ -137,6 +148,44 @@ test("HTTP request timings capture connect, TTFB, download, and partial timeout 
       assert.ok(error.timings.tcpConnectMs >= 0);
       assert.equal(error.timings.ttfbMs, null);
       return error.code === "ETIMEDOUT";
+    },
+  );
+});
+
+test("HTTPS timings measure a real TLS handshake and preserve failed-handshake timing", async (t) => {
+  const server = https.createServer(
+    { key: TLS_TEST_KEY, cert: TLS_TEST_CERT },
+    (_req, res) => res.end("secure response"),
+  );
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const url = new URL(`https://localhost:${server.address().port}/`);
+  const result = await requestOnce(
+    url,
+    [{ address: "127.0.0.1", family: 4 }],
+    1_000,
+    { rejectUnauthorized: false },
+  );
+  assert.equal(result.status, 200);
+  assert.ok(result.timing.tcpConnectMs >= 0);
+  assert.ok(result.timing.tlsHandshakeMs >= 0);
+  assert.ok(result.timing.ttfbMs >= 0);
+
+  const plainServer = http.createServer((_req, res) => res.end("not TLS"));
+  await new Promise((resolve) => plainServer.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve) => plainServer.close(resolve)));
+  await assert.rejects(
+    requestOnce(
+      new URL(`https://localhost:${plainServer.address().port}/`),
+      [{ address: "127.0.0.1", family: 4 }],
+      1_000,
+      { rejectUnauthorized: false },
+    ),
+    (error) => {
+      assert.ok(error.timings.tcpConnectMs >= 0);
+      assert.ok(error.timings.tlsHandshakeMs >= 0);
+      assert.equal(error.timings.ttfbMs, null);
+      return true;
     },
   );
 });

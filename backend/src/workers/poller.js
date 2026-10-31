@@ -119,7 +119,7 @@ const withTimeout = (promise, timeoutMs) =>
     );
   });
 
-export const requestOnce = (url, addresses, timeoutMs) =>
+export const requestOnce = (url, addresses, timeoutMs, requestOptions = {}) =>
   new Promise((resolve, reject) => {
     const transport = url.protocol === "https:" ? https : http;
     let settled = false;
@@ -164,6 +164,7 @@ export const requestOnce = (url, addresses, timeoutMs) =>
           Accept: "application/json",
           "Accept-Encoding": "identity",
         },
+        ...requestOptions,
       },
       (response) => {
         timing.ttfbMs = performance.now() - requestStarted;
