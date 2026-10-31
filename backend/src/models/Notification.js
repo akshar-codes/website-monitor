@@ -137,7 +137,6 @@ const notificationSchema = new mongoose.Schema(
 // Main per-user feed, newest first.
 notificationSchema.index({ owner: 1, createdAt: -1 });
 notificationSchema.index({ type: 1, alertingProcessedAt: 1, createdAt: 1 });
-notificationSchema.index({ type: 1, alertingProcessedAt: 1, createdAt: 1 });
 
 // Unread badge count / unread-only feed.
 notificationSchema.index({ owner: 1, read: 1, createdAt: -1 });

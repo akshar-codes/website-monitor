@@ -21,12 +21,18 @@ All outbound destinations are DNS-resolved, reject private/reserved IPs, pin the
 
 Use `/integrations` to add and test destinations, create event rules, define escalation steps, and inspect delivery history. Rules support event, monitor, and severity filters. Existing incident and SSL/domain notification events are adapted to these logical events:
 
-| Existing notification | Alert event |
-| --- | --- |
-| `incident_opened` | `incident.created`, `monitor.down` |
-| `incident_updated` | `incident.updated` |
-| `incident_resolved` | `incident.resolved`, `monitor.recovered` |
-| `monitor_down`, `monitor_up`, `monitor_degraded` | Corresponding monitor event |
+| Existing notification                                | Alert event                                            |
+| ---------------------------------------------------- | ------------------------------------------------------ |
+| `incident_opened`                                    | `incident.created`, `monitor.down`                     |
+| `incident_updated`                                   | `incident.updated`                                     |
+| `incident_resolved`                                  | `incident.resolved`, `monitor.recovered`               |
+| `performance_degraded`                               | `performance.degraded`                                 |
+| `performance_recovered`                              | `performance.recovered`                                |
+| `regional_outage`                                    | `regional.outage`                                      |
+| `regional_recovered`                                 | `regional.recovered`                                   |
+| `regional_performance_degraded`                      | `regional.performance_degraded`                        |
+| `global_outage_confirmed`                            | `global.outage_confirmed`                              |
+| `monitor_down`, `monitor_up`, `monitor_degraded`     | Corresponding monitor event                            |
 | SSL/domain expiration and invalid certificate events | `ssl.expiring`, `domain.expiring`, `monitor.ssl_error` |
 
 Escalation executions and delivery rows are persisted in MongoDB with unique idempotency keys and atomic worker claims. Retry delays are bounded exponential backoff; provider `Retry-After` values are honored. A user acknowledgement stops pending escalation steps while keeping the incident open. Incident resolution cancels the remaining schedule.

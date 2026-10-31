@@ -7,6 +7,7 @@ import NotificationIntegration from "../../models/NotificationIntegration.js";
 import Notification from "../../models/Notification.js";
 import NotificationRule from "../../models/NotificationRule.js";
 import Incident from "../../models/Incident.js";
+import RegionalIncident from "../../models/RegionalIncident.js";
 import Monitor from "../../models/Monitor.js";
 import ApiError from "../../utils/ApiError.js";
 import logger from "../../utils/logger.js";
@@ -15,10 +16,16 @@ import { deliverToProvider } from "../integrations/deliveryProvider.service.js";
 const getOwner = (user) => user.id || user._id;
 let alertingTimer = null;
 let alertingRunning = false;
-const TYPE_TO_EVENT = Object.freeze({
+export const TYPE_TO_EVENT = Object.freeze({
   monitor_down: ["monitor.down"],
   monitor_up: ["monitor.recovered"],
   monitor_degraded: ["monitor.degraded"],
+  performance_degraded: ["performance.degraded"],
+  performance_recovered: ["performance.recovered"],
+  regional_outage: ["regional.outage"],
+  regional_recovered: ["regional.recovered"],
+  regional_performance_degraded: ["regional.performance_degraded"],
+  global_outage_confirmed: ["global.outage_confirmed"],
   incident_opened: ["incident.created", "monitor.down"],
   incident_resolved: ["incident.resolved", "monitor.recovered"],
   incident_updated: ["incident.updated"],
@@ -46,6 +53,15 @@ const getNotificationContext = async (notification) => {
     incident = await Incident.findById(incidentId)
       .select("monitor severity status")
       .lean();
+  if (notification.relatedResource?.resourceType === "RegionalIncident") {
+    const regionalIncident = await RegionalIncident.findById(
+      notification.relatedResource.resourceId,
+    )
+      .select("monitor")
+      .lean();
+    if (regionalIncident?.monitor)
+      monitorId = stringifyId(regionalIncident.monitor);
+  }
   if (incident?.monitor) monitorId = stringifyId(incident.monitor);
   return {
     incidentId,
@@ -473,6 +489,7 @@ const safeError = (error) => {
 export const processNotificationDeliveryBatch = async ({
   batchSize = 40,
   now = new Date(),
+  dispatch = deliverToProvider,
 } = {}) => {
   let delivered = 0;
   let failed = 0;
@@ -511,7 +528,7 @@ export const processNotificationDeliveryBatch = async ({
       continue;
     }
     try {
-      await deliverToProvider(integration, row.payload);
+      await dispatch(integration, row.payload);
       await NotificationDelivery.updateOne(
         { _id: row._id, status: "processing" },
         {

@@ -74,13 +74,19 @@ const emailPreferenceKey = (type) =>
     : null;
 
 const resolveOwnerId = (user) => user.id || user._id.toString();
-const ALERTABLE_NOTIFICATION_TYPES = new Set([
+export const ALERTABLE_NOTIFICATION_TYPES = new Set([
   "monitor_down",
   "monitor_up",
   "monitor_degraded",
   "incident_opened",
   "incident_updated",
   "incident_resolved",
+  "performance_degraded",
+  "performance_recovered",
+  "regional_outage",
+  "regional_recovered",
+  "regional_performance_degraded",
+  "global_outage_confirmed",
   "ssl_expiring_soon",
   "ssl_expired",
   "domain_expiring_soon",
