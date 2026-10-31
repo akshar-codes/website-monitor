@@ -6,6 +6,13 @@ import {
   createStatusPageSchema,
   updateStatusPageSchema,
   serviceSchema,
+  reorderServicesSchema,
+  incidentCreateSchema,
+  incidentUpdateSchema,
+  incidentTimelineSchema,
+  resolveIncidentSchema,
+  maintenanceCreateSchema,
+  maintenanceUpdateSchema,
 } from "../validators/statusPage.validator.js";
 const router = Router();
 router.get("/", requirePermission("status-page:read"), controller.list);
@@ -20,6 +27,12 @@ router.get(
   requirePermission("status-page:read"),
   validateObjectId(),
   controller.get,
+);
+router.get(
+  "/:id/preview",
+  requirePermission("status-page:read"),
+  validateObjectId(),
+  controller.preview,
 );
 router.patch(
   "/:id",
@@ -54,6 +67,13 @@ router.post(
   controller.addService,
 );
 router.patch(
+  "/:id/services/reorder",
+  requirePermission("status-page:update"),
+  validateObjectId(),
+  validate(reorderServicesSchema),
+  controller.reorderServices,
+);
+router.patch(
   "/:id/services/:serviceId",
   requirePermission("status-page:update"),
   validateObjectId(),
@@ -67,5 +87,90 @@ router.delete(
   validateObjectId(),
   validateObjectId("serviceId"),
   controller.removeService,
+);
+router.get(
+  "/:id/incidents",
+  requirePermission("status-page:read"),
+  validateObjectId(),
+  controller.listIncidents,
+);
+router.post(
+  "/:id/incidents",
+  requirePermission("status-page:update"),
+  validateObjectId(),
+  validate(incidentCreateSchema),
+  controller.createIncident,
+);
+router.get(
+  "/:id/incidents/:incidentId",
+  requirePermission("status-page:read"),
+  validateObjectId(),
+  validateObjectId("incidentId"),
+  controller.getIncident,
+);
+router.patch(
+  "/:id/incidents/:incidentId",
+  requirePermission("status-page:update"),
+  validateObjectId(),
+  validateObjectId("incidentId"),
+  validate(incidentUpdateSchema),
+  controller.updateIncident,
+);
+router.post(
+  "/:id/incidents/:incidentId/updates",
+  requirePermission("status-page:update"),
+  validateObjectId(),
+  validateObjectId("incidentId"),
+  validate(incidentTimelineSchema),
+  controller.addIncidentUpdate,
+);
+router.post(
+  "/:id/incidents/:incidentId/publish",
+  requirePermission("status-page:update"),
+  validateObjectId(),
+  validateObjectId("incidentId"),
+  controller.publishIncident,
+);
+router.post(
+  "/:id/incidents/:incidentId/resolve",
+  requirePermission("status-page:update"),
+  validateObjectId(),
+  validateObjectId("incidentId"),
+  validate(resolveIncidentSchema),
+  controller.resolveIncident,
+);
+router.get(
+  "/:id/maintenance",
+  requirePermission("status-page:read"),
+  validateObjectId(),
+  controller.listMaintenance,
+);
+router.post(
+  "/:id/maintenance",
+  requirePermission("status-page:update"),
+  validateObjectId(),
+  validate(maintenanceCreateSchema),
+  controller.createMaintenance,
+);
+router.patch(
+  "/:id/maintenance/:maintenanceId",
+  requirePermission("status-page:update"),
+  validateObjectId(),
+  validateObjectId("maintenanceId"),
+  validate(maintenanceUpdateSchema),
+  controller.updateMaintenance,
+);
+router.delete(
+  "/:id/maintenance/:maintenanceId",
+  requirePermission("status-page:update"),
+  validateObjectId(),
+  validateObjectId("maintenanceId"),
+  controller.removeMaintenance,
+);
+router.get(
+  "/:id/subscriber-stats",
+  requirePermission("status-page:read"),
+  validateObjectId(),
+  controller.subscriberStats,
 );
 export default router;
