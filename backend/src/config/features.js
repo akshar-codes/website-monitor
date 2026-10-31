@@ -15,6 +15,7 @@ export const FEATURES = Object.freeze({
   FAST_POLLING: "fastPolling",
   RESPONSE_INSPECTION: "responseInspection",
   PERFORMANCE_ALERT_CONFIG: "performanceAlertConfig",
+  REGIONAL_MONITORING: "regionalMonitoring",
 });
 
 const FEATURE_CHECKS = Object.freeze({
@@ -48,6 +49,10 @@ const FEATURE_CHECKS = Object.freeze({
   [FEATURES.PERFORMANCE_ALERT_CONFIG]: (plan) => {
     const definition = getPlanDefinition(plan);
     return !!definition && definition.rank >= 1;
+  },
+  [FEATURES.REGIONAL_MONITORING]: (plan) => {
+    const definition = getPlanDefinition(plan);
+    return !!definition && definition.limits.maxRegionsPerMonitor > 0;
   },
 });
 

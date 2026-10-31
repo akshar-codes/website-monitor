@@ -34,6 +34,8 @@ export const PLAN_DEFINITIONS = Object.freeze({
       maxStatusServicesPerPage: 3,
       maxStatusSubscribersPerPage: 25,
       statusIncidentHistoryDays: 30,
+      maxRegionsPerMonitor: 1,
+      regionalChecksPerDay: 3_000,
     }),
     features: Object.freeze([
       "Up to 3 monitors",
@@ -41,6 +43,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
       "7-day data retention",
       "Email incident notifications",
       "1 status page, 3 services, 25 subscribers",
+      "1 monitoring region per monitor, 3,000 regional checks/day",
     ]),
   }),
 
@@ -59,6 +62,8 @@ export const PLAN_DEFINITIONS = Object.freeze({
       maxStatusServicesPerPage: 15,
       maxStatusSubscribersPerPage: 500,
       statusIncidentHistoryDays: 365,
+      maxRegionsPerMonitor: 3,
+      regionalChecksPerDay: 250_000,
     }),
     features: Object.freeze([
       "Up to 25 monitors",
@@ -67,6 +72,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
       "Team access — up to 5 members",
       "Priority email support",
       "3 status pages, 15 services each, 500 subscribers each",
+      "3 monitoring regions per monitor, 250,000 regional checks/day",
     ]),
   }),
 
@@ -85,6 +91,8 @@ export const PLAN_DEFINITIONS = Object.freeze({
       maxStatusServicesPerPage: 50,
       maxStatusSubscribersPerPage: 5000,
       statusIncidentHistoryDays: null,
+      maxRegionsPerMonitor: 4,
+      regionalChecksPerDay: null,
     }),
     features: Object.freeze([
       "Unlimited monitors",
@@ -93,6 +101,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
       "Unlimited team members",
       "Priority support with SLA",
       "10 status pages, 50 services each, 5,000 subscribers each",
+      "4 monitoring regions per monitor, unlimited regional checks",
     ]),
   }),
 });
