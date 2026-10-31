@@ -1,9 +1,13 @@
+import mongoose from "mongoose";
 import DailyStat from "../models/DailyStat.js";
+import HourlyStat from "../models/HourlyStat.js";
+import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import { startOfDayUTC } from "../utils/dateUtils.js";
 import { HEALTH_STATUS } from "../config/constants.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const hourlyStatsBackfilledMonitorIds = new Set();
 
 /**
  * Daily rules (all timestamps and buckets are UTC): uptime is measured only
@@ -141,9 +145,18 @@ export const reconcileDailyStat = async (monitor, date, deps = {}) => {
   const bucketDate = startOfDayUTC(date);
   const checks = await fetchDayChecks(checksModel, monitor._id, bucketDate);
   if (!checks.length) {
-    await dailyStats.deleteOne({ monitor: monitor._id, date: bucketDate });
+    if (dailyStats.deleteOne) {
+      await dailyStats.deleteOne({ monitor: monitor._id, date: bucketDate });
+    }
     return null;
   }
+  const existing = dailyStats.findOne
+    ? await dailyStats.findOne({
+        monitor: monitor._id,
+        date: bucketDate,
+      })
+    : null;
+  if (existing?.totalChecks > checks.length) return existing;
   const summary = summarizeChecks(checks, monitor, bucketDate);
   return dailyStats.findOneAndUpdate(
     { monitor: monitor._id, date: bucketDate },
@@ -152,9 +165,471 @@ export const reconcileDailyStat = async (monitor, date, deps = {}) => {
   );
 };
 
-/** The scheduled pipeline updates only the affected UTC day, idempotently. */
-export const updateDailyStat = (monitor, healthCheck, deps = {}) =>
-  reconcileDailyStat(monitor, healthCheck.checkedAt || new Date(), deps);
+const startOfHourUTC = (value) => {
+  const hour = new Date(value);
+  hour.setUTCMinutes(0, 0, 0);
+  return hour;
+};
+
+export const backfillRecentHourlyStats = async (
+  monitorId,
+  intervalSeconds,
+  deps = {},
+) => {
+  if (hourlyStatsBackfilledMonitorIds.has(String(monitorId))) return false;
+  const monitorModel = deps.Monitor || Monitor;
+  const checksModel = deps.HealthCheck || HealthCheck;
+  const hourlyStats = deps.HourlyStat || HourlyStat;
+  if (mongoose.Types.ObjectId.isValid(monitorId)) {
+    const marker = await monitorModel
+      .findById(monitorId)
+      .select("+hourlyStatsBackfilledAt")
+      .lean();
+    if (marker?.hourlyStatsBackfilledAt) {
+      hourlyStatsBackfilledMonitorIds.add(String(monitorId));
+      return false;
+    }
+  } else {
+    return false;
+  }
+
+  const since = new Date(Date.now() - 7 * DAY_MS);
+  const rows = await checksModel.aggregate([
+    { $match: { monitor: monitorId, checkedAt: { $gte: since } } },
+    {
+      $group: {
+        _id: {
+          $dateToString: {
+            format: "%Y-%m-%dT%H:00:00.000Z",
+            date: "$checkedAt",
+          },
+        },
+        totalChecks: { $sum: 1 },
+        scheduledChecks: {
+          $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
+        },
+        successfulChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
+        },
+        failedChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DOWN] }, 1, 0] },
+        },
+        degradedChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0] },
+        },
+        unknownChecks: {
+          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UNKNOWN] }, 1, 0] },
+        },
+        frontendUpChecks: {
+          $sum: {
+            $cond: [{ $eq: ["$frontendStatus", HEALTH_STATUS.UP] }, 1, 0],
+          },
+        },
+        backendUpChecks: {
+          $sum: {
+            $cond: [{ $eq: ["$backendStatus", HEALTH_STATUS.UP] }, 1, 0],
+          },
+        },
+        databaseUpChecks: {
+          $sum: {
+            $cond: [{ $eq: ["$databaseStatus", HEALTH_STATUS.UP] }, 1, 0],
+          },
+        },
+        _responseTimeSum: { $sum: "$responseTime" },
+        minResponseTime: { $min: "$responseTime" },
+        maxResponseTime: { $max: "$responseTime" },
+        _observedSeconds: {
+          $sum: {
+            $cond: [
+              { $ne: ["$scheduled", false] },
+              { $ifNull: ["$intervalSeconds", 300] },
+              0,
+            ],
+          },
+        },
+        estimatedDowntimeSeconds: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$status", HEALTH_STATUS.DOWN] },
+                  { $ne: ["$scheduled", false] },
+                ],
+              },
+              { $ifNull: ["$intervalSeconds", 300] },
+              0,
+            ],
+          },
+        },
+        estimatedDegradedSeconds: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$status", HEALTH_STATUS.DEGRADED] },
+                  { $ne: ["$scheduled", false] },
+                ],
+              },
+              { $ifNull: ["$intervalSeconds", 300] },
+              0,
+            ],
+          },
+        },
+        lastCheckAt: { $max: "$checkedAt" },
+      },
+    },
+  ]);
+  const now = new Date();
+  if (rows.length) {
+    await hourlyStats.bulkWrite(
+      rows.map((row) => {
+        const { _id: bucketKey, ...bucket } = row;
+        const date = new Date(bucketKey);
+        const elapsed = Math.min(
+          3600,
+          Math.max(
+            0,
+            (Math.min(now.getTime(), date.getTime() + 3600000) -
+              date.getTime()) /
+              1000,
+          ),
+        );
+        const observed = Math.min(elapsed, row._observedSeconds || 0);
+        const expected = Math.max(
+          1,
+          Math.ceil(elapsed / Math.max(1, intervalSeconds || 300)),
+        );
+        return {
+          updateOne: {
+            filter: { monitor: monitorId, date },
+            update: {
+              $set: {
+                ...bucket,
+                monitor: monitorId,
+                date,
+                uptimePercentage: row.totalChecks
+                  ? (row.successfulChecks / row.totalChecks) * 100
+                  : null,
+                avgResponseTime: row.totalChecks
+                  ? row._responseTimeSum / row.totalChecks
+                  : 0,
+                expectedChecks: expected,
+                coveragePercentage: Math.min(
+                  100,
+                  (row.scheduledChecks / expected) * 100,
+                ),
+                unobservedSeconds: Math.max(0, elapsed - observed),
+                downtimeSeconds: row.estimatedDowntimeSeconds,
+                degradedSeconds: row.estimatedDegradedSeconds,
+                responseTimeBuckets: {},
+              },
+            },
+            upsert: true,
+          },
+        };
+      }),
+      { ordered: false },
+    );
+  }
+  await monitorModel.updateOne(
+    { _id: monitorId },
+    { $set: { hourlyStatsBackfilledAt: now } },
+  );
+  hourlyStatsBackfilledMonitorIds.add(String(monitorId));
+  return true;
+};
+
+const incrementStatBucket = async (
+  model,
+  monitor,
+  healthCheck,
+  bucketStart,
+  bucketSeconds,
+) => {
+  const checkedAt = new Date(healthCheck.checkedAt || new Date());
+  const elapsedSeconds = Math.min(
+    bucketSeconds,
+    Math.max(0, (checkedAt.getTime() - bucketStart.getTime()) / 1000),
+  );
+  const interval = Math.max(
+    1,
+    Number(healthCheck.intervalSeconds) || Number(monitor.interval) || 300,
+  );
+  const scheduled = healthCheck.scheduled !== false;
+  const status = healthCheck.status;
+  const responseTime = Math.max(0, Number(healthCheck.responseTime) || 0);
+  const success = status === HEALTH_STATUS.UP ? 1 : 0;
+  const failed = status === HEALTH_STATUS.DOWN ? 1 : 0;
+  const degraded = status === HEALTH_STATUS.DEGRADED ? 1 : 0;
+  const unknown = status === HEALTH_STATUS.UNKNOWN ? 1 : 0;
+  const frontendUp = healthCheck.frontendStatus === HEALTH_STATUS.UP ? 1 : 0;
+  const backendUp = healthCheck.backendStatus === HEALTH_STATUS.UP ? 1 : 0;
+  const databaseUp = healthCheck.databaseStatus === HEALTH_STATUS.UP ? 1 : 0;
+  const responseBucket =
+    responseTime < 50
+      ? "lt50"
+      : responseTime < 100
+        ? "lt100"
+        : responseTime < 250
+          ? "lt250"
+          : responseTime < 500
+            ? "lt500"
+            : responseTime < 1000
+              ? "lt1000"
+              : responseTime < 2500
+                ? "lt2500"
+                : responseTime < 5000
+                  ? "lt5000"
+                  : "gte5000";
+  const expectedChecks = elapsedSeconds
+    ? Math.max(1, Math.ceil(elapsedSeconds / interval))
+    : 0;
+  const oldTotal = { $ifNull: ["$totalChecks", 0] };
+  const nextTotal = {
+    $add: [oldTotal, { $cond: ["$_addIncomingCheck", 1, 0] }],
+  };
+  const oldScheduled = { $ifNull: ["$scheduledChecks", 0] };
+  const nextScheduled = {
+    $add: [
+      oldScheduled,
+      { $cond: ["$_addIncomingCheck", scheduled ? 1 : 0, 0] },
+    ],
+  };
+  const observedSeconds = {
+    $add: [
+      {
+        $ifNull: ["$_observedSeconds", { $multiply: [oldScheduled, interval] }],
+      },
+      { $cond: ["$_addIncomingCheck", scheduled ? interval : 0, 0] },
+    ],
+  };
+  const responseSum = {
+    $add: [
+      { $ifNull: ["$_responseTimeSum", 0] },
+      { $cond: ["$_addIncomingCheck", responseTime, 0] },
+    ],
+  };
+  const oldSuccessful = { $ifNull: ["$successfulChecks", 0] };
+  const nextSuccessful = {
+    $add: [oldSuccessful, { $cond: ["$_addIncomingCheck", success, 0] }],
+  };
+  const downSeconds = {
+    $cond: ["$_addIncomingCheck", failed && scheduled ? interval : 0, 0],
+  };
+  const degradedSeconds = {
+    $cond: ["$_addIncomingCheck", degraded && scheduled ? interval : 0, 0],
+  };
+
+  await model.updateOne(
+    { monitor: monitor._id, date: bucketStart },
+    [
+      {
+        $set: {
+          _addIncomingCheck: {
+            $gt: [checkedAt, { $ifNull: ["$lastCheckAt", new Date(0)] }],
+          },
+        },
+      },
+      {
+        $set: {
+          monitor: { $ifNull: ["$monitor", monitor._id] },
+          date: { $ifNull: ["$date", bucketStart] },
+          totalChecks: nextTotal,
+          scheduledChecks: nextScheduled,
+          successfulChecks: nextSuccessful,
+          failedChecks: {
+            $add: [
+              { $ifNull: ["$failedChecks", 0] },
+              { $cond: ["$_addIncomingCheck", failed, 0] },
+            ],
+          },
+          degradedChecks: {
+            $add: [
+              { $ifNull: ["$degradedChecks", 0] },
+              { $cond: ["$_addIncomingCheck", degraded, 0] },
+            ],
+          },
+          unknownChecks: {
+            $add: [
+              { $ifNull: ["$unknownChecks", 0] },
+              { $cond: ["$_addIncomingCheck", unknown, 0] },
+            ],
+          },
+          frontendUpChecks: {
+            $add: [
+              { $ifNull: ["$frontendUpChecks", 0] },
+              { $cond: ["$_addIncomingCheck", frontendUp, 0] },
+            ],
+          },
+          backendUpChecks: {
+            $add: [
+              { $ifNull: ["$backendUpChecks", 0] },
+              { $cond: ["$_addIncomingCheck", backendUp, 0] },
+            ],
+          },
+          databaseUpChecks: {
+            $add: [
+              { $ifNull: ["$databaseUpChecks", 0] },
+              { $cond: ["$_addIncomingCheck", databaseUp, 0] },
+            ],
+          },
+          _responseTimeSum: responseSum,
+          _observedSeconds: observedSeconds,
+          responseTimeBuckets: {
+            $mergeObjects: [
+              { $ifNull: ["$responseTimeBuckets", {}] },
+              {
+                [responseBucket]: {
+                  $add: [
+                    { $ifNull: [`$responseTimeBuckets.${responseBucket}`, 0] },
+                    { $cond: ["$_addIncomingCheck", 1, 0] },
+                  ],
+                },
+              },
+            ],
+          },
+          avgResponseTime: { $divide: [responseSum, nextTotal] },
+          minResponseTime: {
+            $cond: [
+              "$_addIncomingCheck",
+              {
+                $cond: [
+                  { $eq: [oldTotal, 0] },
+                  responseTime,
+                  {
+                    $min: [
+                      { $ifNull: ["$minResponseTime", responseTime] },
+                      responseTime,
+                    ],
+                  },
+                ],
+              },
+              { $ifNull: ["$minResponseTime", responseTime] },
+            ],
+          },
+          maxResponseTime: {
+            $cond: [
+              "$_addIncomingCheck",
+              {
+                $max: [
+                  { $ifNull: ["$maxResponseTime", responseTime] },
+                  responseTime,
+                ],
+              },
+              { $ifNull: ["$maxResponseTime", responseTime] },
+            ],
+          },
+          uptimePercentage: {
+            $multiply: [{ $divide: [nextSuccessful, nextTotal] }, 100],
+          },
+          expectedChecks,
+          coveragePercentage: expectedChecks
+            ? {
+                $min: [
+                  100,
+                  {
+                    $multiply: [
+                      { $divide: [nextScheduled, expectedChecks] },
+                      100,
+                    ],
+                  },
+                ],
+              }
+            : 0,
+          unobservedSeconds: {
+            $max: [
+              0,
+              {
+                $subtract: [
+                  elapsedSeconds,
+                  { $min: [elapsedSeconds, observedSeconds] },
+                ],
+              },
+            ],
+          },
+          estimatedDowntimeSeconds: {
+            $min: [
+              bucketSeconds,
+              {
+                $add: [
+                  { $ifNull: ["$estimatedDowntimeSeconds", 0] },
+                  downSeconds,
+                ],
+              },
+            ],
+          },
+          downtimeSeconds: {
+            $min: [
+              bucketSeconds,
+              { $add: [{ $ifNull: ["$downtimeSeconds", 0] }, downSeconds] },
+            ],
+          },
+          estimatedDegradedSeconds: {
+            $min: [
+              bucketSeconds,
+              {
+                $add: [
+                  { $ifNull: ["$estimatedDegradedSeconds", 0] },
+                  degradedSeconds,
+                ],
+              },
+            ],
+          },
+          degradedSeconds: {
+            $min: [
+              bucketSeconds,
+              { $add: [{ $ifNull: ["$degradedSeconds", 0] }, degradedSeconds] },
+            ],
+          },
+          lastCheckAt: {
+            $max: [{ $ifNull: ["$lastCheckAt", checkedAt] }, checkedAt],
+          },
+        },
+      },
+      { $unset: "_addIncomingCheck" },
+    ],
+    { upsert: true, updatePipeline: true },
+  );
+};
+
+/** Store compact per-day and per-hour aggregates for every persisted check. */
+export const updateDailyStat = async (monitor, healthCheck, deps = {}) => {
+  const dailyStats = deps.DailyStat || DailyStat;
+  if (!dailyStats.updateOne && dailyStats.findOneAndUpdate) {
+    return reconcileDailyStat(
+      monitor,
+      healthCheck.checkedAt || new Date(),
+      deps,
+    );
+  }
+  const hourlyStats = deps.HourlyStat || HourlyStat;
+  const checkedAt = healthCheck.checkedAt || new Date();
+  const hourlyBackfilled = await backfillRecentHourlyStats(
+    monitor._id,
+    monitor.interval,
+    deps,
+  );
+  await Promise.all([
+    incrementStatBucket(
+      dailyStats,
+      monitor,
+      healthCheck,
+      startOfDayUTC(checkedAt),
+      DAY_MS / 1000,
+    ),
+    ...(hourlyBackfilled
+      ? []
+      : [
+          incrementStatBucket(
+            hourlyStats,
+            monitor,
+            healthCheck,
+            startOfHourUTC(checkedAt),
+            60 * 60,
+          ),
+        ]),
+  ]);
+};
 
 /**
  * Rebuild a bounded historical range after health-check edits/deletions.
@@ -194,7 +669,16 @@ export const reconcileDailyStatsForRange = async (
   ) {
     const checksForDay = byDay.get(day.toISOString()) || [];
     if (!checksForDay.length) {
-      await dailyStats.deleteOne({ monitor: monitor._id, date: day });
+      continue;
+    }
+    const existing = dailyStats.findOne
+      ? await dailyStats.findOne({
+          monitor: monitor._id,
+          date: day,
+        })
+      : null;
+    if (existing?.totalChecks > checksForDay.length) {
+      results.push(existing);
       continue;
     }
     const summary = summarizeChecks(checksForDay, monitor, day);

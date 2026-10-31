@@ -40,6 +40,9 @@ const dailyStatSchema = new mongoose.Schema(
     coveragePercentage: { type: Number, default: 0, min: 0, max: 100 },
     unobservedSeconds: { type: Number, default: 0, min: 0 },
     lastCheckAt: { type: Date, default: null },
+    frontendUpChecks: { type: Number, default: 0, min: 0 },
+    backendUpChecks: { type: Number, default: 0, min: 0 },
+    databaseUpChecks: { type: Number, default: 0, min: 0 },
 
     // ── Derived percentages ──
 
@@ -93,6 +96,8 @@ const dailyStatSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    _observedSeconds: { type: Number, default: 0, min: 0 },
+    responseTimeBuckets: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   {
     timestamps: true,

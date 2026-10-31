@@ -3,6 +3,7 @@ import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import Incident from "../models/Incident.js";
 import DailyStat from "../models/DailyStat.js";
+import HourlyStat from "../models/HourlyStat.js";
 import ApiError from "../utils/ApiError.js";
 import {
   WINDOW_MS,
@@ -102,24 +103,27 @@ export const getOverview = async (user) => {
     ]),
 
     // 3 ─ Uptime + avg response time (last 24 h), scoped to the caller
-    HealthCheck.aggregate([
+    HourlyStat.aggregate([
       {
         $match: {
           monitor: { $in: ownedIds },
-          checkedAt: { $gte: since },
+          date: { $gte: new Date(new Date(since).setUTCMinutes(0, 0, 0)) },
         },
       },
       {
         $group: {
           _id: null,
-          totalChecks: { $sum: 1 },
-          scheduledChecks: {
-            $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
+          totalChecks: { $sum: "$totalChecks" },
+          scheduledChecks: { $sum: "$scheduledChecks" },
+          successfulChecks: { $sum: "$successfulChecks" },
+          weightedResponseTime: {
+            $sum: {
+              $ifNull: [
+                "$_responseTimeSum",
+                { $multiply: ["$avgResponseTime", "$totalChecks"] },
+              ],
+            },
           },
-          successfulChecks: {
-            $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
-          },
-          avgResponseTime: { $avg: "$responseTime" },
         },
       },
     ]),
@@ -183,6 +187,9 @@ export const getOverview = async (user) => {
     successfulChecks: 0,
     avgResponseTime: 0,
   };
+  stats.avgResponseTime = stats.totalChecks
+    ? stats.weightedResponseTime / stats.totalChecks
+    : 0;
 
   const uptimePercentage =
     stats.totalChecks > 0
@@ -314,67 +321,52 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
     Math.max(since.getTime(), new Date(monitor.createdAt).getTime()),
   );
   const elapsedSeconds = Math.max(0, (endDate - periodStart) / 1000);
-  const [result] = await HealthCheck.aggregate([
-    { $match: { monitor: id, checkedAt: { $gte: since, $lte: endDate } } },
+  const isHourlyWindow = window === "24h";
+  const statModel = isHourlyWindow ? HourlyStat : DailyStat;
+  const bucketStart = isHourlyWindow
+    ? new Date(new Date(since).setUTCMinutes(0, 0, 0))
+    : startOfDayUTC(since);
+  const [result] = await statModel.aggregate([
+    {
+      $match: {
+        monitor: id,
+        date: {
+          $gte: bucketStart,
+          $lte: isHourlyWindow
+            ? new Date(new Date(endDate).setUTCMinutes(0, 0, 0))
+            : startOfDayUTC(endDate),
+        },
+      },
+    },
     {
       $group: {
         _id: null,
-        totalChecks: { $sum: 1 },
-        scheduledChecks: {
-          $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
-        },
-        successfulChecks: {
-          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
-        },
-        failedChecks: {
-          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DOWN] }, 1, 0] },
-        },
-        degradedChecks: {
-          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0] },
-        },
-        unknownChecks: {
-          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UNKNOWN] }, 1, 0] },
-        },
+        totalChecks: { $sum: "$totalChecks" },
+        scheduledChecks: { $sum: "$scheduledChecks" },
+        successfulChecks: { $sum: "$successfulChecks" },
+        failedChecks: { $sum: "$failedChecks" },
+        degradedChecks: { $sum: "$degradedChecks" },
+        unknownChecks: { $sum: "$unknownChecks" },
         observedSeconds: {
           $sum: {
-            $cond: [
-              { $ne: ["$scheduled", false] },
-              { $ifNull: ["$intervalSeconds", monitor.interval || 300] },
-              0,
+            $ifNull: [
+              "$_observedSeconds",
+              { $multiply: ["$scheduledChecks", monitor.interval || 300] },
             ],
           },
         },
-        average: { $avg: "$responseTime" },
-        min: { $min: "$responseTime" },
-        max: { $max: "$responseTime" },
-        estimatedDownSeconds: {
+        average: {
           $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$status", HEALTH_STATUS.DOWN] },
-                  { $ne: ["$scheduled", false] },
-                ],
-              },
-              { $ifNull: ["$intervalSeconds", monitor.interval] },
-              0,
+            $ifNull: [
+              "$_responseTimeSum",
+              { $multiply: ["$avgResponseTime", "$totalChecks"] },
             ],
           },
         },
-        estimatedDegradedSeconds: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$status", HEALTH_STATUS.DEGRADED] },
-                  { $ne: ["$scheduled", false] },
-                ],
-              },
-              { $ifNull: ["$intervalSeconds", monitor.interval] },
-              0,
-            ],
-          },
-        },
+        min: { $min: "$minResponseTime" },
+        max: { $max: "$maxResponseTime" },
+        estimatedDownSeconds: { $sum: "$estimatedDowntimeSeconds" },
+        estimatedDegradedSeconds: { $sum: "$estimatedDegradedSeconds" },
       },
     },
   ]);
@@ -387,7 +379,9 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
     ? Number(((result.successfulChecks / totalChecks) * 100).toFixed(2))
     : null;
   const responseTimeStats = {
-    average: Number((result?.average || 0).toFixed(2)),
+    average: Number(
+      ((result?.average || 0) / (result?.totalChecks || 1)).toFixed(2),
+    ),
     min: result?.min || 0,
     max: result?.max || 0,
   };
@@ -398,7 +392,7 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
     HealthCheck.find({ monitor: id })
       .select("-rawResponse -__v")
       .sort({ checkedAt: -1 })
-      .limit(20)
+      .limit(10)
       .lean(),
     Incident.findActiveForMonitor(id)
       .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
@@ -484,44 +478,32 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
 // analytics endpoint always supplies it to bound an explicit custom
 // range.
 const aggregateHourlyHealthCheckBuckets = (monitorId, since, until = null) =>
-  HealthCheck.aggregate([
+  HourlyStat.aggregate([
     {
       $match: {
         monitor: monitorId,
-        checkedAt: until ? { $gte: since, $lte: until } : { $gte: since },
+        date: until
+          ? {
+              $gte: new Date(new Date(since).setUTCMinutes(0, 0, 0)),
+              $lte: new Date(new Date(until).setUTCMinutes(0, 0, 0)),
+            }
+          : { $gte: new Date(new Date(since).setUTCMinutes(0, 0, 0)) },
       },
     },
     {
-      $group: {
+      $project: {
         _id: {
-          $dateToString: {
-            format: "%Y-%m-%dT%H:00:00.000Z",
-            date: "$checkedAt",
-          },
+          $dateToString: { format: "%Y-%m-%dT%H:00:00.000Z", date: "$date" },
         },
-        avgResponseTime: { $avg: "$responseTime" },
-        minResponseTime: { $min: "$responseTime" },
-        maxResponseTime: { $max: "$responseTime" },
-        totalChecks: { $sum: 1 },
-        successfulChecks: {
-          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
-        },
-        failedChecks: {
-          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DOWN] }, 1, 0] },
-        },
-        degradedChecks: {
-          $sum: {
-            $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0],
-          },
-        },
-        scheduledChecks: {
-          $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
-        },
-        unknownChecks: {
-          $sum: {
-            $cond: [{ $eq: ["$status", HEALTH_STATUS.UNKNOWN] }, 1, 0],
-          },
-        },
+        avgResponseTime: 1,
+        minResponseTime: 1,
+        maxResponseTime: 1,
+        totalChecks: 1,
+        successfulChecks: 1,
+        failedChecks: 1,
+        degradedChecks: 1,
+        scheduledChecks: 1,
+        unknownChecks: 1,
       },
     },
     { $sort: { _id: 1 } },
@@ -722,81 +704,52 @@ const resolveAnalyticsRange = ({ window, startDate, endDate }) => {
  * introducing a second, differently-computed notion of "downtime".
  */
 const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
-  const [result] = await HealthCheck.aggregate([
+  const hourly = endDate.getTime() - startDate.getTime() <= 2 * 86400000;
+  const statsModel = hourly ? HourlyStat : DailyStat;
+  const [result] = await statsModel.aggregate([
     {
       $match: {
         monitor: monitorId,
-        checkedAt: { $gte: startDate, $lte: endDate },
+        date: {
+          $gte: hourly
+            ? new Date(new Date(startDate).setUTCMinutes(0, 0, 0))
+            : startOfDayUTC(startDate),
+          $lte: hourly
+            ? new Date(new Date(endDate).setUTCMinutes(0, 0, 0))
+            : startOfDayUTC(endDate),
+        },
       },
     },
     {
       $group: {
         _id: null,
-        totalChecks: { $sum: 1 },
-        successfulChecks: {
-          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0] },
-        },
-        failedChecks: {
-          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.DOWN] }, 1, 0] },
-        },
-        degradedChecks: {
-          $sum: {
-            $cond: [{ $eq: ["$status", HEALTH_STATUS.DEGRADED] }, 1, 0],
-          },
-        },
-        unknownChecks: {
-          $sum: { $cond: [{ $eq: ["$status", HEALTH_STATUS.UNKNOWN] }, 1, 0] },
-        },
-        scheduledChecks: {
-          $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
-        },
-        estimatedDownSeconds: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$status", HEALTH_STATUS.DOWN] },
-                  { $ne: ["$scheduled", false] },
-                ],
-              },
-              { $ifNull: ["$intervalSeconds", monitor.interval] },
-              0,
-            ],
-          },
-        },
-        estimatedDegradedSeconds: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$status", HEALTH_STATUS.DEGRADED] },
-                  { $ne: ["$scheduled", false] },
-                ],
-              },
-              { $ifNull: ["$intervalSeconds", monitor.interval] },
-              0,
-            ],
-          },
-        },
+        totalChecks: { $sum: "$totalChecks" },
+        successfulChecks: { $sum: "$successfulChecks" },
+        failedChecks: { $sum: "$failedChecks" },
+        degradedChecks: { $sum: "$degradedChecks" },
+        unknownChecks: { $sum: "$unknownChecks" },
+        scheduledChecks: { $sum: "$scheduledChecks" },
+        estimatedDownSeconds: { $sum: "$estimatedDowntimeSeconds" },
+        estimatedDegradedSeconds: { $sum: "$estimatedDegradedSeconds" },
         observedSeconds: {
           $sum: {
-            $cond: [
-              { $ne: ["$scheduled", false] },
-              { $ifNull: ["$intervalSeconds", monitor.interval || 300] },
-              0,
+            $ifNull: [
+              "$_observedSeconds",
+              { $multiply: ["$scheduledChecks", monitor.interval || 300] },
             ],
           },
         },
-        avgResponseTime: { $avg: "$responseTime" },
-        minResponseTime: { $min: "$responseTime" },
-        maxResponseTime: { $max: "$responseTime" },
-        p95ResponseTime: {
-          $percentile: {
-            input: "$responseTime",
-            p: [0.95],
-            method: "approximate",
+        responseTimeSum: {
+          $sum: {
+            $ifNull: [
+              "$_responseTimeSum",
+              { $multiply: ["$avgResponseTime", "$totalChecks"] },
+            ],
           },
         },
+        minResponseTime: { $min: "$minResponseTime" },
+        maxResponseTime: { $max: "$maxResponseTime" },
+        responseTimeBuckets: { $push: "$responseTimeBuckets" },
       },
     },
   ]);
@@ -848,6 +801,33 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
       ? Math.max(1, Math.ceil(eligibleSeconds / (monitor.interval || 300)))
       : 0;
 
+  const responseBuckets = {};
+  for (const doc of result.responseTimeBuckets || []) {
+    for (const [key, count] of Object.entries(doc || {})) {
+      responseBuckets[key] = (responseBuckets[key] || 0) + count;
+    }
+  }
+  const p95Target = Math.ceil(result.totalChecks * 0.95);
+  const bucketThresholds = [
+    ["lt50", 50],
+    ["lt100", 100],
+    ["lt250", 250],
+    ["lt500", 500],
+    ["lt1000", 1000],
+    ["lt2500", 2500],
+    ["lt5000", 5000],
+    ["gte5000", Math.max(5000, result.maxResponseTime || 5000)],
+  ];
+  let percentileCount = 0;
+  let p95ResponseTime = result.maxResponseTime || 0;
+  for (const [key, upperBound] of bucketThresholds) {
+    percentileCount += responseBuckets[key] || 0;
+    if (percentileCount >= p95Target) {
+      p95ResponseTime = upperBound;
+      break;
+    }
+  }
+
   return {
     totalChecks: result.totalChecks,
     successfulChecks: result.successfulChecks,
@@ -876,10 +856,12 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
     uptimePercentage: parseFloat(
       ((result.successfulChecks / result.totalChecks) * 100).toFixed(2),
     ),
-    avgResponseTime: parseFloat((result.avgResponseTime || 0).toFixed(2)),
+    avgResponseTime: parseFloat(
+      ((result.responseTimeSum || 0) / result.totalChecks).toFixed(2),
+    ),
     minResponseTime: result.minResponseTime || 0,
     maxResponseTime: result.maxResponseTime || 0,
-    p95ResponseTime: Math.round(result.p95ResponseTime?.[0] || 0),
+    p95ResponseTime: Math.round(p95ResponseTime),
     downtimeSeconds: Math.min(
       Math.round(eligibleSeconds),
       Math.round(result.estimatedDownSeconds || 0),
@@ -906,32 +888,29 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
  * existing endpoint aggregates into a summary percentage.
  */
 const computeAvailabilityBreakdown = async (monitorId, startDate, endDate) => {
-  const [result] = await HealthCheck.aggregate([
+  const hourly = endDate.getTime() - startDate.getTime() <= 2 * 86400000;
+  const statsModel = hourly ? HourlyStat : DailyStat;
+  const [result] = await statsModel.aggregate([
     {
       $match: {
         monitor: monitorId,
-        checkedAt: { $gte: startDate, $lte: endDate },
+        date: {
+          $gte: hourly
+            ? new Date(new Date(startDate).setUTCMinutes(0, 0, 0))
+            : startOfDayUTC(startDate),
+          $lte: hourly
+            ? new Date(new Date(endDate).setUTCMinutes(0, 0, 0))
+            : startOfDayUTC(endDate),
+        },
       },
     },
     {
       $group: {
         _id: null,
-        total: { $sum: 1 },
-        frontendUp: {
-          $sum: {
-            $cond: [{ $eq: ["$frontendStatus", HEALTH_STATUS.UP] }, 1, 0],
-          },
-        },
-        backendUp: {
-          $sum: {
-            $cond: [{ $eq: ["$backendStatus", HEALTH_STATUS.UP] }, 1, 0],
-          },
-        },
-        databaseUp: {
-          $sum: {
-            $cond: [{ $eq: ["$databaseStatus", HEALTH_STATUS.UP] }, 1, 0],
-          },
-        },
+        total: { $sum: "$totalChecks" },
+        frontendUp: { $sum: "$frontendUpChecks" },
+        backendUp: { $sum: "$backendUpChecks" },
+        databaseUp: { $sum: "$databaseUpChecks" },
       },
     },
   ]);
@@ -1222,11 +1201,11 @@ export const getSystemChartData = async (user, windows = WINDOW_KEYS) => {
         })
           .select("interval createdAt")
           .lean();
-        const buckets = await HealthCheck.aggregate([
+        const buckets = await HourlyStat.aggregate([
           {
             $match: {
               monitor: { $in: ownedIds },
-              checkedAt: { $gte: since },
+              date: { $gte: new Date(new Date(since).setUTCMinutes(0, 0, 0)) },
             },
           },
           {
@@ -1234,18 +1213,30 @@ export const getSystemChartData = async (user, windows = WINDOW_KEYS) => {
               _id: {
                 $dateToString: {
                   format: "%Y-%m-%dT%H:00:00.000Z",
-                  date: "$checkedAt",
+                  date: "$date",
                 },
               },
-              avgResponseTime: { $avg: "$responseTime" },
-              totalChecks: { $sum: 1 },
-              scheduledChecks: {
-                $sum: { $cond: [{ $ne: ["$scheduled", false] }, 1, 0] },
-              },
-              successfulChecks: {
+              totalChecks: { $sum: "$totalChecks" },
+              scheduledChecks: { $sum: "$scheduledChecks" },
+              successfulChecks: { $sum: "$successfulChecks" },
+              weightedRt: {
                 $sum: {
-                  $cond: [{ $eq: ["$status", HEALTH_STATUS.UP] }, 1, 0],
+                  $ifNull: [
+                    "$_responseTimeSum",
+                    { $multiply: ["$avgResponseTime", "$totalChecks"] },
+                  ],
                 },
+              },
+            },
+          },
+          {
+            $addFields: {
+              avgResponseTime: {
+                $cond: [
+                  { $gt: ["$totalChecks", 0] },
+                  { $divide: ["$weightedRt", "$totalChecks"] },
+                  0,
+                ],
               },
             },
           },
