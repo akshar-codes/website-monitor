@@ -34,6 +34,9 @@ export default function StatusPageManage() {
   const [messages, setMessages] = useState({});
   const [updateStatuses, setUpdateStatuses] = useState({});
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [editingIncident, setEditingIncident] = useState(null);
+  const [editingMaintenance, setEditingMaintenance] = useState(null);
   const refresh = useCallback(async () => {
     try {
       const [p, i, m, s] = await Promise.all([
@@ -58,9 +61,11 @@ export default function StatusPageManage() {
   }, [refresh]);
   const act = async (task) => {
     setError("");
+    setSuccess("");
     try {
       await task();
       await refresh();
+      setSuccess("Changes saved.");
     } catch (e) {
       setError(e.response?.data?.message || "Action failed");
     }
@@ -92,7 +97,7 @@ export default function StatusPageManage() {
   if (!page)
     return (
       <Page title="Status page management">
-        {error ? <Notice variant="error">{error}</Notice> : <p>Loading…</p>}
+        {error ? <Notice tone="error">{error}</Notice> : <p>Loading…</p>}
       </Page>
     );
   return (
@@ -105,7 +110,8 @@ export default function StatusPageManage() {
         </Link>
       }
     >
-      {error && <Notice variant="error">{error}</Notice>}
+      {error && <Notice tone="error">{error}</Notice>}
+      {success && <Notice tone="success">{success}</Notice>}
       <Panel
         title="Subscriber totals"
         subtitle="Email addresses are private and are not listed in the dashboard."
@@ -184,30 +190,18 @@ export default function StatusPageManage() {
                   {item.status !== "resolved" && (
                     <Button
                       variant="secondary"
-                      onClick={() => {
-                        const title = window.prompt(
-                          "Incident title",
-                          item.title,
-                        );
-                        if (title === null) return;
-                        const description = window.prompt(
-                          "Public description",
-                          item.description || "",
-                        );
-                        if (description === null) return;
-                        const severity = window.prompt(
-                          "Severity: minor, major, or critical",
-                          item.severity,
-                        );
-                        if (severity !== null)
-                          act(() =>
-                            api.updateStatusIncident(id, item._id, {
-                              title,
-                              description,
-                              severity,
-                            }),
-                          );
-                      }}
+                      onClick={() =>
+                        setEditingIncident(
+                          editingIncident?.id === item._id
+                            ? null
+                            : {
+                                id: item._id,
+                                title: item.title,
+                                description: item.description || "",
+                                severity: item.severity,
+                              },
+                        )
+                      }
                     >
                       Edit
                     </Button>
@@ -238,6 +232,70 @@ export default function StatusPageManage() {
                   )}
                 </div>
               </div>
+              {editingIncident?.id === item._id && (
+                <form
+                  className="mt-4 grid gap-3 rounded border p-3 md:grid-cols-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    act(async () => {
+                      await api.updateStatusIncident(id, item._id, {
+                        title: editingIncident.title,
+                        description: editingIncident.description,
+                        severity: editingIncident.severity,
+                      });
+                      setEditingIncident(null);
+                    });
+                  }}
+                >
+                  <Input
+                    label="Incident title"
+                    required
+                    maxLength={160}
+                    value={editingIncident.title}
+                    onChange={(e) =>
+                      setEditingIncident({
+                        ...editingIncident,
+                        title: e.target.value,
+                      })
+                    }
+                  />
+                  <Select
+                    label="Severity"
+                    value={editingIncident.severity}
+                    onChange={(e) =>
+                      setEditingIncident({
+                        ...editingIncident,
+                        severity: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="minor">Minor</option>
+                    <option value="major">Major</option>
+                    <option value="critical">Critical</option>
+                  </Select>
+                  <Input
+                    label="Public description"
+                    maxLength={3000}
+                    value={editingIncident.description}
+                    onChange={(e) =>
+                      setEditingIncident({
+                        ...editingIncident,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                  <div className="flex gap-2">
+                    <Button type="submit">Save incident</Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setEditingIncident(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
               {item.updates?.map((update) => (
                 <div
                   key={update._id}
@@ -392,38 +450,25 @@ export default function StatusPageManage() {
                   <Button
                     variant="secondary"
                     onClick={() => {
-                      const title = window.prompt(
-                        "Maintenance title",
-                        item.title,
+                      const local = (value) => {
+                        const date = new Date(value);
+                        return new Date(
+                          date.getTime() - date.getTimezoneOffset() * 60000,
+                        )
+                          .toISOString()
+                          .slice(0, 16);
+                      };
+                      setEditingMaintenance(
+                        editingMaintenance?.id === item._id
+                          ? null
+                          : {
+                              id: item._id,
+                              title: item.title,
+                              description: item.description || "",
+                              scheduledStart: local(item.scheduledStart),
+                              scheduledEnd: local(item.scheduledEnd),
+                            },
                       );
-                      if (title === null) return;
-                      const description = window.prompt(
-                        "Public description",
-                        item.description || "",
-                      );
-                      if (description === null) return;
-                      const start = window.prompt(
-                        "Start date (ISO-8601)",
-                        new Date(item.scheduledStart).toISOString(),
-                      );
-                      if (start === null) return;
-                      const end = window.prompt(
-                        "End date (ISO-8601)",
-                        new Date(item.scheduledEnd).toISOString(),
-                      );
-                      if (end === null) return;
-                      try {
-                        act(() =>
-                          api.updateStatusMaintenance(id, item._id, {
-                            title,
-                            description,
-                            scheduledStart: new Date(start).toISOString(),
-                            scheduledEnd: new Date(end).toISOString(),
-                          }),
-                        );
-                      } catch {
-                        setError("Enter valid ISO-8601 start and end dates.");
-                      }
                     }}
                   >
                     Edit
@@ -482,6 +527,93 @@ export default function StatusPageManage() {
                   </Button>
                 )}
               </div>
+              {editingMaintenance?.id === item._id && (
+                <form
+                  className="grid w-full gap-3 rounded border p-3 md:grid-cols-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (
+                      new Date(editingMaintenance.scheduledEnd) <=
+                      new Date(editingMaintenance.scheduledStart)
+                    ) {
+                      setError("Maintenance end must be after its start.");
+                      return;
+                    }
+                    act(async () => {
+                      await api.updateStatusMaintenance(id, item._id, {
+                        title: editingMaintenance.title,
+                        description: editingMaintenance.description,
+                        scheduledStart: new Date(
+                          editingMaintenance.scheduledStart,
+                        ).toISOString(),
+                        scheduledEnd: new Date(
+                          editingMaintenance.scheduledEnd,
+                        ).toISOString(),
+                      });
+                      setEditingMaintenance(null);
+                    });
+                  }}
+                >
+                  <Input
+                    label="Maintenance title"
+                    required
+                    maxLength={160}
+                    value={editingMaintenance.title}
+                    onChange={(e) =>
+                      setEditingMaintenance({
+                        ...editingMaintenance,
+                        title: e.target.value,
+                      })
+                    }
+                  />
+                  <Input
+                    label="Description"
+                    maxLength={3000}
+                    value={editingMaintenance.description}
+                    onChange={(e) =>
+                      setEditingMaintenance({
+                        ...editingMaintenance,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                  <Input
+                    label="Start (local time)"
+                    type="datetime-local"
+                    required
+                    value={editingMaintenance.scheduledStart}
+                    onChange={(e) =>
+                      setEditingMaintenance({
+                        ...editingMaintenance,
+                        scheduledStart: e.target.value,
+                      })
+                    }
+                  />
+                  <Input
+                    label="End (local time)"
+                    type="datetime-local"
+                    required
+                    min={editingMaintenance.scheduledStart}
+                    value={editingMaintenance.scheduledEnd}
+                    onChange={(e) =>
+                      setEditingMaintenance({
+                        ...editingMaintenance,
+                        scheduledEnd: e.target.value,
+                      })
+                    }
+                  />
+                  <div className="flex gap-2">
+                    <Button type="submit">Save schedule</Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setEditingMaintenance(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
             </article>
           ))}
         </div>

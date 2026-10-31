@@ -27,6 +27,10 @@ export default function StatusPages() {
   const [monitors, setMonitors] = useState([]);
   const [selectedMonitor, setSelectedMonitor] = useState({});
   const [usage, setUsage] = useState(null);
+  const [editingPage, setEditingPage] = useState(null);
+  const [editingService, setEditingService] = useState(null);
+  const [success, setSuccess] = useState("");
+  const [deletePage, setDeletePage] = useState(null);
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
@@ -85,9 +89,11 @@ export default function StatusPages() {
   };
   const act = async (fn) => {
     setError("");
+    setSuccess("");
     try {
       await fn();
       await refresh();
+      setSuccess("Status page changes saved.");
     } catch (e) {
       setError(e.response?.data?.message || "Action failed");
     }
@@ -104,7 +110,8 @@ export default function StatusPages() {
         </Link>
       }
     >
-      {error && <Notice variant="error">{error}</Notice>}
+      {error && <Notice tone="error">{error}</Notice>}
+      {success && <Notice tone="success">{success}</Notice>}
       {usage && (
         <p className="mb-4 text-sm text-slate-600">
           Plan usage: {usage.used} / {usage.limit} status pages · up to{" "}
@@ -162,47 +169,25 @@ export default function StatusPages() {
                   )}
                   <Button
                     variant="secondary"
-                    onClick={() => {
-                      const name = window.prompt("Page name", page.name);
-                      if (name === null) return;
-                      const slug = window.prompt("Public URL slug", page.slug);
-                      if (slug === null) return;
-                      const description = window.prompt(
-                        "Public description",
-                        page.description || "",
-                      );
-                      if (description === null) return;
-                      const timezone = window.prompt(
-                        "Display timezone",
-                        page.timezone || "UTC",
-                      );
-                      if (timezone === null) return;
-                      const logo = window.prompt(
-                        "Logo URL (optional)",
-                        page.logo || "",
-                      );
-                      if (logo === null) return;
-                      const theme = window.prompt(
-                        "Theme: light or dark",
-                        page.branding?.theme || "light",
-                      );
-                      if (theme === null) return;
-                      const accentColor = window.prompt(
-                        "Accent color (#RRGGBB)",
-                        page.branding?.accentColor || "#15803d",
-                      );
-                      if (accentColor === null) return;
-                      act(() =>
-                        api.updateStatusPage(page.id, {
-                          name,
-                          slug: slug.toLowerCase().trim().replace(/\s+/g, "-"),
-                          description,
-                          timezone,
-                          logo,
-                          branding: { theme, accentColor },
-                        }),
-                      );
-                    }}
+                    onClick={() =>
+                      setEditingPage(
+                        editingPage?.id === page.id
+                          ? null
+                          : {
+                              id: page.id,
+                              name: page.name,
+                              slug: page.slug,
+                              description: page.description || "",
+                              timezone: page.timezone || "UTC",
+                              logo: page.logo || "",
+                              branding: {
+                                theme: page.branding?.theme || "light",
+                                accentColor:
+                                  page.branding?.accentColor || "#15803d",
+                              },
+                            },
+                      )
+                    }
                   >
                     <Pencil size={15} /> Edit
                   </Button>
@@ -220,15 +205,156 @@ export default function StatusPages() {
                   </Button>
                   <Button
                     variant="secondary"
-                    onClick={() => {
-                      if (window.confirm(`Delete ${page.name}?`))
-                        act(() => api.deleteStatusPage(page.id));
-                    }}
+                    onClick={() => setDeletePage(page)}
                     aria-label={`Delete ${page.name}`}
                   >
                     <Trash2 size={15} />
                   </Button>
                 </div>
+                {deletePage?.id === page.id && (
+                  <div
+                    role="alertdialog"
+                    aria-label={`Delete ${page.name}`}
+                    className="w-full rounded-lg border border-red-200 bg-red-50 p-4"
+                  >
+                    <p className="font-medium">
+                      Delete “{page.name}” and its status page history?
+                    </p>
+                    <p className="mt-1 text-sm">
+                      This removes its incidents, maintenance records, and
+                      subscribers. Monitors remain unchanged.
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={() =>
+                          act(async () => {
+                            await api.deleteStatusPage(page.id);
+                            setDeletePage(null);
+                          })
+                        }
+                      >
+                        Delete status page
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setDeletePage(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {editingPage?.id === page.id && (
+                  <form
+                    className="grid w-full gap-3 border-t border-slate-100 pt-4 md:grid-cols-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      act(async () => {
+                        await api.updateStatusPage(page.id, {
+                          ...editingPage,
+                          slug: editingPage.slug
+                            .toLowerCase()
+                            .trim()
+                            .replace(/\s+/g, "-"),
+                        });
+                        setEditingPage(null);
+                      });
+                    }}
+                  >
+                    <Input
+                      label="Page name"
+                      required
+                      maxLength={120}
+                      value={editingPage.name}
+                      onChange={(e) =>
+                        setEditingPage({ ...editingPage, name: e.target.value })
+                      }
+                    />
+                    <Input
+                      label="URL slug"
+                      required
+                      minLength={3}
+                      maxLength={60}
+                      pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                      value={editingPage.slug}
+                      onChange={(e) =>
+                        setEditingPage({ ...editingPage, slug: e.target.value })
+                      }
+                    />
+                    <Input
+                      label="Description"
+                      maxLength={500}
+                      value={editingPage.description}
+                      onChange={(e) =>
+                        setEditingPage({
+                          ...editingPage,
+                          description: e.target.value,
+                        })
+                      }
+                    />
+                    <Input
+                      label="Timezone"
+                      required
+                      value={editingPage.timezone}
+                      onChange={(e) =>
+                        setEditingPage({
+                          ...editingPage,
+                          timezone: e.target.value,
+                        })
+                      }
+                    />
+                    <Input
+                      label="Logo URL"
+                      type="url"
+                      value={editingPage.logo}
+                      onChange={(e) =>
+                        setEditingPage({ ...editingPage, logo: e.target.value })
+                      }
+                    />
+                    <Select
+                      label="Theme"
+                      value={editingPage.branding.theme}
+                      onChange={(e) =>
+                        setEditingPage({
+                          ...editingPage,
+                          branding: {
+                            ...editingPage.branding,
+                            theme: e.target.value,
+                          },
+                        })
+                      }
+                    >
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </Select>
+                    <Input
+                      label="Accent color"
+                      type="color"
+                      value={editingPage.branding.accentColor}
+                      onChange={(e) =>
+                        setEditingPage({
+                          ...editingPage,
+                          branding: {
+                            ...editingPage.branding,
+                            accentColor: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                    <div className="flex gap-2">
+                      <Button type="submit">Save changes</Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setEditingPage(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                )}
                 <div className="flex w-full flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
                   {[...(page.services || [])]
                     .sort((a, b) => a.displayOrder - b.displayOrder)
@@ -251,24 +377,18 @@ export default function StatusPages() {
                           className="ml-1 text-slate-500"
                           title="Edit public service details"
                           aria-label={`Edit ${service.displayName}`}
-                          onClick={() => {
-                            const displayName = window.prompt(
-                              "Public service name",
-                              service.displayName,
-                            );
-                            if (displayName === null) return;
-                            const description = window.prompt(
-                              "Public service description",
-                              service.description || "",
-                            );
-                            if (description !== null)
-                              act(() =>
-                                api.updateStatusService(page.id, service.id, {
-                                  displayName,
-                                  description,
-                                }),
-                              );
-                          }}
+                          onClick={() =>
+                            setEditingService(
+                              editingService?.id === service.id
+                                ? null
+                                : {
+                                    id: service.id,
+                                    pageId: page.id,
+                                    displayName: service.displayName,
+                                    description: service.description || "",
+                                  },
+                            )
+                          }
                         >
                           <Pencil size={12} />
                         </button>
@@ -352,6 +472,59 @@ export default function StatusPages() {
                         </button>
                       </span>
                     ))}
+                  {editingService?.pageId === page.id && (
+                    <form
+                      className="grid w-full gap-3 rounded border p-3 md:grid-cols-2"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        act(async () => {
+                          await api.updateStatusService(
+                            page.id,
+                            editingService.id,
+                            {
+                              displayName: editingService.displayName,
+                              description: editingService.description,
+                            },
+                          );
+                          setEditingService(null);
+                        });
+                      }}
+                    >
+                      <Input
+                        label="Public service name"
+                        required
+                        maxLength={120}
+                        value={editingService.displayName}
+                        onChange={(e) =>
+                          setEditingService({
+                            ...editingService,
+                            displayName: e.target.value,
+                          })
+                        }
+                      />
+                      <Input
+                        label="Public description"
+                        maxLength={500}
+                        value={editingService.description}
+                        onChange={(e) =>
+                          setEditingService({
+                            ...editingService,
+                            description: e.target.value,
+                          })
+                        }
+                      />
+                      <div className="flex gap-2">
+                        <Button type="submit">Save service</Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => setEditingService(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  )}
                   <select
                     aria-label={`Select monitor for ${page.name}`}
                     className="rounded border border-slate-300 px-2 py-1"
