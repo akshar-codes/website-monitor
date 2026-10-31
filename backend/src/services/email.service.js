@@ -7,6 +7,7 @@ import { buildPasswordChangedEmail } from "../utils/email/templates/passwordChan
 import { buildPlanUpgradeApprovedEmail } from "../utils/email/templates/planUpgradeApprovedEmail.js";
 import { buildPlanUpgradeRejectedEmail } from "../utils/email/templates/planUpgradeRejectedEmail.js";
 import { buildPlanUpgradeRequestSubmittedEmail } from "../utils/email/templates/planUpgradeRequestSubmittedEmail.js";
+import { buildSuggestionReplyEmail } from "../utils/email/templates/suggestionReplyEmail.js";
 
 const sendMail = async ({ to, subject, html, text }) => {
   const transporter = getTransporter();
@@ -139,6 +140,20 @@ export const sendPlanUpgradeRequestSubmittedEmail = async (
 
   await sendMail({ to: admin.email, subject, html, text });
   logger.info(`Plan-upgrade-request email sent to admin ${admin.email}`);
+};
+
+/** Sends the SiteWatch team reply to a user's suggestion. */
+export const sendSuggestionReplyEmail = async (user, suggestion, reply) => {
+  const suggestionsUrl = `${env.CLIENT_URL}/suggestions`;
+  const { subject, html, text } = buildSuggestionReplyEmail({
+    name: user.name,
+    title: suggestion.title,
+    reply,
+    suggestionsUrl,
+  });
+
+  await sendMail({ to: user.email, subject, html, text });
+  logger.info(`Suggestion reply email sent to ${user.email}`);
 };
 
 const escapeEmailText = (value = "") =>

@@ -22,6 +22,7 @@ import notificationRoutes from "./notification.routes.js";
 import apiKeyRoutes from "./apiKey.routes.js";
 import apiV1Routes from "./apiV1.routes.js";
 import adminRoutes from "./admin.routes.js";
+import suggestionRoutes from "./suggestion.routes.js";
 import { isAuthenticated } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
 import { ROLES } from "../config/constants.js";
@@ -57,6 +58,7 @@ router.use("/ssl", isAuthenticated, sslRoutes);
 router.use("/activity", isAuthenticated, activityRoutes);
 router.use("/notifications", isAuthenticated, notificationRoutes);
 router.use("/plan-upgrade-requests", isAuthenticated, planUpgradeRequestRoutes);
+router.use("/suggestions", isAuthenticated, suggestionRoutes);
 
 // ── Requires an authenticated session AND the admin role ──
 router.use("/admin", isAuthenticated, authorize(ROLES.ADMIN), adminRoutes);
