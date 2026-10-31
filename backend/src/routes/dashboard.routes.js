@@ -29,6 +29,7 @@ import {
   getMonitorChartData,
   getMonitorDetails,
   getMonitorAnalytics,
+  getMonitorRegionalAnalytics,
 } from "../controllers/dashboard.controller.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
 import { requirePermission } from "../middlewares/permission.js";
@@ -94,6 +95,15 @@ router.get(
 // matches literal "analytics" vs. the earlier routes' literal segments,
 // none of which collide with a :id param here) — kept last simply to
 // group it after the other per-monitor detail endpoints.
+router.get(
+  "/monitors/:id/regions",
+  requirePermission("monitor:read"),
+  validateObjectId("id"),
+  validate(monitorStatsQuerySchema, "query"),
+  requireWindowWithinRetention,
+  getMonitorRegionalAnalytics,
+);
+
 router.get(
   "/monitors/:id/analytics",
   requirePermission("monitor:read"),

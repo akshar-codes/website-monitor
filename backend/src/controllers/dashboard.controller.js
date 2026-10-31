@@ -109,3 +109,12 @@ export const getMonitorAnalytics = asyncHandler(async (req, res) => {
 
   sendSuccess(res, { data });
 });
+
+export const getMonitorRegionalAnalytics = asyncHandler(async (req, res) => {
+  const data = await dashboardService.getMonitorRegionalAnalytics(
+    req.params.id,
+    req.validatedQuery,
+    req.user,
+  );
+  sendSuccess(res, { data });
+});
