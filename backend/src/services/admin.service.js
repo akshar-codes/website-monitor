@@ -7,6 +7,12 @@ import Activity from "../models/Activity.js";
 import DailyStat from "../models/DailyStat.js";
 import HourlyStat from "../models/HourlyStat.js";
 import PerformanceAlertState from "../models/PerformanceAlertState.js";
+import RegionalCheck from "../models/RegionalCheck.js";
+import RegionalProbeRun from "../models/RegionalProbeRun.js";
+import RegionalIncident from "../models/RegionalIncident.js";
+import RegionalDailyStat from "../models/RegionalDailyStat.js";
+import RegionalHourlyStat from "../models/RegionalHourlyStat.js";
+import RegionalPerformanceState from "../models/RegionalPerformanceState.js";
 import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
 import { escapeRegExp } from "../utils/regex.js";
@@ -559,6 +565,14 @@ export const deleteUser = async (targetUserId, actingUser) => {
       DailyStat.deleteMany({ monitor: { $in: ownedMonitorIds } }),
       HourlyStat.deleteMany({ monitor: { $in: ownedMonitorIds } }),
       PerformanceAlertState.deleteMany({ monitor: { $in: ownedMonitorIds } }),
+      RegionalCheck.deleteMany({ monitor: { $in: ownedMonitorIds } }),
+      RegionalProbeRun.deleteMany({ monitor: { $in: ownedMonitorIds } }),
+      RegionalIncident.deleteMany({ monitor: { $in: ownedMonitorIds } }),
+      RegionalDailyStat.deleteMany({ monitor: { $in: ownedMonitorIds } }),
+      RegionalHourlyStat.deleteMany({ monitor: { $in: ownedMonitorIds } }),
+      RegionalPerformanceState.deleteMany({
+        monitor: { $in: ownedMonitorIds },
+      }),
     ]);
     await Monitor.deleteMany({ owner: targetUserId });
   }

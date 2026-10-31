@@ -3,6 +3,8 @@ import StatusPage from "../models/StatusPage.js";
 import StatusSubscriber from "../models/StatusSubscriber.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { hasFeature, FEATURES } from "../config/features.js";
+import ProbeAgent from "../models/ProbeAgent.js";
+import { PROBE_REGIONS } from "../config/regions.js";
 
 /**
  * Computes the requesting user's current usage against their plan's
@@ -23,6 +25,26 @@ export const getUsageForUser = async (user) => {
   const definition = getPlanDefinition(plan);
 
   const monitorCount = await Monitor.countDocuments({ owner: ownerId });
+  const regionalMonitors = await Monitor.find({
+    owner: ownerId,
+    "regionalMonitoring.enabled": true,
+  })
+    .select("interval regionalMonitoring")
+    .lean();
+  const regionalChecksUsed = regionalMonitors.reduce(
+    (sum, monitor) =>
+      sum +
+      monitor.regionalMonitoring.regions.length * (86_400 / monitor.interval),
+    0,
+  );
+  const activeProbeAgents = await ProbeAgent.find({
+    lastHeartbeatAt: { $gte: new Date(Date.now() - 90_000) },
+  })
+    .select("regionId")
+    .lean();
+  const activeRegions = new Set(
+    activeProbeAgents.map((agent) => agent.regionId),
+  );
   const statusPages = await StatusPage.find({ owner: ownerId })
     .select("services")
     .sort({ createdAt: -1 })
@@ -85,6 +107,16 @@ export const getUsageForUser = async (user) => {
         subscribers: subscribersByPage.get(String(page._id)) || 0,
       })),
     },
+    regionalMonitoring: {
+      monitors: regionalMonitors.length,
+      checksUsedPerDay: Math.ceil(regionalChecksUsed),
+      checksLimitPerDay: definition.limits.regionalChecksPerDay,
+      maxRegionsPerMonitor: definition.limits.maxRegionsPerMonitor,
+      regions: PROBE_REGIONS.map((region) => ({
+        ...region,
+        operational: activeRegions.has(region.id),
+      })),
+    },
     features: {
       [FEATURES.TEAM_ACCESS]: hasFeature(plan, FEATURES.TEAM_ACCESS),
       [FEATURES.EXTENDED_RETENTION]: hasFeature(
@@ -99,6 +131,10 @@ export const getUsageForUser = async (user) => {
       [FEATURES.PERFORMANCE_ALERT_CONFIG]: hasFeature(
         plan,
         FEATURES.PERFORMANCE_ALERT_CONFIG,
+      ),
+      [FEATURES.REGIONAL_MONITORING]: hasFeature(
+        plan,
+        FEATURES.REGIONAL_MONITORING,
       ),
     },
   };

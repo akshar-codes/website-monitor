@@ -25,6 +25,7 @@ import { getPlanDefinition } from "../config/plans.js";
 import { FEATURES, hasFeature } from "../config/features.js";
 import { estimatePercentile } from "../utils/latencyHistogram.js";
 import PerformanceAlertState from "../models/PerformanceAlertState.js";
+import { getRegionalAnalytics } from "./regionalProbe.service.js";
 
 const resolveOwnerObjectId = (user) =>
   new mongoose.Types.ObjectId(user.id || user._id);
@@ -309,7 +310,7 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
 
   const monitor = await Monitor.findOne({ _id: id, owner: ownerId })
     .select(
-      "name url active interval lastCheckedAt nextCheckAt consecutiveFailures createdAt updatedAt",
+      "name url active interval lastCheckedAt nextCheckAt consecutiveFailures createdAt updatedAt regionalMonitoring",
     )
     .lean();
   if (!monitor) {
@@ -419,6 +420,7 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
       interval: monitor.interval,
       createdAt: monitor.createdAt,
       updatedAt: monitor.updatedAt,
+      regionalMonitoring: monitor.regionalMonitoring,
     },
     currentStatus,
     lastCheckedAt: monitor.lastCheckedAt,
@@ -1245,6 +1247,26 @@ export const getMonitorAnalytics = async (monitorId, query, user) => {
     availability,
     chart,
   };
+};
+
+export const getMonitorRegionalAnalytics = async (monitorId, query, user) => {
+  const ownerId = user.id || user._id.toString();
+  const id = new mongoose.Types.ObjectId(monitorId);
+  const monitor = await Monitor.findOne({ _id: id, owner: ownerId })
+    .select("_id")
+    .lean();
+  if (!monitor)
+    throw ApiError.notFound(`Monitor not found with id: ${monitorId}`);
+  const windowMs =
+    query.window === "7d"
+      ? 7 * 86_400_000
+      : query.window === "30d"
+        ? 30 * 86_400_000
+        : 24 * 60 * 60_000;
+  return getRegionalAnalytics(id, {
+    startDate: new Date(Date.now() - windowMs),
+    endDate: new Date(),
+  });
 };
 
 // ── Dashboard summary (aggregated) ───────────────────────────────────────────

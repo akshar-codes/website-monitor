@@ -22,6 +22,14 @@ const alertPreferenceKey = (type) => {
     return "performanceAlerts";
   if (
     [
+      "regional_outage",
+      "regional_recovered",
+      "regional_performance_degraded",
+    ].includes(type)
+  )
+    return "regionalMonitoring";
+  if (
+    [
       "ssl_expiring_soon",
       "ssl_expired",
       "ssl_invalid",
@@ -30,7 +38,13 @@ const alertPreferenceKey = (type) => {
     ].includes(type)
   )
     return "sslExpiry";
-  if (["incident_opened", "incident_resolved"].includes(type))
+  if (
+    [
+      "incident_opened",
+      "incident_resolved",
+      "global_outage_confirmed",
+    ].includes(type)
+  )
     return "incidents";
   if (
     [
@@ -51,6 +65,7 @@ const emailPreferenceKey = (type) =>
     "monitorDown",
     "monitorRecovery",
     "performanceAlerts",
+    "regionalMonitoring",
     "sslExpiry",
     "incidents",
   ].includes(alertPreferenceKey(type))
@@ -359,6 +374,10 @@ export const dispatchNotificationDigests = async () => {
     "incident_resolved",
     "performance_degraded",
     "performance_recovered",
+    "regional_outage",
+    "regional_recovered",
+    "global_outage_confirmed",
+    "regional_performance_degraded",
     "ssl_expiring_soon",
     "ssl_expired",
     "ssl_invalid",

@@ -5,9 +5,18 @@ import Incident from "../models/Incident.js";
 import StatusPage from "../models/StatusPage.js";
 import HourlyStat from "../models/HourlyStat.js";
 import PerformanceAlertState from "../models/PerformanceAlertState.js";
+import RegionalCheck from "../models/RegionalCheck.js";
+import RegionalProbeRun from "../models/RegionalProbeRun.js";
+import ProbeAgent from "../models/ProbeAgent.js";
+import RegionalPerformanceState from "../models/RegionalPerformanceState.js";
+import RegionalIncident from "../models/RegionalIncident.js";
+import RegionalDailyStat from "../models/RegionalDailyStat.js";
+import RegionalHourlyStat from "../models/RegionalHourlyStat.js";
 import ApiError from "../utils/ApiError.js";
 import { ROLES } from "../config/constants.js";
 import { hasFeature, FEATURES } from "../config/features.js";
+import { getPlanDefinition } from "../config/plans.js";
+import { getRegion } from "../config/regions.js";
 import {
   isIntervalAllowedForPlan,
   getMinCheckInterval,
@@ -21,6 +30,65 @@ import {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const resolveOwnerId = (user) => user.id || user._id.toString();
+
+export const assertRegionalMonitoringAllowed = async (
+  user,
+  config = {},
+  interval = 300,
+  excludeMonitorId,
+  retainedRegions = [],
+) => {
+  if (!config?.enabled) return;
+  const definition = getPlanDefinition(user.plan);
+  const regions = config.regions || [];
+  const maxRegions = definition?.limits.maxRegionsPerMonitor ?? 0;
+  if (
+    !hasFeature(user.plan, FEATURES.REGIONAL_MONITORING) ||
+    regions.length > maxRegions
+  ) {
+    throw ApiError.upgradeRequired(
+      `Your plan allows up to ${maxRegions} monitoring region${maxRegions === 1 ? "" : "s"} per monitor.`,
+    );
+  }
+  if (!regions.length)
+    throw ApiError.badRequest(
+      "Select at least one region for regional monitoring.",
+    );
+  if (regions.some((id) => !getRegion(id)))
+    throw ApiError.badRequest("A selected probe region is not available.");
+  const online = await ProbeAgent.distinct("regionId", {
+    regionId: { $in: regions },
+    lastHeartbeatAt: { $gte: new Date(Date.now() - 90_000) },
+  });
+  const unavailableNewRegions = regions.filter(
+    (region) => !online.includes(region) && !retainedRegions.includes(region),
+  );
+  if (unavailableNewRegions.length) {
+    throw ApiError.badRequest(
+      "One or more selected regions do not currently have an active probe agent.",
+    );
+  }
+
+  const ownerId = resolveOwnerId(user);
+  const filter = { owner: ownerId, "regionalMonitoring.enabled": true };
+  if (excludeMonitorId) filter._id = { $ne: excludeMonitorId };
+  const existing = await Monitor.find(filter)
+    .select("interval regionalMonitoring")
+    .lean();
+  const requested = regions.length * (86_400 / interval);
+  const used = existing.reduce(
+    (sum, monitor) =>
+      sum +
+      monitor.regionalMonitoring.regions.length * (86_400 / monitor.interval),
+    0,
+  );
+  const budget = definition?.limits.regionalChecksPerDay;
+  if (budget != null && used + requested > budget) {
+    throw ApiError.upgradeRequired(
+      `Regional monitoring would exceed your account budget of ${budget.toLocaleString()} regional checks per day.`,
+    );
+  }
+};
 
 /**
  * Throws ApiError.upgradeRequired when `interval` is faster than the
@@ -81,6 +149,11 @@ export const createMonitor = async (data, user) => {
   const ownerId = resolveOwnerId(user);
 
   assertIntervalAllowedForPlan(user.plan, data.interval);
+  await assertRegionalMonitoringAllowed(
+    user,
+    data.regionalMonitoring,
+    data.interval,
+  );
 
   const existing = await Monitor.findOne({ owner: ownerId, url: data.url });
   if (existing) {
@@ -185,6 +258,9 @@ export const getMonitorDiagnostics = async (id, user) => {
 
 export const updateMonitor = async (id, data, user) => {
   const ownerId = resolveOwnerId(user);
+  const previous = await Monitor.findOne({ _id: id, owner: ownerId })
+    .select("active url interval regionalMonitoring")
+    .lean();
 
   if (data.performanceAlerts) {
     const configurable = Object.keys(data.performanceAlerts).some(
@@ -202,6 +278,20 @@ export const updateMonitor = async (id, data, user) => {
   if (data.interval !== undefined) {
     assertIntervalAllowedForPlan(user.plan, data.interval);
   }
+  const regionalConfig =
+    data.regionalMonitoring || previous?.regionalMonitoring;
+  if (
+    regionalConfig &&
+    (data.regionalMonitoring || data.interval !== undefined)
+  ) {
+    await assertRegionalMonitoringAllowed(
+      user,
+      regionalConfig,
+      data.interval || previous?.interval || 300,
+      id,
+      previous?.regionalMonitoring?.regions || [],
+    );
+  }
 
   if (data.url) {
     const existing = await Monitor.findOne({
@@ -213,10 +303,6 @@ export const updateMonitor = async (id, data, user) => {
       throw ApiError.conflict(`You already have a monitor for "${data.url}"`);
     }
   }
-
-  const previous = await Monitor.findOne({ _id: id, owner: ownerId })
-    .select("active url")
-    .lean();
 
   // Reactivating a monitor schedules an immediate re-check.
   if (data.active === true) {
@@ -257,6 +343,22 @@ export const updateMonitor = async (id, data, user) => {
       },
       { upsert: true },
     );
+    await RegionalPerformanceState.updateMany(
+      { monitor: monitor._id },
+      {
+        $set: {
+          status: "normal",
+          baselineSamples: [],
+          recentSamples: [],
+          baselineMedianMs: null,
+          baselineMadMs: null,
+          consecutiveBreaches: 0,
+          consecutiveRecoveries: 0,
+          lastEvaluatedCheck: null,
+          lastAlertAt: null,
+        },
+      },
+    );
   }
 
   // Distinguish a pause/resume toggle from a general field edit so the
@@ -288,6 +390,11 @@ export const duplicateMonitor = async (id, data, user) => {
   const source = await getMonitorById(id, user);
   const ownerId = resolveOwnerId(user);
   assertIntervalAllowedForPlan(user.plan, data.interval);
+  await assertRegionalMonitoringAllowed(
+    user,
+    data.regionalMonitoring,
+    data.interval,
+  );
   const existing = await Monitor.findOne({ owner: ownerId, url: data.url });
   if (existing)
     throw ApiError.conflict(`You already have a monitor for "${data.url}"`);
@@ -325,6 +432,12 @@ export const deleteMonitor = async (id, user) => {
     DailyStat.deleteMany({ monitor: monitor._id }),
     HourlyStat.deleteMany({ monitor: monitor._id }),
     PerformanceAlertState.deleteMany({ monitor: monitor._id }),
+    RegionalCheck.deleteMany({ monitor: monitor._id }),
+    RegionalProbeRun.deleteMany({ monitor: monitor._id }),
+    RegionalIncident.deleteMany({ monitor: monitor._id }),
+    RegionalDailyStat.deleteMany({ monitor: monitor._id }),
+    RegionalHourlyStat.deleteMany({ monitor: monitor._id }),
+    RegionalPerformanceState.deleteMany({ monitor: monitor._id }),
     Incident.deleteMany({ monitor: monitor._id }),
     StatusPage.updateMany(
       { "services.monitor": monitor._id },

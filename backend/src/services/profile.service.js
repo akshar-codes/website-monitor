@@ -17,6 +17,12 @@ import HealthCheck from "../models/HealthCheck.js";
 import DailyStat from "../models/DailyStat.js";
 import HourlyStat from "../models/HourlyStat.js";
 import PerformanceAlertState from "../models/PerformanceAlertState.js";
+import RegionalCheck from "../models/RegionalCheck.js";
+import RegionalProbeRun from "../models/RegionalProbeRun.js";
+import RegionalIncident from "../models/RegionalIncident.js";
+import RegionalDailyStat from "../models/RegionalDailyStat.js";
+import RegionalHourlyStat from "../models/RegionalHourlyStat.js";
+import RegionalPerformanceState from "../models/RegionalPerformanceState.js";
 import Incident from "../models/Incident.js";
 import SslInfo from "../models/SslInfo.js";
 import Activity from "../models/Activity.js";
@@ -127,6 +133,12 @@ export const deleteAccount = async (userId, confirmationEmail) => {
     DailyStat.deleteMany({ monitor: { $in: monitorIds } }),
     HourlyStat.deleteMany({ monitor: { $in: monitorIds } }),
     PerformanceAlertState.deleteMany({ monitor: { $in: monitorIds } }),
+    RegionalCheck.deleteMany({ monitor: { $in: monitorIds } }),
+    RegionalProbeRun.deleteMany({ monitor: { $in: monitorIds } }),
+    RegionalIncident.deleteMany({ monitor: { $in: monitorIds } }),
+    RegionalDailyStat.deleteMany({ monitor: { $in: monitorIds } }),
+    RegionalHourlyStat.deleteMany({ monitor: { $in: monitorIds } }),
+    RegionalPerformanceState.deleteMany({ monitor: { $in: monitorIds } }),
     Incident.deleteMany({ monitor: { $in: monitorIds } }),
     SslInfo.deleteMany({ monitor: { $in: monitorIds } }),
     Monitor.deleteMany({ owner: account._id }),
