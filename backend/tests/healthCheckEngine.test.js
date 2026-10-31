@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { classify } from "../src/workers/classifier.js";
-import { isPublicAddress, poll } from "../src/workers/poller.js";
+import { isPublicAddress, poll, requestOnce } from "../src/workers/poller.js";
 import { FAILURE_REASONS, HEALTH_STATUS } from "../src/config/constants.js";
 import dns from "node:dns/promises";
+import http from "node:http";
 
 const healthyBody = {
   status: "ok",
@@ -100,6 +101,44 @@ test("poll rejects loopback destinations before making a request", async () => {
   assert.equal(result.ok, false);
   assert.equal(result.failureReason, FAILURE_REASONS.UNSAFE_DESTINATION);
   assert.equal(result.body, null);
+});
+
+test("HTTP request timings capture connect, TTFB, download, and partial timeout data", async (t) => {
+  const server = http.createServer((req, res) => {
+    setTimeout(
+      () => {
+        res.writeHead(200, { "content-type": "text/plain" });
+        res.end("timed response");
+      },
+      req.url === "/slow" ? 100 : 25,
+    );
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const address = server.address();
+  const url = new URL(`http://timing-test.invalid:${address.port}/fast`);
+  const result = await requestOnce(
+    url,
+    [{ address: "127.0.0.1", family: 4 }],
+    500,
+  );
+  assert.equal(result.status, 200);
+  assert.ok(result.timing.tcpConnectMs >= 0);
+  assert.ok(result.timing.ttfbMs >= 15);
+  assert.ok(result.timing.downloadMs >= 0);
+  assert.equal(result.timing.tlsHandshakeMs, null);
+  await assert.rejects(
+    requestOnce(
+      new URL(`http://timing-test.invalid:${address.port}/slow`),
+      [{ address: "127.0.0.1", family: 4 }],
+      30,
+    ),
+    (error) => {
+      assert.ok(error.timings.tcpConnectMs >= 0);
+      assert.equal(error.timings.ttfbMs, null);
+      return error.code === "ETIMEDOUT";
+    },
+  );
 });
 
 test("poll enforces a total timeout while DNS resolution is pending", async () => {

@@ -42,6 +42,14 @@ const healthCheckSchema = new mongoose.Schema(
       required: [true, "Response time is required"],
       min: [0, "Response time cannot be negative"],
     },
+    timings: {
+      dnsMs: { type: Number, default: null, min: 0 },
+      tcpConnectMs: { type: Number, default: null, min: 0 },
+      tlsHandshakeMs: { type: Number, default: null, min: 0 },
+      ttfbMs: { type: Number, default: null, min: 0 },
+      downloadMs: { type: Number, default: null, min: 0 },
+      totalMs: { type: Number, default: null, min: 0 },
+    },
     /** Interval in force for this sample; preserves estimates after edits. */
     intervalSeconds: { type: Number, min: 1, default: null },
     scheduled: { type: Boolean, default: true },

@@ -2,6 +2,7 @@ import dns from "node:dns/promises";
 import { isIP } from "node:net";
 import http from "node:http";
 import https from "node:https";
+import { performance } from "node:perf_hooks";
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
 import { FAILURE_REASONS } from "../config/constants.js";
@@ -118,14 +119,30 @@ const withTimeout = (promise, timeoutMs) =>
     );
   });
 
-const requestOnce = (url, addresses, timeoutMs) =>
+export const requestOnce = (url, addresses, timeoutMs) =>
   new Promise((resolve, reject) => {
     const transport = url.protocol === "https:" ? https : http;
     let settled = false;
+    const requestStarted = performance.now();
+    const timing = {
+      tcpConnectMs: null,
+      tlsHandshakeMs: null,
+      ttfbMs: null,
+      downloadMs: null,
+    };
+    let tlsStartedAt = null;
+    let bodyStartedAt = null;
     const done = (fn, value) => {
       if (settled) return;
       settled = true;
       clearTimeout(totalTimer);
+      if (fn === reject) {
+        if (tlsStartedAt != null && timing.tlsHandshakeMs == null)
+          timing.tlsHandshakeMs = performance.now() - tlsStartedAt;
+        if (bodyStartedAt != null && timing.downloadMs == null)
+          timing.downloadMs = performance.now() - bodyStartedAt;
+        value.timings = timing;
+      }
       fn(value);
     };
     let addressIndex = 0;
@@ -149,6 +166,8 @@ const requestOnce = (url, addresses, timeoutMs) =>
         },
       },
       (response) => {
+        timing.ttfbMs = performance.now() - requestStarted;
+        bodyStartedAt = performance.now();
         const chunks = [];
         let size = 0;
         response.on("data", (chunk) => {
@@ -173,11 +192,30 @@ const requestOnce = (url, addresses, timeoutMs) =>
             ),
             body: Buffer.concat(chunks).toString("utf8"),
             location: response.headers.location,
+            timing: {
+              ...timing,
+              downloadMs: performance.now() - bodyStartedAt,
+              totalMs: performance.now() - requestStarted,
+            },
           }),
         );
         response.on("error", (error) => done(reject, error));
       },
     );
+    request.on("socket", (socket) => {
+      const socketStarted = performance.now();
+      const connected = () => {
+        timing.tcpConnectMs = performance.now() - socketStarted;
+        if (url.protocol === "https:") {
+          tlsStartedAt = performance.now();
+          socket.once("secureConnect", () => {
+            timing.tlsHandshakeMs = performance.now() - tlsStartedAt;
+          });
+        }
+      };
+      if (socket.connecting) socket.once("connect", connected);
+      else connected();
+    });
     const totalTimer = setTimeout(() => {
       const error = Object.assign(new Error("Request timed out"), {
         code: "ETIMEDOUT",
@@ -195,9 +233,17 @@ const requestOnce = (url, addresses, timeoutMs) =>
   });
 
 const singlePoll = async (inputUrl, timeoutMs) => {
-  const startedAt = Date.now();
+  const startedAt = performance.now();
   let currentUrl;
-  let dnsDurationMs = 0;
+  const timings = {
+    dnsMs: 0,
+    tcpConnectMs: 0,
+    tlsHandshakeMs: 0,
+    ttfbMs: 0,
+    downloadMs: 0,
+    totalMs: 0,
+  };
+  const available = new Set();
   const redirects = [];
   try {
     currentUrl = new URL(inputUrl);
@@ -211,18 +257,22 @@ const singlePoll = async (inputUrl, timeoutMs) => {
       });
     }
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      const dnsStartedAt = Date.now();
-      const remainingMs = timeoutMs - (Date.now() - startedAt);
+      const dnsStartedAt = performance.now();
+      const remainingMs = timeoutMs - (performance.now() - startedAt);
       if (remainingMs <= 0)
         throw Object.assign(new Error("Request timed out"), {
           code: "ETIMEDOUT",
         });
-      const addresses = await withTimeout(
-        resolvePublicAddresses(currentUrl.hostname),
-        remainingMs,
-      );
-      dnsDurationMs += Date.now() - dnsStartedAt;
-      const requestBudgetMs = timeoutMs - (Date.now() - startedAt);
+      let addresses;
+      try {
+        addresses = await withTimeout(
+          resolvePublicAddresses(currentUrl.hostname),
+          remainingMs,
+        );
+      } finally {
+        timings.dnsMs += performance.now() - dnsStartedAt;
+      }
+      const requestBudgetMs = timeoutMs - (performance.now() - startedAt);
       if (requestBudgetMs <= 0)
         throw Object.assign(new Error("Request timed out"), {
           code: "ETIMEDOUT",
@@ -232,6 +282,17 @@ const singlePoll = async (inputUrl, timeoutMs) => {
         addresses,
         requestBudgetMs,
       );
+      for (const key of [
+        "tcpConnectMs",
+        "tlsHandshakeMs",
+        "ttfbMs",
+        "downloadMs",
+      ]) {
+        if (response.timing[key] != null) {
+          timings[key] += response.timing[key];
+          available.add(key);
+        }
+      }
       if (REDIRECTS.has(response.status) && response.location) {
         if (hop === MAX_REDIRECTS)
           throw Object.assign(new Error("Too many redirects"), {
@@ -254,7 +315,18 @@ const singlePoll = async (inputUrl, timeoutMs) => {
         currentUrl = nextUrl;
         continue;
       }
-      const responseTime = Date.now() - startedAt;
+      const responseTime = performance.now() - startedAt;
+      timings.totalMs = responseTime;
+      const serializedTimings = Object.fromEntries(
+        Object.entries(timings).map(([key, value]) => [
+          key,
+          key === "totalMs" ||
+          (key === "dnsMs" && timings.dnsMs > 0) ||
+          available.has(key)
+            ? Number(value.toFixed(2))
+            : null,
+        ]),
+      );
       let body = null;
       let failureReason = null;
       try {
@@ -276,16 +348,39 @@ const singlePoll = async (inputUrl, timeoutMs) => {
           statusText: null,
           headers: response.headers,
           redirects,
-          dns: { durationMs: dnsDurationMs },
-          timing: { totalMs: responseTime, dnsMs: dnsDurationMs },
+          dns: { durationMs: timings.dnsMs },
+          timing: serializedTimings,
         },
+        timings: serializedTimings,
       };
     }
     throw Object.assign(new Error("Too many redirects"), {
       code: "ERR_TOO_MANY_REDIRECTS",
     });
   } catch (error) {
-    const responseTime = Date.now() - startedAt;
+    for (const key of [
+      "tcpConnectMs",
+      "tlsHandshakeMs",
+      "ttfbMs",
+      "downloadMs",
+    ]) {
+      if (error.timings?.[key] != null) {
+        timings[key] += error.timings[key];
+        available.add(key);
+      }
+    }
+    const responseTime = performance.now() - startedAt;
+    timings.totalMs = responseTime;
+    const serializedTimings = Object.fromEntries(
+      Object.entries(timings).map(([key, value]) => [
+        key,
+        key === "totalMs" ||
+        (key === "dnsMs" && timings.dnsMs > 0) ||
+        available.has(key)
+          ? Number(value.toFixed(2))
+          : null,
+      ]),
+    );
     const errorCode = error.code || error.cause?.code || "UNKNOWN";
     const failureReason =
       errorCode === "ENOTFOUND" || errorCode === "EAI_AGAIN"
@@ -311,13 +406,14 @@ const singlePoll = async (inputUrl, timeoutMs) => {
         finalHost: currentUrl ? cleanHostname(currentUrl.hostname) : null,
         headers: {},
         redirects,
-        dns: { durationMs: dnsDurationMs },
-        timing: { totalMs: responseTime, dnsMs: dnsDurationMs },
+        dns: { durationMs: timings.dnsMs },
+        timing: serializedTimings,
         errorCode:
           errorCode === "ERR_BLOCKED_ADDRESS"
             ? "blocked_destination"
             : errorCode,
       },
+      timings: serializedTimings,
     };
   }
 };
@@ -362,6 +458,14 @@ export const poll = async (url, opts = {}) => {
       body: null,
       error: FAILURE_REASONS.TIMEOUT,
       failureReason: FAILURE_REASONS.TIMEOUT,
+      timings: {
+        dnsMs: null,
+        tcpConnectMs: null,
+        tlsHandshakeMs: null,
+        ttfbMs: null,
+        downloadMs: null,
+        totalMs: totalTimeout,
+      },
       diagnostics: {
         timing: { totalMs: totalTimeout },
         errorCode: "ETIMEDOUT",
