@@ -5,6 +5,7 @@ import { useNotificationsCenter } from "../../hooks/useNotifications";
 import { useSidebarLayout } from "../../hooks/useSidebarLayout";
 import OmniSearch from "./OmniSearch";
 import WorkspaceSidebar from "./WorkspaceSidebar";
+import { useTranslation } from "../../i18n";
 
 export default function AppLayout() {
   const location = useLocation();
@@ -12,6 +13,7 @@ export default function AppLayout() {
   const { user, isAdmin, logout } = useAuth();
   const { unreadTotal } = useNotificationsCenter();
   const { collapsed, mobileOpen, toggle, closeMobile } = useSidebarLayout();
+  const t = useTranslation();
 
   if (location.pathname === "/") return <Outlet />;
 
@@ -22,7 +24,7 @@ export default function AppLayout() {
       {mobileOpen && (
         <button
           className="sidebar-backdrop"
-          aria-label="Close navigation menu"
+          aria-label={t("Close navigation menu")}
           onClick={closeMobile}
         />
       )}
@@ -42,7 +44,7 @@ export default function AppLayout() {
           <button
             className="mobile-menu-toggle"
             onClick={toggle}
-            aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
+            aria-label={t(mobileOpen ? "Close navigation" : "Open navigation")}
           >
             {mobileOpen ? <X size={19} /> : <Menu size={19} />}
           </button>
@@ -51,7 +53,7 @@ export default function AppLayout() {
             <Link
               className={`notification-button${location.pathname === "/notifications" ? " selected" : ""}`}
               to={isAdmin ? "/admin/audit-logs" : "/notifications"}
-              aria-label={`${unreadTotal} unread notifications`}
+              aria-label={`${unreadTotal} ${t("unread notifications")}`}
               aria-current={
                 location.pathname === "/notifications" ? "page" : undefined
               }

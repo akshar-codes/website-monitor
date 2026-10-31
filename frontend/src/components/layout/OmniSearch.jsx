@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, X, ArrowUpRight } from "lucide-react";
+import { useTranslation } from "../../i18n";
 
 const destinations = [
   ["Dashboard", "/", "Overview and monitor health"],
@@ -20,6 +21,7 @@ const destinations = [
 ];
 
 export default function OmniSearch() {
+  const t = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
@@ -55,7 +57,7 @@ export default function OmniSearch() {
         onClick={() => setOpen(true)}
       >
         <Search size={16} />
-        <span>Search monitors, pages...</span>
+        <span>{t("Search monitors, pages...")}</span>
         <kbd>Ctrl K</kbd>
       </button>
       {open && (
@@ -69,7 +71,7 @@ export default function OmniSearch() {
             className="omni-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Search SiteWatch"
+            aria-label={t("Search SiteWatch")}
           >
             <div className="omni-input">
               <Search size={17} />
@@ -77,9 +79,12 @@ export default function OmniSearch() {
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search pages and actions..."
+                placeholder={t("Search pages and actions...")}
               />
-              <button onClick={() => setOpen(false)} aria-label="Close search">
+              <button
+                onClick={() => setOpen(false)}
+                aria-label={t("Close search")}
+              >
                 <X size={16} />
               </button>
             </div>
@@ -87,8 +92,8 @@ export default function OmniSearch() {
               {filtered.map(([name, path, hint]) => (
                 <button key={path} onClick={() => go(path)}>
                   <span>
-                    <b>{name}</b>
-                    <small>{hint}</small>
+                    <b>{t(name)}</b>
+                    <small>{t(hint)}</small>
                   </span>
                   <ArrowUpRight size={15} />
                 </button>

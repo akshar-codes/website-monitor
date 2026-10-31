@@ -22,6 +22,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { formatPlanName } from "../../utils/formatPlanName";
+import { useTranslation } from "../../i18n";
 
 const userLinks = [
   ["Dashboard", "/", LayoutDashboard],
@@ -61,6 +62,7 @@ export default function WorkspaceSidebar({
   incidentCount = 0,
   onSignOut,
 }) {
+  const t = useTranslation();
   const location = useLocation();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileWrapRef = useRef(null);
@@ -113,8 +115,10 @@ export default function WorkspaceSidebar({
         <button
           className="sidebar-toggle"
           onClick={onToggle}
-          aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
-          title={collapsed ? "Expand navigation" : "Collapse navigation"}
+          aria-label={t(
+            collapsed ? "Expand navigation" : "Collapse navigation",
+          )}
+          title={t(collapsed ? "Expand navigation" : "Collapse navigation")}
         >
           {collapsed ? (
             <PanelLeftOpen size={18} />
@@ -124,18 +128,18 @@ export default function WorkspaceSidebar({
         </button>
       </div>
 
-      <nav className="side-nav" aria-label="Main navigation">
+      <nav className="side-nav" aria-label={t("Main navigation")}>
         {links.map(([label, href, Icon]) => (
           <Link
             key={href}
             className={`nav-link ${isActive(href) ? "selected" : ""}`}
             to={href}
             onClick={closeMenus}
-            title={collapsed ? label : undefined}
+            title={collapsed ? t(label) : undefined}
             aria-current={isActive(href) ? "page" : undefined}
           >
             <Icon size={18} />
-            <span>{label}</span>
+            <span>{t(label)}</span>
             {label === "Incidents" && incidentCount > 0 && (
               <b className="nav-count">{incidentCount}</b>
             )}
@@ -145,13 +149,17 @@ export default function WorkspaceSidebar({
 
       <div className="sidebar-profile-wrap" ref={profileWrapRef}>
         {profileMenuOpen && (
-          <div className="profile-menu" role="menu" aria-label="Account menu">
+          <div
+            className="profile-menu"
+            role="menu"
+            aria-label={t("Account menu")}
+          >
             <div className="profile-menu-heading">
               <span className="avatar">{user?.name?.[0] || "A"}</span>
               <span>
                 <b>{user?.name || "Account"}</b>
                 <small>
-                  {user?.email || user?.plan || "Manage your account"}
+                  {user?.email || user?.plan || t("Manage your account")}
                 </small>
               </span>
             </div>
@@ -164,7 +172,7 @@ export default function WorkspaceSidebar({
                 onClick={closeMenus}
               >
                 <Icon size={16} />
-                <span>{label}</span>
+                <span>{t(label)}</span>
               </Link>
             ))}
             <button
@@ -176,7 +184,7 @@ export default function WorkspaceSidebar({
               }}
             >
               <LogOut size={16} />
-              <span>Sign out</span>
+              <span>{t("Sign out")}</span>
             </button>
           </div>
         )}

@@ -8,6 +8,7 @@ import {
   Bell,
   KeyRound,
 } from "lucide-react";
+import { useTranslation } from "../i18n";
 
 const links = [
   ["Account", "account", UserRound],
@@ -20,9 +21,10 @@ const links = [
 ];
 
 export default function SettingsLayout() {
+  const t = useTranslation();
   return (
     <div className="settings-route">
-      <nav className="settings-nav" aria-label="Settings sections">
+      <nav className="settings-nav" aria-label={t("Settings sections")}>
         {links.map(([label, path, Icon]) => (
           <NavLink
             key={path}
@@ -31,7 +33,7 @@ export default function SettingsLayout() {
             className={({ isActive }) => (isActive ? "active" : "")}
           >
             <Icon size={15} />
-            {label}
+            {t(label)}
           </NavLink>
         ))}
       </nav>
