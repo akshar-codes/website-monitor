@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   PieChart,
   Pie,
@@ -7,7 +8,13 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { useAdminDashboard } from "../hooks/useAdmin";
+import {
+  useAdminDashboard,
+  useAdminIncidents,
+  useUserList,
+} from "../hooks/useAdmin";
+import { useQuery } from "../hooks/useQuery";
+import * as healthApi from "../services/api/health";
 import {
   Page,
   Panel,
@@ -16,6 +23,7 @@ import {
   Status,
   Table,
   Select,
+  Input,
   Notice,
 } from "../components/ui/Primitives";
 import {
@@ -30,6 +38,8 @@ import {
 
 export default function AdminDashboard() {
   const [days, setDays] = useState(30);
+  const [incidentUserSearch, setIncidentUserSearch] = useState("");
+  const [selectedIncidentUser, setSelectedIncidentUser] = useState(null);
   // Keep the query key stable across renders. Recomputing `new Date()` here
   // changed the ISO strings on every render, causing useQuery to refetch
   // after every response and quickly exhaust the API rate limit.
@@ -42,6 +52,19 @@ export default function AdminDashboard() {
     };
   }, [days]);
   const { data, loading, error, refetch } = useAdminDashboard(params);
+  const siteHealthQuery = useQuery(() => healthApi.getHealth(), []);
+  const siteHealth = siteHealthQuery.data;
+  const userSearch = incidentUserSearch.trim();
+  const userSearchQuery = useUserList(
+    { search: userSearch, role: "user", limit: 8 },
+    userSearch.length >= 2 && !selectedIncidentUser,
+  );
+  const userSearchResults = userSearchQuery.data?.data || [];
+  const userIncidentsQuery = useAdminIncidents(
+    { ownerId: selectedIncidentUser?.id, activeOnly: true, page: 1, limit: 20 },
+    Boolean(selectedIncidentUser?.id),
+  );
+  const userIncidents = userIncidentsQuery.data?.data || [];
   const usersByPlan = Object.entries(data?.users?.byPlan || {}).map(
     ([name, stats]) => ({
       name,
@@ -51,14 +74,12 @@ export default function AdminDashboard() {
   );
   const statuses = Object.entries(data?.monitors?.statuses || {});
   const hasRows =
-    data?.recentRegistrations?.length ||
-    data?.incidents?.active?.length ||
-    data?.recentAdminActivity?.length;
+    data?.recentRegistrations?.length || data?.recentAdminActivity?.length;
 
   return (
     <Page
       title="Administration"
-      description="A live overview of users, monitors, incidents, and platform activity."
+      description="SiteWatch service health, customer accounts, and monitor operations."
       eyebrow="SITEWATCH CONTROL ROOM"
       actions={
         <>
@@ -93,10 +114,18 @@ export default function AdminDashboard() {
         />
         <Metric
           label="Active incidents"
-          value={data?.incidents?.activeCount ?? "—"}
+          value={
+            selectedIncidentUser
+              ? (userIncidentsQuery.data?.pagination?.total ?? 0)
+              : "—"
+          }
           icon={TriangleAlert}
           tone="red"
-          note="Need review"
+          note={
+            selectedIncidentUser
+              ? "For selected customer"
+              : "Select a customer below"
+          }
         />
         <Metric
           label="New registrations"
@@ -150,7 +179,43 @@ export default function AdminDashboard() {
             </div>
           )}
         </Panel>
-        <Panel title="Monitor status" subtitle="Current fleet health">
+        <Panel
+          title="SiteWatch service health"
+          subtitle="API and database status"
+        >
+          <div className="status-distribution">
+            <div>
+              <span>API server</span>
+              <Status value={siteHealth?.status === "ok" ? "up" : "unknown"} />
+            </div>
+            <div>
+              <span>Database</span>
+              <Status
+                value={siteHealth?.mongo === "connected" ? "up" : "unknown"}
+              />
+            </div>
+            <div>
+              <span>Service uptime</span>
+              <b>
+                {siteHealth?.uptime == null
+                  ? "—"
+                  : `${Math.floor(siteHealth.uptime / 3600)}h ${Math.floor((siteHealth.uptime % 3600) / 60)}m`}
+              </b>
+            </div>
+            <div>
+              <span>Environment</span>
+              <b>{siteHealth?.environment || "—"}</b>
+            </div>
+          </div>
+          {siteHealthQuery.error && (
+            <Notice tone="warning">
+              Could not read SiteWatch service health.
+            </Notice>
+          )}
+        </Panel>
+      </div>
+      <div className="two-panel-grid">
+        <Panel title="Monitor status" subtitle="Customer monitor fleet health">
           <div className="status-distribution">
             {statuses.map(([name, count]) => (
               <div key={name}>
@@ -160,22 +225,32 @@ export default function AdminDashboard() {
             ))}
           </div>
         </Panel>
-      </div>
-      <div className="two-panel-grid">
-        <Panel title="Recent registrations" subtitle="Latest accounts">
+        <Panel
+          title="Recent customers"
+          subtitle="Select a customer to view account details and monitors"
+          actions={
+            <Link className="sw-button secondary" to="/admin/users">
+              Manage all users
+            </Link>
+          }
+        >
           <Table
             columns={[
               {
                 key: "name",
                 label: "User",
                 render: (v, row) => (
-                  <>
+                  <Link
+                    to={`/admin/users/${row.id}`}
+                    className="admin-customer-link"
+                  >
                     <b>{v || row.email}</b>
                     <small className="table-secondary">{row.email}</small>
-                  </>
+                  </Link>
                 ),
               },
               { key: "plan", label: "Plan" },
+              { key: "monitorCount", label: "Monitors" },
               {
                 key: "createdAt",
                 label: "Joined",
@@ -185,37 +260,97 @@ export default function AdminDashboard() {
             rows={data?.recentRegistrations || []}
           />
         </Panel>
-        <Panel
-          title="Active incidents"
-          subtitle="Latest unresolved platform events"
-        >
-          <Table
-            columns={[
-              {
-                key: "monitor",
-                label: "Monitor",
-                render: (v, row) => v?.name || row.monitorName || "—",
-              },
-              {
-                key: "title",
-                label: "Incident",
-                render: (v, row) => v || row.message || "Service interruption",
-              },
-              {
-                key: "severity",
-                label: "Severity",
-                render: (v) => <Status value={v} />,
-              },
-              {
-                key: "createdAt",
-                label: "Started",
-                render: (v) => (v ? new Date(v).toLocaleString() : "—"),
-              },
-            ]}
-            rows={data?.incidents?.active || []}
-          />
-        </Panel>
       </div>
+      <Panel
+        title="Customer incidents"
+        subtitle={
+          selectedIncidentUser
+            ? `Active incidents for ${selectedIncidentUser.name || selectedIncidentUser.email}`
+            : "Search for a customer to inspect their active monitor incidents"
+        }
+      >
+        <Input
+          aria-label="Search customer accounts"
+          placeholder="Search customer name or email"
+          value={
+            selectedIncidentUser
+              ? selectedIncidentUser.email
+              : incidentUserSearch
+          }
+          onChange={(event) => {
+            setSelectedIncidentUser(null);
+            setIncidentUserSearch(event.target.value);
+          }}
+        />
+        {selectedIncidentUser && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setSelectedIncidentUser(null);
+              setIncidentUserSearch("");
+            }}
+          >
+            Clear customer
+          </Button>
+        )}
+        {!selectedIncidentUser && userSearch.length >= 2 && (
+          <div className="admin-customer-search-results">
+            {userSearchQuery.loading ? (
+              <div className="sw-loading">Searching customers...</div>
+            ) : userSearchResults.length ? (
+              userSearchResults.map((user) => (
+                <button
+                  type="button"
+                  key={user.id}
+                  onClick={() => setSelectedIncidentUser(user)}
+                >
+                  <b>{user.name || "Unnamed customer"}</b>
+                  <span>{user.email}</span>
+                </button>
+              ))
+            ) : (
+              <small>No matching customer accounts.</small>
+            )}
+          </div>
+        )}
+        {selectedIncidentUser && userIncidentsQuery.loading && (
+          <div className="sw-loading">Loading customer incidents...</div>
+        )}
+        <Table
+          columns={[
+            {
+              key: "monitor",
+              label: "Monitor",
+              render: (v, row) => v?.name || row.monitorName || "—",
+            },
+            {
+              key: "title",
+              label: "Incident",
+              render: (v, row) =>
+                v ||
+                row.rootCause ||
+                row.triggerCheck?.failureReason ||
+                "Service interruption",
+            },
+            {
+              key: "severity",
+              label: "Severity",
+              render: (v) => <Status value={v} />,
+            },
+            {
+              key: "startedAt",
+              label: "Started",
+              render: (v) => (v ? new Date(v).toLocaleString() : "—"),
+            },
+          ]}
+          rows={selectedIncidentUser ? userIncidents : []}
+          empty={
+            selectedIncidentUser
+              ? "This customer has no active incidents."
+              : "Search for and select a customer to view incidents."
+          }
+        />
+      </Panel>
       <Panel
         title="Recent administrator activity"
         subtitle="Audit trail of privileged actions"

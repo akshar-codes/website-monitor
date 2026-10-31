@@ -222,7 +222,8 @@ export default function AdminPlanRequests() {
                         {request.status === "pending" && (
                           <div className="row-actions">
                             <button
-                              title="Approve"
+                              aria-label="Approve"
+                              data-tooltip="Approve"
                               disabled={
                                 !billingSettingsLoaded ||
                                 (paymentMode &&
@@ -234,7 +235,8 @@ export default function AdminPlanRequests() {
                               <Check size={14} />
                             </button>
                             <button
-                              title="Reject"
+                              aria-label="Reject"
+                              data-tooltip="Reject"
                               onClick={() => openRejection(request)}
                             >
                               <X size={14} />

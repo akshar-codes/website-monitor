@@ -310,13 +310,18 @@ export default function AdminUsers() {
                       </td>
                       <td>
                         <div className="row-actions">
-                          <Link title="Details" to={`/admin/users/${id}`}>
+                          <Link
+                            aria-label="Details"
+                            data-tooltip="Details"
+                            to={`/admin/users/${id}`}
+                          >
                             <ExternalLink size={14} />
                           </Link>
                           {id !== currentUser?.id && (
                             <>
                               <button
-                                title="Change role"
+                                aria-label="Change role"
+                                data-tooltip="Change role"
                                 onClick={() =>
                                   setPendingRoleChange({
                                     user,
@@ -330,28 +335,32 @@ export default function AdminUsers() {
                                 <Shield size={14} />
                               </button>
                               <button
-                                title="Change plan"
+                                aria-label="Change plan"
+                                data-tooltip="Change plan"
                                 onClick={() => setPendingPlanChange(user)}
                               >
                                 <CreditCard size={14} />
                               </button>
                               {user.active ? (
                                 <button
-                                  title="Suspend"
+                                  aria-label="Suspend"
+                                  data-tooltip="Suspend"
                                   onClick={() => setPendingSuspend(user)}
                                 >
                                   <Ban size={14} />
                                 </button>
                               ) : (
                                 <button
-                                  title="Reactivate"
+                                  aria-label="Reactivate"
+                                  data-tooltip="Reactivate"
                                   onClick={() => setPendingReactivate(user)}
                                 >
                                   <CheckCircle2 size={14} />
                                 </button>
                               )}
                               <button
-                                title="Delete"
+                                aria-label="Delete"
+                                data-tooltip="Delete"
                                 onClick={() => setPendingDelete(user)}
                               >
                                 <Trash2 size={14} />

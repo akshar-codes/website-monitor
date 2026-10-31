@@ -2834,6 +2834,34 @@ for (const [language, copy] of Object.entries(commonCopy)) {
     localeCopy[language],
   );
 }
+Object.assign(translations.es, {
+  "Good afternoon,": "Buenas tardes,",
+  "Good evening,": "Buenas noches,",
+});
+Object.assign(translations.fr, {
+  "Good afternoon,": "Bon après-midi,",
+  "Good evening,": "Bonsoir,",
+});
+Object.assign(translations.de, {
+  "Good afternoon,": "Guten Tag,",
+  "Good evening,": "Guten Abend,",
+});
+Object.assign(translations.pt, {
+  "Good afternoon,": "Boa tarde,",
+  "Good evening,": "Boa noite,",
+});
+Object.assign(translations.hi, {
+  "Good afternoon,": "नमस्कार,",
+  "Good evening,": "शुभ संध्या,",
+});
+Object.assign(translations.ja, {
+  "Good afternoon,": "こんにちは、",
+  "Good evening,": "こんばんは、",
+});
+Object.assign(translations.zh, {
+  "Good afternoon,": "下午好，",
+  "Good evening,": "晚上好，",
+});
 export const japaneseTranslations = translations.ja;
 
 export function translate(value, language = "en") {
@@ -2860,7 +2888,13 @@ export function translateNode(node, language) {
       return child;
     if (typeof child.props.children === "function") return child;
     const translatedProps = {};
-    for (const prop of ["aria-label", "title", "placeholder", "alt"]) {
+    for (const prop of [
+      "aria-label",
+      "title",
+      "data-tooltip",
+      "placeholder",
+      "alt",
+    ]) {
       if (typeof child.props[prop] === "string") {
         translatedProps[prop] = translate(child.props[prop], language);
       }

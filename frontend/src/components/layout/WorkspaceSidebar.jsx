@@ -118,7 +118,9 @@ export default function WorkspaceSidebar({
           aria-label={t(
             collapsed ? "Expand navigation" : "Collapse navigation",
           )}
-          title={t(collapsed ? "Expand navigation" : "Collapse navigation")}
+          data-tooltip={t(
+            collapsed ? "Expand navigation" : "Collapse navigation",
+          )}
         >
           {collapsed ? (
             <PanelLeftOpen size={18} />
@@ -135,7 +137,7 @@ export default function WorkspaceSidebar({
             className={`nav-link ${isActive(href) ? "selected" : ""}`}
             to={href}
             onClick={closeMenus}
-            title={collapsed ? t(label) : undefined}
+            data-tooltip={collapsed ? t(label) : undefined}
             aria-current={isActive(href) ? "page" : undefined}
           >
             <Icon size={18} />
@@ -193,7 +195,8 @@ export default function WorkspaceSidebar({
           aria-haspopup="menu"
           aria-expanded={profileMenuOpen}
           onClick={() => setProfileMenuOpen((open) => !open)}
-          title={collapsed ? user?.name || "Account" : undefined}
+          aria-label={user?.name || t("Account")}
+          data-tooltip={collapsed ? user?.name || t("Account") : undefined}
         >
           <span className="avatar">{user?.name?.[0] || "A"}</span>
           <span>

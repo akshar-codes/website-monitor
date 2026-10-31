@@ -204,7 +204,7 @@ export default {
   Failure: "Shippai",
   Open: "Mi kaiketsu",
   Investigating: "Chosa chu",
-  Resolved: "Kaiketsu",
+  Resolved: "Kaiketsu zumi",
   Critical: "Judai",
   High: "Ko",
   Medium: "Naka",
@@ -353,4 +353,6 @@ export default {
   "unread notifications": "Ken no midoku tsuchi",
   "Building comparison…": "Hikaku o sakusei chu …",
   "Japanese (Romaji)": "Nihongo (Romaji)",
+  "Good afternoon,": "Konnichiwa,",
+  "Good evening,": "Kombanwa,",
 };

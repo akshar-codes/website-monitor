@@ -126,14 +126,16 @@ export default function ApiKeysSettings() {
       render: (_, row) => (
         <div className="row-actions">
           <button
-            title="Revoke"
+            aria-label="Revoke"
+            data-tooltip="Revoke"
             disabled={!!row.revokedAt}
             onClick={() => setSelected({ key: row, action: "revoke" })}
           >
             <ShieldAlert size={14} />
           </button>
           <button
-            title="Delete"
+            aria-label="Delete"
+            data-tooltip="Delete"
             onClick={() => setSelected({ key: row, action: "delete" })}
           >
             <Trash2 size={14} />

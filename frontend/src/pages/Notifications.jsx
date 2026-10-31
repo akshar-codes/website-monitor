@@ -155,14 +155,19 @@ export default function Notifications() {
                 <div className="notification-actions">
                   {!item.read && (
                     <button
-                      title="Mark read"
+                      aria-label="Mark read"
+                      data-tooltip="Mark read"
                       disabled={submittingId === item.id}
                       onClick={() => markAsRead(item.id || item._id)}
                     >
                       <MailOpen size={15} />
                     </button>
                   )}
-                  <button title="Delete" onClick={() => setDeleteTarget(item)}>
+                  <button
+                    aria-label="Delete"
+                    data-tooltip="Delete"
+                    onClick={() => setDeleteTarget(item)}
+                  >
                     <Trash2 size={15} />
                   </button>
                 </div>
