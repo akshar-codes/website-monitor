@@ -23,6 +23,8 @@ import {
 import { getOwnedMonitorIds } from "./monitor.service.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { FEATURES, hasFeature } from "../config/features.js";
+import { estimatePercentile } from "../utils/latencyHistogram.js";
+import PerformanceAlertState from "../models/PerformanceAlertState.js";
 
 const resolveOwnerObjectId = (user) =>
   new mongoose.Types.ObjectId(user.id || user._id);
@@ -504,6 +506,7 @@ const aggregateHourlyHealthCheckBuckets = (monitorId, since, until = null) =>
         degradedChecks: 1,
         scheduledChecks: 1,
         unknownChecks: 1,
+        latencyHistograms: 1,
       },
     },
     { $sort: { _id: 1 } },
@@ -750,6 +753,7 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
         minResponseTime: { $min: "$minResponseTime" },
         maxResponseTime: { $max: "$maxResponseTime" },
         responseTimeBuckets: { $push: "$responseTimeBuckets" },
+        latencyHistograms: { $push: "$latencyHistograms" },
       },
     },
   ]);
@@ -782,6 +786,19 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
       minResponseTime: 0,
       maxResponseTime: 0,
       p95ResponseTime: 0,
+      p50ResponseTime: null,
+      p99ResponseTime: null,
+      responseTimeSampleCount: 0,
+      latencyPercentiles: {
+        estimate: "histogram_bucket_upper_bound",
+        responseTime: { sampleCount: 0, p50: null, p95: null, p99: null },
+        timings: Object.fromEntries(
+          ["dns", "tcpConnect", "tlsHandshake", "ttfb"].map((metric) => [
+            metric,
+            { sampleCount: 0, p50: null, p95: null },
+          ]),
+        ),
+      },
       downtimeSeconds: 0,
       estimatedDowntimeSeconds: 0,
       degradedSeconds: 0,
@@ -828,6 +845,39 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
     }
   }
 
+  const mergedHistograms = {};
+  for (const document of result.latencyHistograms || []) {
+    for (const [metric, histogram] of Object.entries(document || {})) {
+      if (metric === "version" || !histogram) continue;
+      const target = (mergedHistograms[metric] ||= {
+        sampleCount: 0,
+        buckets: {},
+      });
+      target.sampleCount += histogram.sampleCount || 0;
+      for (const [bucket, count] of Object.entries(histogram.buckets || {}))
+        target.buckets[bucket] = (target.buckets[bucket] || 0) + count;
+    }
+  }
+  const responseDistribution = mergedHistograms.responseTime || {
+    sampleCount: 0,
+    buckets: {},
+  };
+  const percentile = (metric, p) =>
+    estimatePercentile(mergedHistograms[metric], p);
+  const p50ResponseTime = percentile("responseTime", 0.5);
+  const p95Estimate = percentile("responseTime", 0.95);
+  const p99ResponseTime = percentile("responseTime", 0.99);
+  const timings = Object.fromEntries(
+    ["dnsMs", "tcpConnectMs", "tlsHandshakeMs", "ttfbMs"].map((metric) => [
+      metric.replace("Ms", ""),
+      {
+        sampleCount: mergedHistograms[metric]?.sampleCount || 0,
+        p50: percentile(metric, 0.5),
+        p95: percentile(metric, 0.95),
+      },
+    ]),
+  );
+
   return {
     totalChecks: result.totalChecks,
     successfulChecks: result.successfulChecks,
@@ -861,7 +911,20 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
     ),
     minResponseTime: result.minResponseTime || 0,
     maxResponseTime: result.maxResponseTime || 0,
-    p95ResponseTime: Math.round(p95ResponseTime),
+    p95ResponseTime: Math.round(p95Estimate ?? p95ResponseTime),
+    p50ResponseTime,
+    p99ResponseTime,
+    responseTimeSampleCount: responseDistribution.sampleCount,
+    latencyPercentiles: {
+      estimate: "histogram_bucket_upper_bound",
+      responseTime: {
+        sampleCount: responseDistribution.sampleCount,
+        p50: p50ResponseTime,
+        p95: p95Estimate,
+        p99: p99ResponseTime,
+      },
+      timings,
+    },
     downtimeSeconds: Math.min(
       Math.round(eligibleSeconds),
       Math.round(result.estimatedDownSeconds || 0),
@@ -936,6 +999,23 @@ const computeAvailabilityBreakdown = async (monitorId, startDate, endDate) => {
   };
 };
 
+const summarizeTimingHistograms = (histograms = {}) =>
+  Object.fromEntries(
+    [
+      ["dns", "dnsMs"],
+      ["tcpConnect", "tcpConnectMs"],
+      ["tlsHandshake", "tlsHandshakeMs"],
+      ["ttfb", "ttfbMs"],
+    ].map(([name, metric]) => [
+      name,
+      {
+        sampleCount: histograms[metric]?.sampleCount || 0,
+        p50: estimatePercentile(histograms[metric], 0.5),
+        p95: estimatePercentile(histograms[metric], 0.95),
+      },
+    ]),
+  );
+
 /** Hourly chart series for short (<=2 day) analytics ranges — reuses the
  * shared bucket aggregation, sourced from raw HealthCheck documents. */
 const computeHourlyChart = async (
@@ -975,6 +1055,19 @@ const computeHourlyChart = async (
     points.push({
       timestamp,
       avgResponseTime: Number((bucket?.avgResponseTime || 0).toFixed(2)),
+      phaseTimings: summarizeTimingHistograms(bucket?.latencyHistograms),
+      p50ResponseTime: estimatePercentile(
+        bucket?.latencyHistograms?.responseTime,
+        0.5,
+      ),
+      p95ResponseTime: estimatePercentile(
+        bucket?.latencyHistograms?.responseTime,
+        0.95,
+      ),
+      p99ResponseTime: estimatePercentile(
+        bucket?.latencyHistograms?.responseTime,
+        0.99,
+      ),
       uptimePercentage: bucket?.totalChecks
         ? Number(
             ((bucket.successfulChecks / bucket.totalChecks) * 100).toFixed(2),
@@ -1020,6 +1113,19 @@ const computeDailyChart = async (monitorId, startDate, endDate) => {
     points.push({
       timestamp: day,
       avgResponseTime: stat?.avgResponseTime || 0,
+      phaseTimings: summarizeTimingHistograms(stat?.latencyHistograms),
+      p50ResponseTime: estimatePercentile(
+        stat?.latencyHistograms?.responseTime,
+        0.5,
+      ),
+      p95ResponseTime: estimatePercentile(
+        stat?.latencyHistograms?.responseTime,
+        0.95,
+      ),
+      p99ResponseTime: estimatePercentile(
+        stat?.latencyHistograms?.responseTime,
+        0.99,
+      ),
       uptimePercentage: stat?.totalChecks ? stat.uptimePercentage : null,
       totalChecks: stat?.totalChecks || 0,
       successfulChecks: stat?.successfulChecks || 0,
@@ -1043,7 +1149,7 @@ export const getMonitorAnalytics = async (monitorId, query, user) => {
   const id = new mongoose.Types.ObjectId(monitorId);
 
   const monitor = await Monitor.findOne({ _id: id, owner: ownerId })
-    .select("name url interval active createdAt")
+    .select("name url interval active createdAt performanceAlerts owner")
     .lean();
   if (!monitor) {
     throw ApiError.notFound(`Monitor not found with id: ${monitorId}`);
@@ -1053,12 +1159,16 @@ export const getMonitorAnalytics = async (monitorId, query, user) => {
   const spanDays = daysBetween(startDate, endDate);
   const granularity = spanDays <= 2 ? "hourly" : "daily";
 
-  const [overview, availability, chart] = await Promise.all([
+  const [overview, availability, chart, performanceAlert] = await Promise.all([
     computeOverviewStats(id, monitor, startDate, endDate),
     computeAvailabilityBreakdown(id, startDate, endDate),
     granularity === "hourly"
       ? computeHourlyChart(id, startDate, endDate, monitor.interval)
       : computeDailyChart(id, startDate, endDate),
+    PerformanceAlertState.findOne({
+      monitor: id,
+      metric: "responseTime",
+    }).lean(),
   ]);
 
   return {
@@ -1076,6 +1186,26 @@ export const getMonitorAnalytics = async (monitorId, query, user) => {
       granularity,
     },
     overview,
+    performanceAlert: performanceAlert
+      ? {
+          status:
+            performanceAlert.baselineMedianMs == null
+              ? "warming_up"
+              : performanceAlert.status,
+          baselineMedianMs: performanceAlert.baselineMedianMs,
+          baselineMadMs: performanceAlert.baselineMadMs,
+          consecutiveBreaches: performanceAlert.consecutiveBreaches,
+          consecutiveRecoveries: performanceAlert.consecutiveRecoveries,
+          settings: monitor.performanceAlerts,
+        }
+      : {
+          status: "warming_up",
+          baselineMedianMs: null,
+          baselineMadMs: null,
+          consecutiveBreaches: 0,
+          consecutiveRecoveries: 0,
+          settings: monitor.performanceAlerts,
+        },
     availability,
     chart,
   };

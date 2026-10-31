@@ -18,6 +18,8 @@ const alertPreferenceKey = (type) => {
   if (type === "monitor_down" || type === "monitor_degraded")
     return "monitorDown";
   if (type === "monitor_up") return "monitorRecovery";
+  if (["performance_degraded", "performance_recovered"].includes(type))
+    return "performanceAlerts";
   if (
     [
       "ssl_expiring_soon",
@@ -45,9 +47,13 @@ const alertPreferenceKey = (type) => {
   return "systemAnnouncements";
 };
 const emailPreferenceKey = (type) =>
-  ["monitorDown", "monitorRecovery", "sslExpiry", "incidents"].includes(
-    alertPreferenceKey(type),
-  )
+  [
+    "monitorDown",
+    "monitorRecovery",
+    "performanceAlerts",
+    "sslExpiry",
+    "incidents",
+  ].includes(alertPreferenceKey(type))
     ? alertPreferenceKey(type)
     : null;
 
@@ -325,6 +331,8 @@ export const dispatchNotificationDigests = async () => {
     "monitor_degraded",
     "incident_opened",
     "incident_resolved",
+    "performance_degraded",
+    "performance_recovered",
     "ssl_expiring_soon",
     "ssl_expired",
     "ssl_invalid",

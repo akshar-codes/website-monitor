@@ -96,6 +96,10 @@ export const getUsageForUser = async (user) => {
         FEATURES.UNLIMITED_MONITORS,
       ),
       [FEATURES.FAST_POLLING]: hasFeature(plan, FEATURES.FAST_POLLING),
+      [FEATURES.PERFORMANCE_ALERT_CONFIG]: hasFeature(
+        plan,
+        FEATURES.PERFORMANCE_ALERT_CONFIG,
+      ),
     },
   };
 };

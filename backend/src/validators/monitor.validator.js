@@ -36,6 +36,15 @@ const intervalField = z
   });
 
 const activeField = z.boolean();
+const performanceAlertsField = z
+  .object({
+    enabled: z.boolean().optional(),
+    sensitivity: z.enum(["low", "normal", "high"]).optional(),
+    thresholdMultiplier: z.number().min(1.1).max(5).optional(),
+    consecutiveBreaches: z.number().int().min(2).max(10).optional(),
+    cooldownMinutes: z.number().int().min(5).max(1440).optional(),
+  })
+  .strict();
 
 // ── Create schema — all required fields ──
 
@@ -54,6 +63,7 @@ export const updateMonitorSchema = z
     url: urlField.optional(),
     interval: intervalField.optional(),
     active: activeField.optional(),
+    performanceAlerts: performanceAlertsField.optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided for update",

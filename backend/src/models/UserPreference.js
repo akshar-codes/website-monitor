@@ -72,6 +72,7 @@ const notificationPreferencesSchema = new mongoose.Schema(
     inApp: {
       monitorDown: { type: Boolean, default: true },
       monitorRecovery: { type: Boolean, default: true },
+      performanceAlerts: { type: Boolean, default: true },
       sslExpiry: { type: Boolean, default: true },
       incidents: { type: Boolean, default: true },
       billing: { type: Boolean, default: true },
@@ -82,6 +83,7 @@ const notificationPreferencesSchema = new mongoose.Schema(
       enabled: { type: Boolean, default: false },
       monitorDown: { type: Boolean, default: true },
       monitorRecovery: { type: Boolean, default: true },
+      performanceAlerts: { type: Boolean, default: true },
       sslExpiry: { type: Boolean, default: true },
       incidents: { type: Boolean, default: true },
       enabledAt: { type: Date, default: null },

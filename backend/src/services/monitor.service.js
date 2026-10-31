@@ -3,8 +3,11 @@ import HealthCheck from "../models/HealthCheck.js";
 import DailyStat from "../models/DailyStat.js";
 import Incident from "../models/Incident.js";
 import StatusPage from "../models/StatusPage.js";
+import HourlyStat from "../models/HourlyStat.js";
+import PerformanceAlertState from "../models/PerformanceAlertState.js";
 import ApiError from "../utils/ApiError.js";
 import { ROLES } from "../config/constants.js";
+import { hasFeature, FEATURES } from "../config/features.js";
 import {
   isIntervalAllowedForPlan,
   getMinCheckInterval,
@@ -183,6 +186,19 @@ export const getMonitorDiagnostics = async (id, user) => {
 export const updateMonitor = async (id, data, user) => {
   const ownerId = resolveOwnerId(user);
 
+  if (data.performanceAlerts) {
+    const configurable = Object.keys(data.performanceAlerts).some(
+      (key) => key !== "enabled",
+    );
+    if (
+      configurable &&
+      !hasFeature(user.plan, FEATURES.PERFORMANCE_ALERT_CONFIG)
+    )
+      throw ApiError.upgradeRequired(
+        "Configurable performance alert sensitivity is available on Pro and Enterprise.",
+      );
+  }
+
   if (data.interval !== undefined) {
     assertIntervalAllowedForPlan(user.plan, data.interval);
   }
@@ -283,6 +299,8 @@ export const deleteMonitor = async (id, user) => {
   await Promise.all([
     HealthCheck.deleteMany({ monitor: monitor._id }),
     DailyStat.deleteMany({ monitor: monitor._id }),
+    HourlyStat.deleteMany({ monitor: monitor._id }),
+    PerformanceAlertState.deleteMany({ monitor: monitor._id }),
     Incident.deleteMany({ monitor: monitor._id }),
     StatusPage.updateMany(
       { "services.monitor": monitor._id },

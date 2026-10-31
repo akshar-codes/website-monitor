@@ -14,6 +14,7 @@ export const FEATURES = Object.freeze({
   UNLIMITED_MONITORS: "unlimitedMonitors",
   FAST_POLLING: "fastPolling",
   RESPONSE_INSPECTION: "responseInspection",
+  PERFORMANCE_ALERT_CONFIG: "performanceAlertConfig",
 });
 
 const FEATURE_CHECKS = Object.freeze({
@@ -41,6 +42,10 @@ const FEATURE_CHECKS = Object.freeze({
 
   // Inspecting saved endpoint response data is available from Pro upward.
   [FEATURES.RESPONSE_INSPECTION]: (plan) => {
+    const definition = getPlanDefinition(plan);
+    return !!definition && definition.rank >= 1;
+  },
+  [FEATURES.PERFORMANCE_ALERT_CONFIG]: (plan) => {
     const definition = getPlanDefinition(plan);
     return !!definition && definition.rank >= 1;
   },

@@ -54,6 +54,17 @@ const monitorSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    performanceAlerts: {
+      enabled: { type: Boolean, default: true },
+      sensitivity: {
+        type: String,
+        enum: ["low", "normal", "high"],
+        default: "normal",
+      },
+      thresholdMultiplier: { type: Number, min: 1.1, max: 5, default: null },
+      consecutiveBreaches: { type: Number, min: 2, max: 10, default: 3 },
+      cooldownMinutes: { type: Number, min: 5, max: 1440, default: 30 },
+    },
 
     // ── Worker fields (health checks) ──
 

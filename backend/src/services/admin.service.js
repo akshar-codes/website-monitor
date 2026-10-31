@@ -5,6 +5,8 @@ import HealthCheck from "../models/HealthCheck.js";
 import Incident from "../models/Incident.js";
 import Activity from "../models/Activity.js";
 import DailyStat from "../models/DailyStat.js";
+import HourlyStat from "../models/HourlyStat.js";
+import PerformanceAlertState from "../models/PerformanceAlertState.js";
 import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
 import { escapeRegExp } from "../utils/regex.js";
@@ -555,6 +557,8 @@ export const deleteUser = async (targetUserId, actingUser) => {
       HealthCheck.deleteMany({ monitor: { $in: ownedMonitorIds } }),
       Incident.deleteMany({ monitor: { $in: ownedMonitorIds } }),
       DailyStat.deleteMany({ monitor: { $in: ownedMonitorIds } }),
+      HourlyStat.deleteMany({ monitor: { $in: ownedMonitorIds } }),
+      PerformanceAlertState.deleteMany({ monitor: { $in: ownedMonitorIds } }),
     ]);
     await Monitor.deleteMany({ owner: targetUserId });
   }

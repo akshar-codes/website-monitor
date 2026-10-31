@@ -26,6 +26,7 @@ import {
 } from "../src/services/statusPage.service.js";
 import StatusSubscriber from "../src/models/StatusSubscriber.js";
 import StatusDelivery from "../src/models/StatusDelivery.js";
+import PerformanceAlertState from "../src/models/PerformanceAlertState.js";
 import Monitor from "../src/models/Monitor.js";
 import { syncMonitorIncident } from "../src/services/statusIncidentSync.service.js";
 import express from "express";
@@ -33,6 +34,17 @@ import statusPageRoutes from "../src/routes/statusPage.routes.js";
 import publicStatusRoutes from "../src/routes/publicStatus.routes.js";
 import errorHandler from "../src/middlewares/errorHandler.js";
 import { deliverBatch } from "../src/workers/statusNotificationWorker.js";
+import {
+  buildLatencyHistograms,
+  estimatePercentile,
+} from "../src/utils/latencyHistogram.js";
+import {
+  median,
+  medianAbsoluteDeviation,
+  evaluatePerformanceCheck,
+} from "../src/services/performanceAnomaly.service.js";
+import { updateMonitorSchema } from "../src/validators/monitor.validator.js";
+import { FEATURES, hasFeature } from "../src/config/features.js";
 import {
   enqueueStatusEvent,
   tokenHash,
@@ -550,4 +562,134 @@ test("management APIs enforce permissions while public status routes remain unau
   }
   const publicResponse = await fetch(`${url}/api/public/status/not_a_slug`);
   assert.equal(publicResponse.status, 400);
+});
+
+test("versioned latency histograms estimate percentiles using eligible samples only", () => {
+  const histogram = buildLatencyHistograms([
+    {
+      responseTime: 12,
+      httpStatus: 200,
+      timings: { dnsMs: 5, tlsHandshakeMs: null },
+    },
+    {
+      responseTime: 88,
+      httpStatus: 200,
+      diagnostics: { dns: { durationMs: 8 } },
+    },
+    { responseTime: 900, httpStatus: null, timings: { dnsMs: 10 } },
+  ]);
+  assert.equal(histogram.version, 2);
+  assert.equal(histogram.responseTime.sampleCount, 2);
+  assert.equal(estimatePercentile(histogram.responseTime, 0.5), 20);
+  assert.equal(histogram.dnsMs.sampleCount, 3);
+  assert.equal(histogram.tlsHandshakeMs.sampleCount, 0);
+  assert.equal(estimatePercentile(histogram.tlsHandshakeMs, 0.95), null);
+});
+
+test("monitor performance alert settings validate ranges and gate advanced controls by plan", () => {
+  assert.equal(
+    updateMonitorSchema.safeParse({
+      performanceAlerts: {
+        enabled: false,
+        sensitivity: "high",
+        consecutiveBreaches: 3,
+        cooldownMinutes: 30,
+      },
+    }).success,
+    true,
+  );
+  assert.equal(
+    updateMonitorSchema.safeParse({
+      performanceAlerts: { thresholdMultiplier: 0.5 },
+    }).success,
+    false,
+  );
+  assert.equal(
+    hasFeature(PLANS.FREE, FEATURES.PERFORMANCE_ALERT_CONFIG),
+    false,
+  );
+  assert.equal(hasFeature(PLANS.PRO, FEATURES.PERFORMANCE_ALERT_CONFIG), true);
+});
+
+test("anomaly detector requires sustained breaches, supports recovery, and ignores manual checks", async (t) => {
+  assert.equal(median([1, 3, 2, 4]), 2.5);
+  assert.equal(medianAbsoluteDeviation([1, 2, 3, 4, 5]), 1);
+  const state = {
+    _id: "state",
+    status: "normal",
+    baselineMedianMs: 200,
+    baselineMadMs: 0,
+    baselineSamples: Array(20).fill(200),
+    recentSamples: [],
+    consecutiveBreaches: 0,
+    consecutiveRecoveries: 0,
+    save: async () => {},
+  };
+  t.mock.method(PerformanceAlertState, "findOneAndUpdate", async () => state);
+  t.mock.method(HealthCheck, "find", () => ({
+    sort() {
+      return this;
+    },
+    limit() {
+      return this;
+    },
+    select() {
+      return this;
+    },
+    lean: async () => [],
+  }));
+  const notifications = [];
+  const deps = {
+    createNotification: async (notification) =>
+      notifications.push(notification),
+  };
+  const monitor = {
+    _id: "64b000000000000000000040",
+    owner: "64b000000000000000000041",
+    name: "API",
+    performanceAlerts: { enabled: true, sensitivity: "normal" },
+  };
+  assert.equal(
+    await evaluatePerformanceCheck(
+      monitor,
+      { _id: "manual", scheduled: false, httpStatus: 200, responseTime: 900 },
+      deps,
+    ),
+    null,
+  );
+  for (let i = 0; i < 3; i += 1)
+    await evaluatePerformanceCheck(
+      monitor,
+      {
+        _id: `slow-${i}`,
+        scheduled: true,
+        httpStatus: 200,
+        responseTime: 600,
+        checkedAt: new Date(Date.now() + i),
+      },
+      deps,
+    );
+  assert.equal(state.status, "degraded");
+  assert.equal(
+    notifications.filter((item) => item.type === "performance_degraded").length,
+    1,
+  );
+  for (let i = 0; i < 5; i += 1)
+    await evaluatePerformanceCheck(
+      monitor,
+      {
+        _id: `recovery-${i}`,
+        scheduled: true,
+        httpStatus: 200,
+        responseTime: 200,
+        checkedAt: new Date(Date.now() + 100 + i),
+      },
+      deps,
+    );
+  assert.equal(state.status, "normal");
+  assert.equal(
+    notifications.filter((item) => item.type === "performance_recovered")
+      .length,
+    1,
+  );
 });

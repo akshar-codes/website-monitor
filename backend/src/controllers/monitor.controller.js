@@ -73,6 +73,7 @@ export const manualHealthCheck = asyncHandler(async (req, res) => {
     backendStatus: classification.backendStatus,
     databaseStatus: classification.databaseStatus,
     responseTime: result.responseTime,
+    timings: result.timings || result.diagnostics?.timing || null,
     intervalSeconds: monitor.interval,
     scheduled: false,
     httpStatus: result.httpStatus,

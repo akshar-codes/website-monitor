@@ -15,6 +15,8 @@ import {
 import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import DailyStat from "../models/DailyStat.js";
+import HourlyStat from "../models/HourlyStat.js";
+import PerformanceAlertState from "../models/PerformanceAlertState.js";
 import Incident from "../models/Incident.js";
 import SslInfo from "../models/SslInfo.js";
 import Activity from "../models/Activity.js";
@@ -123,6 +125,8 @@ export const deleteAccount = async (userId, confirmationEmail) => {
   await Promise.all([
     HealthCheck.deleteMany({ monitor: { $in: monitorIds } }),
     DailyStat.deleteMany({ monitor: { $in: monitorIds } }),
+    HourlyStat.deleteMany({ monitor: { $in: monitorIds } }),
+    PerformanceAlertState.deleteMany({ monitor: { $in: monitorIds } }),
     Incident.deleteMany({ monitor: { $in: monitorIds } }),
     SslInfo.deleteMany({ monitor: { $in: monitorIds } }),
     Monitor.deleteMany({ owner: account._id }),
