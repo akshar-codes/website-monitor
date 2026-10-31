@@ -18,6 +18,8 @@ const AdminSuggestions = lazy(() => import("./pages/AdminSuggestions"));
 const Monitors = lazy(() => import("./pages/Monitors"));
 const StatusPages = lazy(() => import("./pages/StatusPages"));
 const PublicStatus = lazy(() => import("./pages/PublicStatus"));
+const StatusPageManage = lazy(() => import("./pages/StatusPageManage"));
+const StatusSubscription = lazy(() => import("./pages/StatusSubscription"));
 const MonitorDetails = lazy(() => import("./pages/MonitorDetails"));
 const SslMonitoring = lazy(() => import("./pages/SslMonitoring"));
 const Insights = lazy(() => import("./pages/Insights"));
@@ -90,6 +92,16 @@ export default function App() {
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/oauth/callback" element={<OAuthCallback />} />
                   <Route path="/status/:slug" element={<PublicStatus />} />
+                  <Route element={<ProtectedRoute />}>
+                    <Route
+                      path="/status-preview/:id"
+                      element={<PublicStatus />}
+                    />
+                  </Route>
+                  <Route
+                    path="/status-subscription"
+                    element={<StatusSubscription />}
+                  />
 
                   {/* Requires an authenticated session */}
                   <Route element={<ProtectedRoute />}>
@@ -129,6 +141,10 @@ export default function App() {
                           }
                         />
                         <Route path="/status-pages" element={<StatusPages />} />
+                        <Route
+                          path="/status-pages/:id/manage"
+                          element={<StatusPageManage />}
+                        />
                         <Route
                           path="/ssl"
                           element={

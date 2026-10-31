@@ -59,10 +59,17 @@ export function Select({ label, children, ...props }) {
   );
 }
 
-export function Panel({ title, subtitle, actions, children, className = "" }) {
+export function Panel({
+  title,
+  subtitle,
+  actions,
+  children,
+  className = "",
+  id,
+}) {
   const t = useTranslation();
   return (
-    <section className={`sw-panel ${className}`}>
+    <section id={id} className={`sw-panel ${className}`}>
       {(title || actions) && (
         <div className="sw-panel-heading">
           <div>
