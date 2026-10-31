@@ -27,6 +27,7 @@ import {
   updateStatusSchema,
   downtimeStatsSchema,
 } from "../validators/incident.validator.js";
+import * as alertingController from "../controllers/alerting.controller.js";
 
 const router = Router();
 
@@ -55,6 +56,24 @@ router.patch(
   validateObjectId("id"),
   validate(updateStatusSchema, "body"),
   updateIncidentStatus,
+);
+router.get(
+  "/:id/escalations",
+  requirePermission("incident:read"),
+  validateObjectId("id"),
+  alertingController.incidentEscalations,
+);
+router.post(
+  "/:id/acknowledge",
+  requirePermission("incident:update"),
+  validateObjectId("id"),
+  alertingController.acknowledgeIncident,
+);
+router.delete(
+  "/:id/acknowledge",
+  requirePermission("incident:update"),
+  validateObjectId("id"),
+  alertingController.removeIncidentAcknowledgement,
 );
 
 export default router;
