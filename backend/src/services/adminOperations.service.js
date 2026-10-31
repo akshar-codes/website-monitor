@@ -3,6 +3,7 @@ import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import Incident from "../models/Incident.js";
 import DailyStat from "../models/DailyStat.js";
+import HourlyStat from "../models/HourlyStat.js";
 import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import {
@@ -252,19 +253,30 @@ export const getAdminMonitorDetail = async (id, window) => {
         "90d": 90 * 86400000,
       }[window],
   );
+  const hourly = window === "24h";
+  const statsModel = hourly ? HourlyStat : DailyStat;
+  const statStart = hourly
+    ? new Date(new Date(start).setUTCMinutes(0, 0, 0))
+    : new Date(
+        Date.UTC(
+          start.getUTCFullYear(),
+          start.getUTCMonth(),
+          start.getUTCDate(),
+        ),
+      );
   const [checks, stats, incidents] = await Promise.all([
     HealthCheck.find({ monitor: id })
       .sort({ checkedAt: -1 })
-      .limit(20)
+      .limit(10)
       .select(
         "status httpStatus responseTime failureReason checkedAt diagnostics",
       )
       .lean(),
-    DailyStat.aggregate([
+    statsModel.aggregate([
       {
         $match: {
           monitor: new mongoose.Types.ObjectId(id),
-          date: { $gte: start },
+          date: { $gte: statStart },
         },
       },
       {
@@ -273,9 +285,38 @@ export const getAdminMonitorDetail = async (id, window) => {
           totalChecks: { $sum: "$totalChecks" },
           successfulChecks: { $sum: "$successfulChecks" },
           failedChecks: { $sum: "$failedChecks" },
-          averageResponseTime: { $avg: "$avgResponseTime" },
+          weightedResponseTime: {
+            $sum: {
+              $ifNull: [
+                "$_responseTimeSum",
+                { $multiply: ["$avgResponseTime", "$totalChecks"] },
+              ],
+            },
+          },
           downtimeSeconds: { $sum: "$downtimeSeconds" },
-          uptimePercentage: { $avg: "$uptimePercentage" },
+        },
+      },
+      {
+        $addFields: {
+          averageResponseTime: {
+            $cond: [
+              { $gt: ["$totalChecks", 0] },
+              { $divide: ["$weightedResponseTime", "$totalChecks"] },
+              0,
+            ],
+          },
+          uptimePercentage: {
+            $cond: [
+              { $gt: ["$totalChecks", 0] },
+              {
+                $multiply: [
+                  { $divide: ["$successfulChecks", "$totalChecks"] },
+                  100,
+                ],
+              },
+              null,
+            ],
+          },
         },
       },
     ]),
@@ -283,7 +324,7 @@ export const getAdminMonitorDetail = async (id, window) => {
       .sort({ startedAt: -1 })
       .limit(20)
       .select(
-        "startedAt endedAt duration status severity rootCause resolutionNotes statusHistory triggerCheck recoveryCheck",
+        "startedAt endedAt duration status severity rootCause resolutionNotes statusHistory triggerCheck recoveryCheck triggerCheckSnapshot recoveryCheckSnapshot",
       )
       .populate(
         "triggerCheck",
@@ -344,7 +385,8 @@ export const getAdminMonitorDetail = async (id, window) => {
       rootCause: incident.rootCause,
       resolutionNotes: incident.resolutionNotes,
       statusHistory: incident.statusHistory,
-      triggerCheck: incident.triggerCheck,
+      triggerCheck: incident.triggerCheck || incident.triggerCheckSnapshot,
+      recoveryCheck: incident.recoveryCheck || incident.recoveryCheckSnapshot,
     })),
   };
 };
@@ -404,6 +446,8 @@ export const listAdminIncidents = async ({
   return {
     incidents: incidents.map((item) => ({
       ...item,
+      triggerCheck: item.triggerCheck || item.triggerCheckSnapshot || null,
+      recoveryCheck: item.recoveryCheck || item.recoveryCheckSnapshot || null,
       duration: getIncidentDurationSeconds(item),
       monitor: item.monitor
         ? { ...item.monitor, url: safeUrl(item.monitor.url) }
@@ -434,6 +478,10 @@ export const getAdminIncidentDetail = async (id) => {
   if (!incident) throw ApiError.notFound(`Incident not found with id: ${id}`);
   return {
     ...incident,
+    triggerCheck:
+      incident.triggerCheck || incident.triggerCheckSnapshot || null,
+    recoveryCheck:
+      incident.recoveryCheck || incident.recoveryCheckSnapshot || null,
     duration: getIncidentDurationSeconds(incident),
     monitor: incident.monitor
       ? { ...incident.monitor, url: safeUrl(incident.monitor.url) }

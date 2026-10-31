@@ -20,6 +20,11 @@
 
 import { Router } from "express";
 import {
+  listSuggestions,
+  markSuggestionReviewed,
+  replyToSuggestion,
+} from "../controllers/suggestion.controller.js";
+import {
   getAdminDashboard,
   getAdminMonitors,
   getAdminMonitorDetails,
@@ -53,6 +58,7 @@ import {
   resolveAdminIncidentSchema,
 } from "../validators/adminOperations.validator.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
+import { replySuggestionSchema } from "../validators/suggestion.validator.js";
 import { captureFailedAdminOperations } from "../middlewares/adminAuditFailureCapture.js";
 import {
   listAdminAuditEvents,
@@ -74,6 +80,18 @@ import {
 const router = Router();
 
 router.use(captureFailedAdminOperations);
+router.get("/suggestions", listSuggestions);
+router.patch(
+  "/suggestions/:id/review",
+  validateObjectId("id"),
+  markSuggestionReviewed,
+);
+router.post(
+  "/suggestions/:id/reply",
+  validateObjectId("id"),
+  validate(replySuggestionSchema, "body"),
+  replyToSuggestion,
+);
 router.get(
   "/audit-logs",
   validate(adminAuditQuerySchema, "query"),
@@ -118,7 +136,11 @@ router.post(
 router.get("/users", validate(listUsersSchema, "query"), getUsers);
 router.get("/plans/overview", getPlanOverview);
 router.get("/billing-settings", getAdminBillingSettings);
-router.patch("/billing-settings", validate(updateBillingSettingsSchema, "body"), updateAdminBillingSettings);
+router.patch(
+  "/billing-settings",
+  validate(updateBillingSettingsSchema, "body"),
+  updateAdminBillingSettings,
+);
 router.get("/plans/history", getPlanHistory);
 router.get("/users/:id/plan", validateObjectId("id"), getUserPlanDetails);
 router.get("/users/:id", validateObjectId("id"), getUserDetails);

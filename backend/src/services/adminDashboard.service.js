@@ -2,7 +2,9 @@ import { HEALTH_STATUS, ROLES } from "../config/constants.js";
 import User from "../models/User.js";
 import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
+import DailyStat from "../models/DailyStat.js";
 import Activity from "../models/Activity.js";
+import { startOfDayUTC, endOfDayUTC } from "../utils/dateUtils.js";
 
 const PLANS = ["free", "pro", "unlimited"];
 export async function getAdminDashboard({ startDate, endDate }) {
@@ -57,27 +59,39 @@ export async function getAdminDashboard({ startDate, endDate }) {
       { $group: { _id: "$monitor", status: { $first: "$status" } } },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
-    HealthCheck.aggregate([
-      { $match: { checkedAt: range } },
+    DailyStat.aggregate([
+      {
+        $match: {
+          date: {
+            $gte: startOfDayUTC(startDate),
+            $lte: endOfDayUTC(endDate),
+          },
+        },
+      },
       {
         $group: {
           _id: null,
-          total: { $sum: 1 },
-          failed: {
+          total: { $sum: "$totalChecks" },
+          failed: { $sum: { $add: ["$failedChecks", "$degradedChecks"] } },
+          weightedResponseTime: {
             $sum: {
-              $cond: [
-                {
-                  $in: [
-                    "$status",
-                    [HEALTH_STATUS.DOWN, HEALTH_STATUS.DEGRADED],
-                  ],
-                },
-                1,
-                0,
+              $ifNull: [
+                "$_responseTimeSum",
+                { $multiply: ["$avgResponseTime", "$totalChecks"] },
               ],
             },
           },
-          averageResponseTime: { $avg: "$responseTime" },
+        },
+      },
+      {
+        $addFields: {
+          averageResponseTime: {
+            $cond: [
+              { $gt: ["$total", 0] },
+              { $divide: ["$weightedResponseTime", "$total"] },
+              0,
+            ],
+          },
         },
       },
     ]),
