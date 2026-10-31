@@ -32,6 +32,7 @@ const hourlyStatSchema = new mongoose.Schema(
     _responseTimeSum: { type: Number, default: 0 },
     _observedSeconds: { type: Number, default: 0 },
     responseTimeBuckets: { type: mongoose.Schema.Types.Mixed, default: {} },
+    latencyHistograms: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { timestamps: true },
 );

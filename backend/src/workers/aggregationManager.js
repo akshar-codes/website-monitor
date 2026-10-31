@@ -5,6 +5,11 @@ import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import { startOfDayUTC } from "../utils/dateUtils.js";
 import { HEALTH_STATUS } from "../config/constants.js";
+import {
+  buildLatencyHistograms,
+  LATENCY_HISTOGRAM_VERSION,
+  LATENCY_METRICS,
+} from "../utils/latencyHistogram.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const hourlyStatsBackfilledMonitorIds = new Set();
@@ -125,6 +130,7 @@ export const summarizeChecks = (checks, monitor, day, now = new Date()) => {
       Math.round(estimatedDegradedSeconds),
     ),
     lastCheckAt,
+    latencyHistograms: buildLatencyHistograms(checks),
   };
 };
 
@@ -133,7 +139,9 @@ const fetchDayChecks = (model, monitorId, date) => {
   const end = new Date(start.getTime() + DAY_MS);
   return model
     .find({ monitor: monitorId, checkedAt: { $gte: start, $lt: end } })
-    .select("status responseTime intervalSeconds scheduled checkedAt")
+    .select(
+      "status responseTime timings diagnostics httpStatus intervalSeconds scheduled checkedAt",
+    )
     .sort({ checkedAt: 1 })
     .lean();
 };
@@ -276,6 +284,14 @@ export const backfillRecentHourlyStats = async (
           },
         },
         lastCheckAt: { $max: "$checkedAt" },
+        latencySamples: {
+          $push: {
+            httpStatus: "$httpStatus",
+            responseTime: "$responseTime",
+            timings: "$timings",
+            diagnostics: "$diagnostics",
+          },
+        },
       },
     },
   ]);
@@ -283,7 +299,7 @@ export const backfillRecentHourlyStats = async (
   if (rows.length) {
     await hourlyStats.bulkWrite(
       rows.map((row) => {
-        const { _id: bucketKey, ...bucket } = row;
+        const { _id: bucketKey, latencySamples = [], ...bucket } = row;
         const date = new Date(bucketKey);
         const elapsed = Math.min(
           3600,
@@ -322,6 +338,7 @@ export const backfillRecentHourlyStats = async (
                 downtimeSeconds: row.estimatedDowntimeSeconds,
                 degradedSeconds: row.estimatedDegradedSeconds,
                 responseTimeBuckets: {},
+                latencyHistograms: buildLatencyHistograms(latencySamples),
               },
             },
             upsert: true,
@@ -419,6 +436,54 @@ const incrementStatBucket = async (
   const degradedSeconds = {
     $cond: ["$_addIncomingCheck", degraded && scheduled ? interval : 0, 0],
   };
+  const incomingHistograms = buildLatencyHistograms([healthCheck]);
+  const latencyMetrics = {};
+  for (const metric of LATENCY_METRICS) {
+    const sample = incomingHistograms[metric];
+    const bucket = Object.keys(sample.buckets)[0];
+    const currentPath = `$latencyHistograms.${metric}`;
+    latencyMetrics[metric] = {
+      $mergeObjects: [
+        { $ifNull: [currentPath, {}] },
+        {
+          sampleCount: {
+            $add: [
+              { $ifNull: [`${currentPath}.sampleCount`, 0] },
+              {
+                $cond: [
+                  {
+                    $and: [
+                      "$_addIncomingCheck",
+                      sample.sampleCount ? true : false,
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            ],
+          },
+          ...(bucket
+            ? {
+                buckets: {
+                  $mergeObjects: [
+                    { $ifNull: [`${currentPath}.buckets`, {}] },
+                    {
+                      [bucket]: {
+                        $add: [
+                          { $ifNull: [`${currentPath}.buckets.${bucket}`, 0] },
+                          { $cond: ["$_addIncomingCheck", 1, 0] },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              }
+            : {}),
+        },
+      ],
+    };
+  }
 
   await model.updateOne(
     { monitor: monitor._id, date: bucketStart },
@@ -474,6 +539,12 @@ const incrementStatBucket = async (
             ],
           },
           _responseTimeSum: responseSum,
+          latencyHistograms: {
+            $mergeObjects: [
+              { $ifNull: ["$latencyHistograms", {}] },
+              { version: LATENCY_HISTOGRAM_VERSION, ...latencyMetrics },
+            ],
+          },
           _observedSeconds: observedSeconds,
           responseTimeBuckets: {
             $mergeObjects: [
@@ -651,7 +722,9 @@ export const reconcileDailyStatsForRange = async (
       monitor: monitor._id,
       checkedAt: { $gte: firstDay, $lt: new Date(lastDay.getTime() + DAY_MS) },
     })
-    .select("status responseTime intervalSeconds scheduled checkedAt")
+    .select(
+      "status responseTime timings diagnostics httpStatus intervalSeconds scheduled checkedAt",
+    )
     .sort({ checkedAt: 1 })
     .lean();
   const byDay = new Map();

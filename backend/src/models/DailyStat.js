@@ -98,6 +98,7 @@ const dailyStatSchema = new mongoose.Schema(
     },
     _observedSeconds: { type: Number, default: 0, min: 0 },
     responseTimeBuckets: { type: mongoose.Schema.Types.Mixed, default: {} },
+    latencyHistograms: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   {
     timestamps: true,
