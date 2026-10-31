@@ -21,6 +21,16 @@ const globalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
+  skip: (req) => req.path.startsWith("/internal/probes"),
+});
+
+export const probeAgentLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.probeAgent?.agentId || ipKeyGenerator(req.ip),
+  handler: rateLimitHandler,
 });
 
 /**
