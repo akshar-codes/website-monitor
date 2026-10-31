@@ -29,6 +29,11 @@ export const ROLE_PERMISSIONS = Object.freeze({
     "notification:read",
     "notification:update",
     "notification:delete",
+    "integration:read",
+    "integration:create",
+    "integration:update",
+    "integration:delete",
+    "alert:manage",
   ]),
 
   [ROLES.ADMIN]: Object.freeze([

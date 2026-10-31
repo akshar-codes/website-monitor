@@ -28,6 +28,7 @@ const envSchema = z
       .string({ required_error: "MONGO_URI is required" })
       .min(1, "MONGO_URI cannot be empty"),
     PROBE_AGENT_CONFIG: z.string().optional().default("{}"),
+    ALERT_CREDENTIAL_ENCRYPTION_KEY: z.string().optional().default(""),
 
     // ── Logging ──
     LOG_LEVEL: z
