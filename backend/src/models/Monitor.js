@@ -65,6 +65,14 @@ const monitorSchema = new mongoose.Schema(
       consecutiveBreaches: { type: Number, min: 2, max: 10, default: 3 },
       cooldownMinutes: { type: Number, min: 5, max: 1440, default: 30 },
     },
+    regionalMonitoring: {
+      enabled: { type: Boolean, default: false },
+      regions: {
+        type: [String],
+        enum: ["india-mumbai", "us-east", "eu-west", "singapore"],
+        default: [],
+      },
+    },
 
     // ── Worker fields (health checks) ──
 

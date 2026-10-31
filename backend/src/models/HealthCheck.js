@@ -24,6 +24,7 @@ const healthCheckSchema = new mongoose.Schema(
     // Prevent duplicate history rows if a scheduled pipeline retries after a
     // transient persistence failure. Manual checks receive unique run IDs.
     executionKey: { type: String, default: undefined, select: false },
+    regionalRunId: { type: String, default: null, index: true },
 
     // ── Overall verdict ──
     status: {
