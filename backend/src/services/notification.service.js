@@ -77,7 +77,12 @@ const resolveOwnerId = (user) => user.id || user._id.toString();
  * models/Notification.js), so nothing else in the create/read/update path
  * needs to change.
  */
-const dispatchChannels = async (notification, preferences, user) => {
+const dispatchChannels = async (
+  notification,
+  preferences,
+  user,
+  { awaitEmail = false } = {},
+) => {
   notification.channels.inApp = {
     sent: preferences.inApp[alertPreferenceKey(notification.type)] !== false,
     sentAt:
@@ -91,11 +96,18 @@ const dispatchChannels = async (notification, preferences, user) => {
 
   await notification.save();
   // SMTP latency must not hold up monitor checks or notification API work.
-  void dispatchEmailChannel(notification, preferences, user);
+  if (awaitEmail)
+    await dispatchEmailChannel(notification, preferences, user, true);
+  else void dispatchEmailChannel(notification, preferences, user);
 };
 
 // eslint-disable-next-line no-unused-vars
-const dispatchEmailChannel = async (notification, preferences, user) => {
+const dispatchEmailChannel = async (
+  notification,
+  preferences,
+  user,
+  throwOnError = false,
+) => {
   const key = emailPreferenceKey(notification.type);
   if (
     !preferences.email.enabled ||
@@ -124,6 +136,7 @@ const dispatchEmailChannel = async (notification, preferences, user) => {
     logger.warn(
       `Notification email failed for ${user.email}: ${error.message}`,
     );
+    if (throwOnError) throw error;
   }
 };
 
@@ -144,6 +157,8 @@ export const createNotification = async ({
   relatedResource = null,
   metadata = null,
   expiresAt = null,
+  dedupeKey = null,
+  throwOnError = false,
 }) => {
   if (!NOTIFICATION_TYPE_CATEGORY[type]) {
     logger.error(`Refusing to create notification with unknown type: ${type}`);
@@ -166,7 +181,7 @@ export const createNotification = async ({
       ? await User.findById(ownerId).select("name email")
       : null;
     if (needsImmediateEmail && !user) return null;
-    const notification = await Notification.create({
+    const notificationData = {
       owner: ownerId,
       type,
       category: NOTIFICATION_TYPE_CATEGORY[type],
@@ -182,9 +197,19 @@ export const createNotification = async ({
         : undefined,
       metadata,
       expiresAt,
-    });
+      ...(dedupeKey ? { dedupeKey } : {}),
+    };
+    const notification = dedupeKey
+      ? await Notification.findOneAndUpdate(
+          { dedupeKey },
+          { $setOnInsert: notificationData },
+          { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
+        )
+      : await Notification.create(notificationData);
 
-    await dispatchChannels(notification, preferences, user);
+    await dispatchChannels(notification, preferences, user, {
+      awaitEmail: throwOnError,
+    });
 
     return notification;
   } catch (error) {
@@ -192,6 +217,7 @@ export const createNotification = async ({
       `Failed to create notification (type "${type}") for user ${ownerId}: ${error.message}`,
       { stack: error.stack },
     );
+    if (throwOnError) throw error;
     return null;
   }
 };

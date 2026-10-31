@@ -33,6 +33,7 @@ const notificationSchema = new mongoose.Schema(
         message: `Type must be one of: ${NOTIFICATION_TYPE_VALUES.join(", ")}`,
       },
     },
+    dedupeKey: { type: String, default: null },
 
     category: {
       type: String,
@@ -147,6 +148,10 @@ notificationSchema.index({ owner: 1, category: 1, read: 1, createdAt: -1 });
 
 // Pending email digests are selected per owner and delivery state, oldest first.
 notificationSchema.index({ owner: 1, "channels.email.sent": 1, createdAt: 1 });
+notificationSchema.index(
+  { dedupeKey: 1 },
+  { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } },
+);
 
 // TTL cleanup — only applies to documents that opted into an expiry.
 notificationSchema.index(
