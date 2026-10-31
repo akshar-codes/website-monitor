@@ -6,6 +6,7 @@ import { sendStatusSubscriberEmail } from "../services/email.service.js";
 import {
   makeUnsubscribeToken,
   tokenHash,
+  deliveryRetry,
 } from "../services/statusNotification.service.js";
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
@@ -13,10 +14,8 @@ import { enqueueBestEffort } from "../services/statusNotification.service.js";
 
 let timer = null;
 let running = false;
-const MAX_ATTEMPTS = 5;
-const BASE_BACKOFF_MS = 30_000;
 
-async function deliverBatch() {
+export async function deliverBatch() {
   if (running) return;
   running = true;
   try {
@@ -95,24 +94,17 @@ async function deliverBatch() {
           },
         });
       } catch (error) {
-        const failed = job.attempts >= MAX_ATTEMPTS;
-        const backoff = Math.min(
-          6 * 60 * 60_000,
-          BASE_BACKOFF_MS * 2 ** Math.max(0, job.attempts - 1),
-        );
-        const safeError = /^[A-Z0-9_]{1,40}$/.test(error.code || "")
-          ? `Email delivery failed (${error.code})`
-          : "Email delivery failed";
+        const retry = deliveryRetry(job.attempts, error.code || "");
         await job.updateOne({
           $set: {
-            status: failed ? "failed" : "pending",
-            nextAttemptAt: new Date(Date.now() + backoff),
+            status: retry.terminal ? "failed" : "pending",
+            nextAttemptAt: retry.nextAttemptAt,
             leaseUntil: null,
-            lastError: safeError,
+            lastError: retry.safeError,
           },
         });
         logger.warn(
-          `Status notification delivery ${failed ? "failed permanently" : "will retry"}`,
+          `Status notification delivery ${retry.terminal ? "failed permanently" : "will retry"}`,
           { deliveryId: String(job._id), attempts: job.attempts },
         );
       }

@@ -90,7 +90,20 @@ export async function setPublished(pageId, owner, publish) {
   const page = await getOwned(pageId, owner);
   page.isPublished = publish;
   page.publishedAt = publish ? new Date() : page.publishedAt;
-  return serialize(await page.save());
+  const saved = await page.save();
+  const visibleServices = page.services
+    .filter((service) => service.isVisible)
+    .map((service) => service._id);
+  if (publish && visibleServices.length)
+    await StatusIncident.updateMany(
+      {
+        statusPage: page._id,
+        sourceIncidentId: { $ne: null },
+        affectedServices: { $in: visibleServices },
+      },
+      { $set: { isPublished: true } },
+    );
+  return serialize(saved);
 }
 export async function addService(pageId, owner, data) {
   const page = await getOwned(pageId, owner);
@@ -138,7 +151,20 @@ export async function updateService(pageId, serviceId, owner, data) {
   const service = page.services.id(serviceId);
   if (!service) throw ApiError.notFound("Status page service not found");
   Object.assign(service, data);
-  return serialize(await page.save());
+  const saved = await page.save();
+  if (data.isVisible === false)
+    await StatusIncident.updateMany(
+      {
+        statusPage: page._id,
+        sourceIncidentId: { $ne: null },
+        affectedServices: service._id,
+      },
+      {
+        $pull: { affectedServices: service._id },
+        $set: { isPublished: false },
+      },
+    );
+  return serialize(saved);
 }
 export async function removeService(pageId, serviceId, owner) {
   const page = await getOwned(pageId, owner);
@@ -148,7 +174,16 @@ export async function removeService(pageId, serviceId, owner) {
   page.services.forEach((item, index) => {
     item.displayOrder = index;
   });
-  return serialize(await page.save());
+  const saved = await page.save();
+  await StatusIncident.updateMany(
+    {
+      statusPage: page._id,
+      sourceIncidentId: { $ne: null },
+      affectedServices: service._id,
+    },
+    { $pull: { affectedServices: service._id }, $set: { isPublished: false } },
+  );
+  return serialize(saved);
 }
 
 export async function reorderServices(pageId, owner, serviceIds) {

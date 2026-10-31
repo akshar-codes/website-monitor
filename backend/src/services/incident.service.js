@@ -20,6 +20,7 @@ import {
   ACTIVITY_CATEGORIES,
   ACTIVITY_ACTIONS,
 } from "../config/activityConstants.js";
+import { syncIncidentById } from "./statusIncidentSync.service.js";
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
@@ -231,6 +232,10 @@ export const updateIncidentStatus = async (
     );
   }
   await logStatusChange();
+  await syncIncidentById(
+    updatedIncident._id,
+    status === INCIDENT_STATUS.RESOLVED ? "resolved" : "updated",
+  );
 
   const result = await Incident.findById(updatedIncident._id)
     .populate("monitor", MONITOR_POPULATE_FIELDS)

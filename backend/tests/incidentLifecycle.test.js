@@ -19,6 +19,7 @@ const makeHarness = ({
     activities: [],
     notifications: [],
     resolvedUpdates: 0,
+    statusPageEvents: [],
   };
   const monitorDocument = () => ({
     _id: "monitor-1",
@@ -75,6 +76,8 @@ const makeHarness = ({
       Incident,
       logActivity: async (entry) => state.activities.push(entry),
       createNotification: async (entry) => state.notifications.push(entry),
+      syncStatusIncident: async (incident, action) =>
+        state.statusPageEvents.push({ incident, action }),
     },
   };
 };
@@ -115,6 +118,7 @@ test("opens one incident after the configured consecutive-failure threshold", as
   );
   assert.equal(state.activities[0].action, "incident_auto_opened");
   assert.equal(state.notifications[0].type, "incident_opened");
+  assert.equal(state.statusPageEvents[0].action, "opened");
 });
 
 test("deduplicates replayed checks and concurrent incident creation", async () => {
@@ -171,6 +175,7 @@ test("resolves an active incident after two consecutive successes and records du
   assert.equal(state.activeIncident.duration, 60);
   assert.equal(state.activities[0].action, "incident_auto_resolved");
   assert.equal(state.notifications[0].type, "incident_resolved");
+  assert.equal(state.statusPageEvents.at(-1).action, "resolved");
 });
 
 test("recovery retries and intermittent failures do not prematurely resolve incidents", async () => {

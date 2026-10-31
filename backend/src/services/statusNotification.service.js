@@ -7,6 +7,16 @@ import logger from "../utils/logger.js";
 
 export const tokenHash = (token) =>
   createHash("sha256").update(token).digest("hex");
+export const deliveryRetry = (attempts, code = "") => ({
+  terminal: attempts >= 5,
+  nextAttemptAt: new Date(
+    Date.now() +
+      Math.min(6 * 60 * 60_000, 30_000 * 2 ** Math.max(0, attempts - 1)),
+  ),
+  safeError: /^[A-Z0-9_]{1,40}$/.test(code)
+    ? `Email delivery failed (${code})`
+    : "Email delivery failed",
+});
 const unsubscribeSecret = env.COOKIE_SECRET;
 
 export const makeUnsubscribeToken = (subscriber) => {

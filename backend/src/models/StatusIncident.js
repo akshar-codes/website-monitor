@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 const updateSchema = new mongoose.Schema({
+  eventId: { type: String, default: null },
   message: { type: String, required: true, trim: true, maxlength: 3000 },
   status: {
     type: String,
@@ -17,6 +18,11 @@ const schema = new mongoose.Schema(
       ref: "StatusPage",
       required: true,
       index: true,
+    },
+    sourceIncidentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Incident",
+      default: null,
     },
     title: { type: String, required: true, trim: true, maxlength: 160 },
     description: { type: String, trim: true, maxlength: 3000, default: "" },
@@ -44,4 +50,11 @@ const schema = new mongoose.Schema(
   { timestamps: true },
 );
 schema.index({ statusPage: 1, isPublished: 1, startedAt: -1 });
+schema.index(
+  { statusPage: 1, sourceIncidentId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { sourceIncidentId: { $type: "objectId" } },
+  },
+);
 export default mongoose.model("StatusIncident", schema);

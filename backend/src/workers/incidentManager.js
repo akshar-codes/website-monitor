@@ -13,6 +13,7 @@ import {
   INCIDENT_SEVERITY,
 } from "../config/constants.js";
 import { createNotification } from "../services/notification.service.js";
+import { syncMonitorIncident } from "../services/statusIncidentSync.service.js";
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_PRIORITIES,
@@ -94,7 +95,13 @@ const openIncident = async (monitor, healthCheck, failureCount, deps) => {
     monitor: monitor._id,
     status: { $in: ACTIVE_STATUSES },
   }).sort({ startedAt: -1 });
-  if (!activeIncident || !created) return activeIncident;
+  if (!activeIncident) return null;
+  if (!created) {
+    // Reconcile on replay too; this repairs a crash between incident creation
+    // and status-page synchronization without duplicating public timeline entries.
+    await deps.syncStatusIncident(activeIncident, "updated");
+    return activeIncident;
+  }
 
   logger.warn("Incident opened", {
     incidentId: String(activeIncident._id),
@@ -133,6 +140,7 @@ const openIncident = async (monitor, healthCheck, failureCount, deps) => {
     },
     deps,
   );
+  await deps.syncStatusIncident(activeIncident, "opened");
   return activeIncident;
 };
 
@@ -199,6 +207,7 @@ const resolveIncident = async (monitor, healthCheck, deps) => {
     },
     deps,
   );
+  await deps.syncStatusIncident(resolved, "resolved");
   return resolved;
 };
 
@@ -212,6 +221,7 @@ export const handleIncident = async (monitor, healthCheck, overrides = {}) => {
     Incident,
     logActivity,
     createNotification,
+    syncStatusIncident: syncMonitorIncident,
     ...overrides,
   };
   const isHealthy = healthCheck.status === HEALTH_STATUS.UP;

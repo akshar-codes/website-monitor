@@ -72,6 +72,7 @@ export const createStatusPageSchema = z
     description: fields.description,
     logo: fields.logo,
     timezone: fields.timezone,
+    branding: fields.branding,
   })
   .strict();
 export const updateStatusPageSchema = z
