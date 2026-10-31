@@ -33,6 +33,16 @@ export const probeAgentLimiter = rateLimit({
   handler: rateLimitHandler,
 });
 
+export const integrationTestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  keyGenerator: (req) =>
+    req.user?.id || req.user?._id?.toString() || ipKeyGenerator(req.ip),
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
 /**
  * Factory for sensitive-auth-endpoint limiters. Each call returns an
  * independent limiter instance with its own counter bucket, so traffic
