@@ -119,11 +119,11 @@ export default function Dashboard() {
   const t = useTranslation();
   const localHour = new Date().getHours();
   const greeting =
-    localHour < 12
-      ? { label: "Good morning,", emoji: "☀️" }
-      : localHour < 17
-        ? { label: "Good afternoon,", emoji: "🌤️" }
-        : { label: "Good evening,", emoji: "🌙" };
+    localHour < 5 || localHour >= 17
+      ? { label: "Good evening,", emoji: "🌙" }
+      : localHour < 12
+        ? { label: "Good morning,", emoji: "☀️" }
+        : { label: "Good afternoon,", emoji: "🌤️" };
   const location = useLocation();
   const navigate = useNavigate();
   const { preferences } = usePreferences();

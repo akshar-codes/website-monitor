@@ -11,6 +11,7 @@ const DEFAULTS = {
     monitorDown: true,
     monitorRecovery: true,
     performanceAlerts: true,
+    regionalMonitoring: true,
     sslExpiry: true,
     incidents: true,
     billing: true,
@@ -22,6 +23,7 @@ const DEFAULTS = {
     monitorDown: true,
     monitorRecovery: true,
     performanceAlerts: true,
+    regionalMonitoring: true,
     sslExpiry: true,
     incidents: true,
   },
@@ -52,6 +54,11 @@ const sections = [
     key: "performanceAlerts",
     label: "Performance degradation",
     help: "Sustained response-time degradation and recovery.",
+  },
+  {
+    key: "regionalMonitoring",
+    label: "Regional monitoring",
+    help: "Regional outages, recovery, and regional latency degradation.",
   },
 ];
 

@@ -73,6 +73,18 @@ export function useMonitorAnalytics(id, params = {}) {
   );
 }
 
+export function useMonitorRegionalAnalytics(
+  id,
+  window = "24h",
+  pollingInterval = 30000,
+) {
+  return usePolling(
+    () => dashboardApi.getMonitorRegionalAnalytics(id, { window }),
+    [id, window],
+    pollingInterval,
+  );
+}
+
 export function useRecentHealthChecks(params = {}) {
   const paramsKey = JSON.stringify(params);
   return useQuery(

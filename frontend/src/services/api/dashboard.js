@@ -74,3 +74,10 @@ export async function getMonitorAnalytics(id, params = {}) {
   });
   return data;
 }
+
+export async function getMonitorRegionalAnalytics(id, params = {}) {
+  const { data } = await apiClient.get(`/dashboard/monitors/${id}/regions`, {
+    params,
+  });
+  return data;
+}

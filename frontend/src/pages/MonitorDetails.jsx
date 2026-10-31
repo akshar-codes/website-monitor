@@ -1,10 +1,15 @@
 import { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useMonitorDetails, useMonitorMutations } from "../hooks/useMonitors";
+import {
+  useMonitorDetails,
+  useMonitorMutations,
+  useMonitorRegionalAnalytics,
+} from "../hooks/useMonitors";
 import { useUsage } from "../hooks/useUsage";
 import MonitorInsights from "../components/monitorDetails/MonitorInsights";
 import { ROUTES } from "../constants/routes";
 import { formatRelative, formatUptime } from "../utils/format";
+import RegionalMonitoringFields from "../components/monitor/RegionalMonitoringFields";
 import {
   Page,
   Panel,
@@ -52,11 +57,14 @@ export default function MonitorDetails() {
   const navigate = useNavigate();
 
   const [window, setWindow] = useState("24h");
+  const [regionalMetric, setRegionalMetric] = useState("p95");
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data, loading, error, refetch } = useMonitorDetails(id, window);
+  const { data: regionalResponse } = useMonitorRegionalAnalytics(id, window);
   const details = data?.data;
+  const regionalData = regionalResponse?.data;
 
   const { data: usageData } = useUsage();
   const usage = usageData?.data;
@@ -287,6 +295,130 @@ export default function MonitorDetails() {
           rows={checks}
         />
       </Panel>
+      {monitor.regionalMonitoring?.enabled && (
+        <Panel
+          title="Regional monitoring"
+          subtitle="Independent probe results by location"
+        >
+          <div className="sw-metric-grid">
+            {regionalData?.regions
+              ?.filter((region) =>
+                monitor.regionalMonitoring.regions.includes(region.regionId),
+              )
+              .map((region) => (
+                <Metric
+                  key={region.regionId}
+                  label={`${region.region.name} · ${region.region.location}`}
+                  value={region.currentStatus}
+                  icon={Globe2}
+                  note={
+                    region.agentStatus === "unavailable"
+                      ? "Probe agent unavailable"
+                      : region.lastCheckedAt
+                        ? `Last checked ${formatRelative(region.lastCheckedAt)}`
+                        : "No probe result yet"
+                  }
+                  tone={
+                    region.currentStatus === "up"
+                      ? "green"
+                      : region.currentStatus === "down"
+                        ? "amber"
+                        : "blue"
+                  }
+                />
+              ))}
+          </div>
+          {regionalData?.regions?.some(
+            (region) =>
+              monitor.regionalMonitoring.regions.includes(region.regionId) &&
+              region.performanceAlert?.status === "degraded",
+          ) && (
+            <Notice tone="warning">
+              Sustained regional response-time degradation detected. See the
+              regional performance settings and comparison below.
+            </Notice>
+          )}
+          <div className="detail-chart-grid mt-5">
+            <div>
+              <label className="mb-2 flex items-center gap-2 text-sm">
+                Regional response-time comparison
+                <select
+                  value={regionalMetric}
+                  onChange={(event) => setRegionalMetric(event.target.value)}
+                >
+                  <option value="average">Average</option>
+                  <option value="p50">P50</option>
+                  <option value="p95">P95</option>
+                  <option value="p99">P99</option>
+                </select>
+              </label>
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={regionalData?.trend || []}>
+                  <CartesianGrid stroke="#edf2f6" />
+                  <XAxis dataKey="timestamp" tick={{ fontSize: 9 }} />
+                  <YAxis tick={{ fontSize: 9 }} />
+                  <Tooltip />
+                  {monitor.regionalMonitoring.regions.map((regionId, index) => (
+                    <Line
+                      key={regionId}
+                      dataKey={`${regionId}.${regionalMetric}`}
+                      name={
+                        regionalData?.regions?.find(
+                          (item) => item.regionId === regionId,
+                        )?.region.name || regionId
+                      }
+                      stroke={
+                        ["#2563eb", "#059669", "#7c3aed", "#c2410c"][index % 4]
+                      }
+                      dot={false}
+                      connectNulls={false}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div>
+              <h3>Recent regional checks</h3>
+              <Table
+                columns={[
+                  {
+                    key: "regionId",
+                    label: "Region",
+                    render: (regionId) =>
+                      regionalData?.regions?.find(
+                        (item) => item.regionId === regionId,
+                      )?.region.name || regionId,
+                  },
+                  {
+                    key: "status",
+                    label: "Status",
+                    render: (status) => <Status value={status} />,
+                  },
+                  {
+                    key: "responseTime",
+                    label: "Response",
+                    render: (value) =>
+                      value == null ? "—" : `${Math.round(value)} ms`,
+                  },
+                  {
+                    key: "completedAt",
+                    label: "Checked",
+                    render: (value) => (value ? formatRelative(value) : "—"),
+                  },
+                ]}
+                rows={(regionalData?.recentChecks || [])
+                  .filter((check) =>
+                    monitor.regionalMonitoring.regions.includes(check.regionId),
+                  )
+                  .slice(0, 12)}
+              />
+            </div>
+          </div>
+          {!regionalData && (
+            <Notice tone="info">Loading regional probe data…</Notice>
+          )}
+        </Panel>
+      )}
       <MonitorInsights
         monitorId={id}
         details={details}
@@ -306,6 +438,10 @@ export default function MonitorDetails() {
                     name: f.get("name"),
                     url: f.get("url"),
                     interval: Number(f.get("interval")),
+                    regionalMonitoring: {
+                      enabled: f.get("regionalMonitoring.enabled") === "on",
+                      regions: f.getAll("regionalMonitoring.regions"),
+                    },
                     performanceAlerts: {
                       enabled: f.get("performanceAlerts.enabled") === "on",
                       ...(usage?.features?.performanceAlertConfig
@@ -356,6 +492,10 @@ export default function MonitorDetails() {
                   <option value="300">300 seconds</option>
                   <option value="600">600 seconds</option>
                 </Select>
+                <RegionalMonitoringFields
+                  usage={usage}
+                  config={monitor.regionalMonitoring}
+                />
                 <fieldset className="settings-grid rounded-lg border p-3 md:col-span-2">
                   <legend>Performance degradation alerts</legend>
                   <label className="flex items-center gap-2">

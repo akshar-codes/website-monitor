@@ -30,6 +30,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { formatUptime } from "../utils/format";
+import RegionalMonitoringFields from "../components/monitor/RegionalMonitoringFields";
 
 const STATUS_FILTERS = [
   { label: "All", value: "all" },
@@ -446,6 +447,10 @@ export default function Monitors() {
                   interval: Number(form.get("interval")),
                   method: form.get("method") || "GET",
                   active: true,
+                  regionalMonitoring: {
+                    enabled: form.get("regionalMonitoring.enabled") === "on",
+                    regions: form.getAll("regionalMonitoring.regions"),
+                  },
                 });
               }}
             >
@@ -483,6 +488,13 @@ export default function Monitors() {
                 <option>HEAD</option>
                 <option>POST</option>
               </Select>
+              <RegionalMonitoringFields
+                usage={usage}
+                config={
+                  editMonitor?.regionalMonitoring ||
+                  duplicateSource?.regionalMonitoring
+                }
+              />
               <div className="modal-actions">
                 <Button
                   variant="secondary"
