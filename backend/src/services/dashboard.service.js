@@ -789,6 +789,22 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
       p50ResponseTime: null,
       p99ResponseTime: null,
       responseTimeSampleCount: 0,
+      responseTime: {
+        sampleCount: 0,
+        average: 0,
+        min: null,
+        max: null,
+        p50: null,
+        p95: null,
+        p99: null,
+        estimate: "histogram_bucket_upper_bound",
+      },
+      timings: Object.fromEntries(
+        ["dns", "tcpConnect", "tlsHandshake", "ttfb"].map((metric) => [
+          metric,
+          { sampleCount: 0, p50: null, p95: null },
+        ]),
+      ),
       latencyPercentiles: {
         estimate: "histogram_bucket_upper_bound",
         responseTime: { sampleCount: 0, p50: null, p95: null, p99: null },
@@ -915,6 +931,21 @@ const computeOverviewStats = async (monitorId, monitor, startDate, endDate) => {
     p50ResponseTime,
     p99ResponseTime,
     responseTimeSampleCount: responseDistribution.sampleCount,
+    responseTime: {
+      sampleCount: responseDistribution.sampleCount,
+      average: parseFloat(
+        (
+          (result.responseTimeSum || 0) / responseDistribution.sampleCount || 0
+        ).toFixed(2),
+      ),
+      min: result.minResponseTime ?? null,
+      max: result.maxResponseTime ?? null,
+      p50: p50ResponseTime,
+      p95: p95Estimate,
+      p99: p99ResponseTime,
+      estimate: "histogram_bucket_upper_bound",
+    },
+    timings,
     latencyPercentiles: {
       estimate: "histogram_bucket_upper_bound",
       responseTime: {

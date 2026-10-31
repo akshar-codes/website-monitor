@@ -311,6 +311,15 @@ export default function MonitorDetails() {
                       ...(usage?.features?.performanceAlertConfig
                         ? {
                             sensitivity: f.get("performanceAlerts.sensitivity"),
+                            ...(f.get("performanceAlerts.thresholdMultiplier")
+                              ? {
+                                  thresholdMultiplier: Number(
+                                    f.get(
+                                      "performanceAlerts.thresholdMultiplier",
+                                    ),
+                                  ),
+                                }
+                              : {}),
                             consecutiveBreaches: Number(
                               f.get("performanceAlerts.consecutiveBreaches"),
                             ),
@@ -369,6 +378,19 @@ export default function MonitorDetails() {
                     <option value="normal">Normal · balanced</option>
                     <option value="high">High · smaller changes</option>
                   </Select>
+                  <Input
+                    label="Threshold multiplier (optional)"
+                    name="performanceAlerts.thresholdMultiplier"
+                    type="number"
+                    min="1.1"
+                    max="5"
+                    step="0.1"
+                    placeholder="Use sensitivity preset"
+                    defaultValue={
+                      monitor.performanceAlerts?.thresholdMultiplier ?? ""
+                    }
+                    disabled={!usage?.features?.performanceAlertConfig}
+                  />
                   <Input
                     label="Consecutive breaches"
                     name="performanceAlerts.consecutiveBreaches"

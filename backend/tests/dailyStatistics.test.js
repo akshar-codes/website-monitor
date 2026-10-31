@@ -59,6 +59,45 @@ test("missing observations are uncovered and never counted as healthy", () => {
   assert.equal(result.unobservedSeconds, 86400);
 });
 
+test("latency histograms include only eligible response and phase samples", () => {
+  const result = summarizeChecks(
+    [
+      {
+        status: HEALTH_STATUS.UP,
+        responseTime: 100,
+        httpStatus: 200,
+        timings: { dnsMs: 8, tcpConnectMs: 12, tlsHandshakeMs: 20, ttfbMs: 45 },
+        intervalSeconds: 300,
+        scheduled: true,
+        checkedAt: new Date("2026-10-21T12:00:00Z"),
+      },
+      {
+        status: HEALTH_STATUS.DOWN,
+        responseTime: null,
+        httpStatus: null,
+        timings: {
+          dnsMs: 9,
+          tcpConnectMs: null,
+          tlsHandshakeMs: null,
+          ttfbMs: null,
+        },
+        intervalSeconds: 300,
+        scheduled: true,
+        checkedAt: new Date("2026-10-21T12:05:00Z"),
+      },
+    ],
+    monitor,
+    new Date("2026-10-21T00:00:00Z"),
+    new Date("2026-10-22T00:00:00Z"),
+  );
+
+  assert.equal(result.latencyHistograms.responseTime.sampleCount, 1);
+  assert.equal(result.latencyHistograms.dnsMs.sampleCount, 2);
+  assert.equal(result.latencyHistograms.tcpConnectMs.sampleCount, 1);
+  assert.equal(result.latencyHistograms.tlsHandshakeMs.sampleCount, 1);
+  assert.equal(result.latencyHistograms.ttfbMs.sampleCount, 1);
+});
+
 test("rerunning daily aggregation replaces the bucket instead of double-counting", async () => {
   const date = new Date("2026-10-21T23:59:59Z");
   const checks = [
