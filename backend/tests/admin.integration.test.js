@@ -12,7 +12,7 @@ import Incident from "../src/models/Incident.js";
 // boundary. No database connection or production credentials are used.
 Object.assign(process.env, {
   NODE_ENV: "test",
-  MONGO_URI: "mongodb://127.0.0.1:27099/website-monitor-tests",
+  MONGO_URI: "mongodb://127.0.0.1:27099/site-watch-tests",
   CORS_ORIGIN: "http://localhost:5173",
   COOKIE_SECRET: "test-cookie-secret-with-more-than-thirty-two-characters",
   SESSION_SECRET: "test-session-secret-with-more-than-thirty-two-characters",

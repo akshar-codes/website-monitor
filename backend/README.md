@@ -1,4 +1,4 @@
-# Website Monitor backend
+# SiteWatch backend
 
 The backend is an Express API with MongoDB persistence. Starting the server also starts scheduled HTTP health checks, SSL/domain checks, notification digest dispatch, and retention maintenance.
 

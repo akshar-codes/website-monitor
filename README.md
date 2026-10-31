@@ -1,6 +1,6 @@
-# Website Monitor
+# SiteWatch
 
-Website Monitor **v2.0.0** is a web application for checking website availability, tracking incidents, and reviewing endpoint response data. It includes a React frontend and an Express API backed by MongoDB.
+SiteWatch **v2.0.0** is a web application for checking website availability, tracking incidents, and reviewing endpoint response data. It includes a React frontend and an Express API backed by MongoDB.
 
 ## Features
 

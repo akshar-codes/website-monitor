@@ -57,7 +57,7 @@ const shutdown = async (signal, exitCode = 0) => {
 registerProcessHandlers((signal) => shutdown(signal, 1));
 
 const startServer = async () => {
-  logger.info(`Starting website-monitor API — environment: ${env.NODE_ENV}`);
+  logger.info(`Starting site-watch API — environment: ${env.NODE_ENV}`);
 
   // 1. Connect to MongoDB
   await connectDB();

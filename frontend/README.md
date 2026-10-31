@@ -1,4 +1,4 @@
-# Website Monitor frontend
+# SiteWatch frontend
 
 The frontend is a React 19 single-page application built with Vite. It uses the relative `/api` path for backend requests and the backend's `/uploads` path for local avatar files. The Vite development server proxies both paths to `http://localhost:5000`.
 

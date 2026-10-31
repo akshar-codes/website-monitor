@@ -168,7 +168,7 @@ export function AuthShell({
           <span>SiteWatch</span>
         </Link>
         <div className="auth-pitch">
-          <span className="auth-kicker">WEBSITE MONITORING</span>
+          <span className="auth-kicker">SITEWATCH MONITORING</span>
           <h1>
             Your websites.
             <br />

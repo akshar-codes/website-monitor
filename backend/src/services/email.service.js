@@ -156,7 +156,7 @@ export const sendNotificationEmail = async (user, notification) => {
   const actionUrl = notification.link
     ? `${env.CLIENT_URL}${notification.link}`
     : env.CLIENT_URL;
-  const html = `<div style="font-family:Arial,sans-serif;color:#18181b;max-width:600px"><h2>${title}</h2><p>${message}</p><p><a href="${escapeEmailText(actionUrl)}">View in Website Monitor</a></p></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;color:#18181b;max-width:600px"><h2>${title}</h2><p>${message}</p><p><a href="${escapeEmailText(actionUrl)}">View in SiteWatch</a></p></div>`;
   await sendMail({
     to: user.email,
     subject: notification.title.replace(/[\r\n]+/g, " "),
@@ -176,14 +176,14 @@ export const sendNotificationDigestEmail = async (
         `<li><strong>${escapeEmailText(item.title)}</strong><br/>${escapeEmailText(item.message)}</li>`,
     )
     .join("");
-  const html = `<div style="font-family:Arial,sans-serif;color:#18181b;max-width:600px"><h2>Your ${frequency} monitoring digest</h2><ul>${rows}</ul><p><a href="${escapeEmailText(env.CLIENT_URL)}">Open Website Monitor</a></p></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;color:#18181b;max-width:600px"><h2>Your ${frequency} monitoring digest</h2><ul>${rows}</ul><p><a href="${escapeEmailText(env.CLIENT_URL)}">Open SiteWatch</a></p></div>`;
   const text = [
     `Your ${frequency} monitoring digest`,
     ...notifications.map((item) => `${item.title}: ${item.message}`),
   ].join("\n\n");
   await sendMail({
     to: user.email,
-    subject: `Website Monitor ${frequency} digest (${notifications.length})`,
+    subject: `SiteWatch ${frequency} digest (${notifications.length})`,
     html,
     text,
   });

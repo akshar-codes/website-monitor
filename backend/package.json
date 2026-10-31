@@ -2,9 +2,9 @@
   "engines": {
     "node": "24.16.0"
   },
-  "name": "website-monitor",
+  "name": "site-watch",
   "version": "2.0.0",
-  "description": "Website monitoring service backend",
+  "description": "SiteWatch uptime and monitoring service backend",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

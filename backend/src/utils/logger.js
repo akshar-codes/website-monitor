@@ -100,7 +100,7 @@ const fileTransports = env.isTest
 const logger = createLogger({
   level: env.LOG_LEVEL,
   format: jsonFileFormat,
-  defaultMeta: { service: "website-monitor-api" },
+  defaultMeta: { service: "site-watch-api" },
   // Don't let a caught exception inside a transport crash the process —
   // process-level crash handling is owned by utils/processHandlers.js.
   exitOnError: false,
