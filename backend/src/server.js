@@ -10,6 +10,10 @@ import {
 } from "./services/sslScheduler.js";
 import { verifyMailTransport } from "./config/mail.js";
 import { dispatchNotificationDigests } from "./services/notification.service.js";
+import {
+  start as startStatusNotifications,
+  stop as stopStatusNotifications,
+} from "./workers/statusNotificationWorker.js";
 
 let server = null;
 let shuttingDown = false;
@@ -37,6 +41,7 @@ const shutdown = async (signal, exitCode = 0) => {
   // Stop the schedulers first (no new polls/checks)
   await stop();
   await stopSslScheduler();
+  await stopStatusNotifications();
   if (digestTimer) clearInterval(digestTimer);
 
   if (!server) {
@@ -68,6 +73,7 @@ const startServer = async () => {
   // 3. Start the monitoring schedulers
   start();
   startSslScheduler();
+  startStatusNotifications();
   digestTimer = setInterval(
     () =>
       dispatchNotificationDigests().catch((error) =>

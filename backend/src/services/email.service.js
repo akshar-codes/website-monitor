@@ -203,3 +203,58 @@ export const sendNotificationDigestEmail = async (
     text,
   });
 };
+
+export const sendStatusSubscriberEmail = async ({
+  to,
+  subject,
+  message,
+  statusUrl,
+  preferencesUrl,
+  unsubscribeUrl,
+}) => {
+  const safe = (value = "") =>
+    String(value).replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[c],
+    );
+  const html = `<div style="font-family:Arial,sans-serif;color:#18181b;max-width:600px"><h2>${safe(subject)}</h2><p>${safe(message)}</p><p><a href="${safe(statusUrl)}">View status page</a></p><p style="font-size:12px;color:#666">You received this because you subscribed to status updates. <a href="${safe(preferencesUrl)}">Manage preferences</a> · <a href="${safe(unsubscribeUrl)}">Unsubscribe</a>.</p></div>`;
+  await sendMail({
+    to,
+    subject: subject.replace(/[\r\n]+/g, " "),
+    html,
+    text: `${message}\n\n${statusUrl}\n\nManage preferences: ${preferencesUrl}\nUnsubscribe: ${unsubscribeUrl}`,
+  });
+};
+
+export const sendStatusVerificationEmail = async ({
+  to,
+  pageName,
+  verificationUrl,
+}) => {
+  const safe = (value = "") =>
+    String(value).replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[c],
+    );
+  const html = `<div style="font-family:Arial,sans-serif;color:#18181b;max-width:600px"><h2>Confirm your status updates</h2><p>Confirm your email to receive incident and maintenance updates for ${safe(pageName)}.</p><p><a href="${safe(verificationUrl)}">Verify subscription</a></p><p>This link expires in 24 hours.</p></div>`;
+  await sendMail({
+    to,
+    subject: `Confirm status updates for ${pageName}`.replace(/[\r\n]+/g, " "),
+    html,
+    text: `Confirm your email to receive status updates for ${pageName}: ${verificationUrl}`,
+  });
+};

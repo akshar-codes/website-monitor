@@ -73,4 +73,19 @@ export const apiKeyLimiter = rateLimit({
   handler: rateLimitHandler,
 });
 
+export const statusSubscriptionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+export const statusTokenLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
 export default globalLimiter;
