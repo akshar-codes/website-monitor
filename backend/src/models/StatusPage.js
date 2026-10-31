@@ -34,6 +34,14 @@ const statusPageSchema = new mongoose.Schema(
     },
     description: { type: String, trim: true, maxlength: 500, default: "" },
     logo: { type: String, trim: true, maxlength: 500, default: "" },
+    branding: {
+      theme: { type: String, enum: ["light", "dark"], default: "light" },
+      accentColor: {
+        type: String,
+        match: /^#[0-9a-fA-F]{6}$/,
+        default: "#15803d",
+      },
+    },
     timezone: { type: String, default: "UTC", maxlength: 80 },
     isPublished: { type: Boolean, default: false },
     publishedAt: { type: Date, default: null },
