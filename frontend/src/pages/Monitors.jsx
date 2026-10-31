@@ -28,7 +28,6 @@ import {
   Play,
   Copy,
   Pencil,
-  ExternalLink,
 } from "lucide-react";
 import { formatUptime } from "../utils/format";
 
@@ -61,7 +60,12 @@ function useMonitorsWithStats(monitors = []) {
       const map = {};
       monitors.forEach((m, i) => {
         if (results[i].status === "fulfilled") {
-          map[m.id || m._id] = results[i].value.data;
+          const stats = results[i].value.data;
+          map[m.id || m._id] = {
+            status: stats.currentStatus,
+            uptimePercentage: stats.uptime?.percentage ?? null,
+            avgResponseTime: stats.responseTime?.average ?? null,
+          };
         }
       });
       return map;
@@ -277,7 +281,17 @@ export default function Monitors() {
                   const id = m.id || m._id;
                   const stats = statsMap[id];
                   return (
-                    <tr key={id}>
+                    <tr
+                      key={id}
+                      className="monitor-clickable-row"
+                      role="link"
+                      tabIndex={0}
+                      aria-label={`View details for ${m.name}`}
+                      onClick={() => navigate(`/monitors/${id}`)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") navigate(`/monitors/${id}`);
+                      }}
+                    >
                       <td>
                         <b className="table-primary">{m.name}</b>
                         <small className="table-secondary">{m.url}</small>
@@ -304,18 +318,21 @@ export default function Monitors() {
                           : "—"}
                       </td>
                       <td>
-                        <div className="row-actions">
+                        <div
+                          className="row-actions"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
                           <button
-                            title="Open"
-                            onClick={() => navigate(`/monitors/${id}`)}
+                            aria-label="Edit"
+                            data-tooltip="Edit"
+                            onClick={() => openEdit(m)}
                           >
-                            <ExternalLink size={14} />
-                          </button>
-                          <button title="Edit" onClick={() => openEdit(m)}>
                             <Pencil size={14} />
                           </button>
                           <button
-                            title={m.active ? "Pause" : "Resume"}
+                            aria-label={m.active ? "Pause" : "Resume"}
+                            data-tooltip={m.active ? "Pause" : "Resume"}
                             onClick={() => toggleMonitor(id, !m.active, m.name)}
                           >
                             <>
@@ -327,7 +344,8 @@ export default function Monitors() {
                             </>
                           </button>
                           <button
-                            title="Duplicate"
+                            aria-label="Duplicate"
+                            data-tooltip="Duplicate"
                             onClick={() => {
                               setDuplicateSource(m);
                               setEditMonitor(null);
@@ -337,7 +355,8 @@ export default function Monitors() {
                             <Copy size={14} />
                           </button>
                           <button
-                            title="Delete"
+                            aria-label="Delete"
+                            data-tooltip="Delete"
                             onClick={() => setDeleteTarget(m)}
                           >
                             <Trash2 size={14} />

@@ -433,17 +433,22 @@
 .detail-list {
   display: grid;
   grid-template-columns: minmax(110px, 0.65fr) 1.35fr;
-  gap: 11px;
+  column-gap: 16px;
+  row-gap: 13px;
   margin: 0;
-  font-size: 10px;
+  font-size: 14px;
+  line-height: 1.5;
 }
 .detail-list dt {
   color: #8495aa;
+  font-size: 13px;
 }
 .detail-list dd {
   margin: 0;
   color: #334c6b;
   font-weight: 600;
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
 .monitor-detail-status {
   display: flex;

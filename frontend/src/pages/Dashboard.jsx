@@ -78,11 +78,19 @@ function MetricCard({ icon: Icon, label, value, color = "green", spark }) {
   const t = useTranslation();
   return (
     <article className="metric-card">
-      <div className={`metric-icon ${color}`}>
-        <Icon size={18} />
+      <div className="metric-top">
+        <div className={`metric-icon ${color}`}>
+          <Icon size={18} />
+        </div>
+        <MiniTrend
+          values={spark}
+          color={color === "red" ? "#f05c62" : "#08a879"}
+        />
       </div>
       <div className="metric-main">
-        <span className="eyebrow">{t(label)}</span>
+        <span className="eyebrow" title={t(label)}>
+          {t(label)}
+        </span>
         <strong>{value}</strong>
         <div className="metric-foot">
           <span>
@@ -90,10 +98,6 @@ function MetricCard({ icon: Icon, label, value, color = "green", spark }) {
           </span>
         </div>
       </div>
-      <MiniTrend
-        values={spark}
-        color={color === "red" ? "#f05c62" : "#08a879"}
-      />
     </article>
   );
 }
@@ -113,6 +117,13 @@ function ChartTooltip({ active, payload, label, suffix = "" }) {
 
 export default function Dashboard() {
   const t = useTranslation();
+  const localHour = new Date().getHours();
+  const greeting =
+    localHour < 12
+      ? { label: "Good morning,", emoji: "☀️" }
+      : localHour < 17
+        ? { label: "Good afternoon,", emoji: "🌤️" }
+        : { label: "Good evening,", emoji: "🌙" };
   const location = useLocation();
   const navigate = useNavigate();
   const { preferences } = usePreferences();
@@ -234,8 +245,8 @@ export default function Dashboard() {
             <div className="welcome-row">
               <div>
                 <h1>
-                  {t("Good morning,")} {displayName}{" "}
-                  <span aria-hidden="true">☀️</span>
+                  {t(greeting.label)} {displayName}{" "}
+                  <span aria-hidden="true">{greeting.emoji}</span>
                 </h1>
                 <p>Here’s what’s happening with your websites today.</p>
               </div>
@@ -532,7 +543,7 @@ export default function Dashboard() {
                   </article>
                 )}
                 {dashboardPrefs?.widgets?.showRecentActivity !== false && (
-                  <article className="panel">
+                  <article className="panel activity-panel">
                     <div className="panel-heading">
                       <div>
                         <h2>Recent Activity</h2>
@@ -545,7 +556,7 @@ export default function Dashboard() {
                     {recentActivities.length ? (
                       recentActivities.slice(0, 5).map((item) => (
                         <div
-                          className="health-row"
+                          className="activity-row"
                           key={item.id || item._id || item.createdAt}
                         >
                           <b>

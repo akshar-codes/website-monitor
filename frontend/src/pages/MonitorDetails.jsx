@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMonitorDetails, useMonitorMutations } from "../hooks/useMonitors";
 import { useUsage } from "../hooks/useUsage";
+import MonitorInsights from "../components/monitorDetails/MonitorInsights";
 import { ROUTES } from "../constants/routes";
 import { formatRelative, formatUptime } from "../utils/format";
 import {
@@ -58,7 +59,7 @@ export default function MonitorDetails() {
   const details = data?.data;
 
   const { data: usageData } = useUsage();
-  const _usage = usageData?.data;
+  const usage = usageData?.data;
 
   const handleMutationSuccess = useCallback(
     (action) => {
@@ -286,6 +287,11 @@ export default function MonitorDetails() {
           rows={checks}
         />
       </Panel>
+      <MonitorInsights
+        monitorId={id}
+        details={details}
+        retentionDays={usage?.retention?.days}
+      />
       {(editOpen || deleteOpen) && (
         <div className="modal-backdrop">
           <section className="form-modal">
