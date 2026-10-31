@@ -437,7 +437,8 @@ test("notification retry schedule is bounded and errors are sanitized", () => {
   const now = Date.now();
   const retry = deliveryRetry(3, "ECONNRESET");
   assert.equal(retry.terminal, false);
-  assert.equal(retry.nextAttemptAt.getTime() - now, 120_000);
+  assert.ok(retry.nextAttemptAt.getTime() - now >= 120_000);
+  assert.ok(retry.nextAttemptAt.getTime() - now < 120_010);
   assert.equal(retry.safeError, "Email delivery failed (ECONNRESET)");
   assert.equal(deliveryRetry(5, "bad detail with token").terminal, true);
   assert.equal(

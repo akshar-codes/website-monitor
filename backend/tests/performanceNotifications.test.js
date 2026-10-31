@@ -11,7 +11,7 @@ const preferenceDocument = (notifications) => ({
   notifications: { toObject: () => notifications },
 });
 
-test("performance notification respects in-app and email preferences", async (t) => {
+test("performance notifications persist for integration dispatch without bypassing channel preferences", async (t) => {
   t.mock.method(UserPreference, "getOrCreateForUser", async () =>
     preferenceDocument({
       inApp: { performanceAlerts: false },
@@ -20,9 +20,13 @@ test("performance notification respects in-app and email preferences", async (t)
     }),
   );
   let createCalls = 0;
-  t.mock.method(Notification, "create", async () => {
+  t.mock.method(Notification, "create", async (data) => {
     createCalls += 1;
-    return {};
+    return {
+      ...data,
+      channels: { inApp: {}, email: {}, push: {} },
+      save: async () => ({}),
+    };
   });
 
   const result = await createNotification({
@@ -32,8 +36,9 @@ test("performance notification respects in-app and email preferences", async (t)
     message: "Response times are elevated.",
   });
 
-  assert.equal(result, null);
-  assert.equal(createCalls, 0);
+  assert.ok(result);
+  assert.equal(createCalls, 1);
+  assert.equal(result.channels.inApp.sent, false);
 });
 
 test("performance events are eligible for digest delivery when enabled", async (t) => {
