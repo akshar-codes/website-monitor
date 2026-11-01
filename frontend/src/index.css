@@ -1781,6 +1781,92 @@ button {
   font-size: 11px;
   line-height: 1.6;
 }
+.oauth-buttons {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #78879a;
+  font-size: 12px;
+  line-height: 1;
+  text-align: center;
+}
+.oauth-divider::before,
+.oauth-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid #e4e8ee;
+}
+.oauth-provider-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.oauth-provider-button {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 10px 8px 10px 26px;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  background: #fff;
+  color: #3c4043;
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+.oauth-provider-button:hover:not(:disabled) {
+  border-color: #c6cbd1;
+  background: #f8faff;
+  box-shadow: 0 1px 2px #1f29370d;
+}
+.oauth-provider-button:focus-visible {
+  outline: 3px solid #4285f455;
+  outline-offset: 2px;
+}
+.oauth-provider-button:disabled {
+  cursor: not-allowed;
+  color: #7c8795;
+  background: #f7f8fa;
+  opacity: 0.72;
+}
+.oauth-provider-icon {
+  position: absolute;
+  left: 10px;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.oauth-github-icon {
+  width: 20px;
+  height: 20px;
+  color: #24292f;
+}
+.oauth-provider-button:disabled .oauth-github-icon {
+  color: #7c8795;
+}
+.oauth-buttons [role="status"] {
+  margin: -2px 0 0;
+  color: #7b8796;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: center;
+}
 .auth-card .sw-form {
   margin-top: 21px;
 }
@@ -1792,17 +1878,22 @@ button {
 .auth-footer {
   margin-top: 19px;
   color: #778aa3;
-  font-size: 10px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
   text-align: center;
 }
 .auth-footer a {
   color: #078d6b;
-  font-weight: 700;
+  font-weight: 600;
 }
 .auth-legal {
   margin-top: 28px;
   color: #9aa8b8;
-  font-size: 9px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: center;
 }
 .auth-page.compact {
   grid-template-columns: 1fr;

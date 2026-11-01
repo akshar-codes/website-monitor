@@ -1,5 +1,11 @@
 import apiClient from "./client";
 
+/** GET /api/auth/providers — OAuth strategies configured by the backend. */
+export async function getOAuthProviders() {
+  const { data } = await apiClient.get("/auth/providers");
+  return data?.data?.providers || {};
+}
+
 /**
  * POST /api/auth/register
  */

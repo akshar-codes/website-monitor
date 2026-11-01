@@ -4,6 +4,7 @@ import useAuthForm from "../hooks/useAuthForm";
 import { mapAuthError } from "../utils/AuthErrors";
 import { AuthShell, Button, Input, Notice } from "../components/ui/Primitives";
 import { Link } from "react-router-dom";
+import OAuthButtons from "../components/auth/OAuthButtons";
 
 export default function Register() {
   const { register } = useAuth();
@@ -120,6 +121,7 @@ export default function Register() {
           </>
         )}
       </form>
+      {!registeredEmail && <OAuthButtons />}
     </AuthShell>
   );
 }

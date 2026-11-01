@@ -7,6 +7,7 @@ import { ROLES } from "../constants/roles";
 import { mapAuthError, getAuthErrorCode } from "../utils/AuthErrors";
 import { AuthShell, Button, Input, Notice } from "../components/ui/Primitives";
 import { Link } from "react-router-dom";
+import OAuthButtons from "../components/auth/OAuthButtons";
 
 export default function Login() {
   const { login } = useAuth();
@@ -114,6 +115,7 @@ export default function Login() {
           {submitting ? "Signing in…" : "Sign in"}
         </Button>
       </form>
+      <OAuthButtons />
     </AuthShell>
   );
 }
