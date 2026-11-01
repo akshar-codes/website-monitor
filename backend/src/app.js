@@ -40,21 +40,23 @@ app.use(compression());
 app.use(requestLogger);
 
 // ── Static file serving ──
-// Locally-stored profile avatars (see middlewares/uploadAvatar.js and
-// services/profile.service.js). Mounted ahead of body parsing/sessions
-// since it's a plain read-only file server with no need for either.
+// Legacy locally-stored profile avatars. New uploads go to Cloudinary;
+// retain this route so existing avatar URLs continue working.
 app.use(
   "/uploads/avatars",
   express.static(path.resolve(__dirname, "..", env.AVATAR_UPLOAD_DIR)),
 );
 
 // ── Body parsing ──
-app.use(express.json({
-  limit: env.MAX_BODY_SIZE,
-  verify(req, _res, buffer) {
-    if (req.originalUrl.startsWith("/api/payments/webhook")) req.rawBody = Buffer.from(buffer);
-  },
-}));
+app.use(
+  express.json({
+    limit: env.MAX_BODY_SIZE,
+    verify(req, _res, buffer) {
+      if (req.originalUrl.startsWith("/api/payments/webhook"))
+        req.rawBody = Buffer.from(buffer);
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true, limit: env.MAX_BODY_SIZE }));
 
 // ── Cookies ──

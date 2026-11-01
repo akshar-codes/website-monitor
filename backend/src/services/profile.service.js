@@ -7,6 +7,11 @@ import {
   AVATAR_DIR_ABSOLUTE,
   AVATAR_URL_PREFIX,
 } from "../middlewares/uploadAvatar.js";
+import {
+  deleteImage,
+  getManagedImagePublicId,
+  uploadImage,
+} from "./imageStorage.service.js";
 import { logActivity } from "../utils/activityLogger.js";
 import {
   ACTIVITY_CATEGORIES,
@@ -100,6 +105,11 @@ const deleteLocalAvatarFile = async (avatarUrl) => {
   }
 };
 
+const deleteManagedAvatar = async (avatarUrl) => {
+  await deleteLocalAvatarFile(avatarUrl);
+  await deleteImage(getManagedImagePublicId(avatarUrl));
+};
+
 // ── View profile ─────────────────────────────────────────────────────────────
 
 export const getProfile = async (user) => {
@@ -151,7 +161,7 @@ export const deleteAccount = async (userId, confirmationEmail) => {
 
   await account.deleteOne();
   await destroyAllUserSessions(account._id.toString());
-  await deleteLocalAvatarFile(account.avatarUrl);
+  await deleteManagedAvatar(account.avatarUrl);
   logger.info(`Account ${account._id} permanently deleted by its owner`);
 };
 
@@ -197,13 +207,26 @@ export const uploadAvatar = async (userId, file) => {
   }
 
   const previousAvatarUrl = user.avatarUrl;
+  const uploaded = await uploadImage(file.buffer, {
+    folder: "sitewatch/avatars",
+    publicId: `${user._id}-${Date.now()}`,
+    transformation: [
+      { width: 512, height: 512, crop: "limit" },
+      { quality: "auto", fetch_format: "auto" },
+    ],
+  });
 
-  user.avatarUrl = `${AVATAR_URL_PREFIX}/${file.filename}`;
-  await user.save({ validateBeforeSave: false });
+  user.avatarUrl = uploaded.url;
+  try {
+    await user.save({ validateBeforeSave: false });
+  } catch (error) {
+    await deleteImage(uploaded.publicId);
+    throw error;
+  }
 
   // Clean up the old file only after the new one is committed, so a
   // mid-request failure never leaves the account without any avatar file.
-  await deleteLocalAvatarFile(previousAvatarUrl);
+  await deleteManagedAvatar(previousAvatarUrl);
 
   logger.info(`Avatar updated for user ${user._id}`);
 
@@ -236,7 +259,7 @@ export const deleteAvatar = async (userId) => {
   user.avatarUrl = null;
   await user.save({ validateBeforeSave: false });
 
-  await deleteLocalAvatarFile(previousAvatarUrl);
+  await deleteManagedAvatar(previousAvatarUrl);
 
   logger.info(`Avatar removed for user ${user._id}`);
 

@@ -278,16 +278,12 @@ const envSchema = z
       .url("GITHUB_CALLBACK_URL must be a valid URL")
       .optional(),
 
-    // ── Profile / avatar uploads ──
-    // Local-disk storage — no cloud object storage (S3/Cloudinary/etc.) is
-    // configured anywhere else in this stack, so profile avatars are served
-    // straight off disk via express.static (see app.js) rather than pulling
-    // in a cloud SDK for a single upload path. Swapping to cloud storage
-    // later only requires changing middlewares/uploadAvatar.js and
-    // services/profile.service.js — nothing else depends on the storage
-    // mechanism.
+    // ── Image uploads ──
+    CLOUDINARY_CLOUD_NAME: z.string().optional().default(""),
+    CLOUDINARY_API_KEY: z.string().optional().default(""),
+    CLOUDINARY_API_SECRET: z.string().optional().default(""),
 
-    /** Directory (relative to the backend project root) avatar files are written to. */
+    /** Legacy local avatar directory, retained for existing uploaded avatars. */
     AVATAR_UPLOAD_DIR: z.string().default("uploads/avatars"),
 
     /** Maximum accepted avatar upload size, in bytes. Defaults to 2 MB. */
@@ -304,6 +300,24 @@ const envSchema = z
       message:
         "MONITOR_JOB_LEASE_MS must exceed POLL_TOTAL_TIMEOUT_MS by at least 5 seconds",
       path: ["MONITOR_JOB_LEASE_MS"],
+    },
+  )
+  .refine(
+    (config) => {
+      const cloudinaryValues = [
+        config.CLOUDINARY_CLOUD_NAME,
+        config.CLOUDINARY_API_KEY,
+        config.CLOUDINARY_API_SECRET,
+      ];
+      return (
+        cloudinaryValues.every((value) => !value) ||
+        cloudinaryValues.every(Boolean)
+      );
+    },
+    {
+      message:
+        "Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET together",
+      path: ["CLOUDINARY_CLOUD_NAME"],
     },
   );
 

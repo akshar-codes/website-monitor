@@ -1,7 +1,6 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import crypto from "crypto";
 import { fileURLToPath } from "url";
 import env from "../config/env.js";
 import ApiError from "../utils/ApiError.js";
@@ -11,9 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Absolute path to the avatar upload directory, resolved once at module
- * load. `env.AVATAR_UPLOAD_DIR` is relative to the backend project root
- * (backend/), mirroring how utils/logger.js resolves LOG_DIR.
+ * Absolute path used to clean up avatars saved by the legacy disk uploader.
  */
 export const AVATAR_DIR_ABSOLUTE = path.resolve(
   __dirname,
@@ -21,7 +18,7 @@ export const AVATAR_DIR_ABSOLUTE = path.resolve(
   env.AVATAR_UPLOAD_DIR,
 );
 
-/** Public URL prefix the directory is mounted under — see app.js. */
+/** Public URL prefix used by legacy disk-stored avatar URLs. */
 export const AVATAR_URL_PREFIX = "/uploads/avatars";
 
 if (!fs.existsSync(AVATAR_DIR_ABSOLUTE)) {
@@ -35,16 +32,6 @@ const ALLOWED_MIME_TYPES = new Map([
   ["image/webp", "webp"],
 ]);
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, AVATAR_DIR_ABSOLUTE),
-  filename: (req, file, cb) => {
-    const ext = ALLOWED_MIME_TYPES.get(file.mimetype) || "jpg";
-    const userId = req.user?.id || req.user?._id?.toString() || "anonymous";
-    const uniqueSuffix = crypto.randomBytes(8).toString("hex");
-    cb(null, `${userId}-${Date.now()}-${uniqueSuffix}.${ext}`);
-  },
-});
-
 const fileFilter = (_req, file, cb) => {
   if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
     return cb(
@@ -57,7 +44,7 @@ const fileFilter = (_req, file, cb) => {
 };
 
 const avatarUpload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: {
     fileSize: env.AVATAR_MAX_FILE_SIZE_BYTES,
