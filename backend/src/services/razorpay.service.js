@@ -165,7 +165,7 @@ export const verifyPlanPayment = async (
   const lock = await PlanPayment.findOneAndUpdate(
     { _id: record._id, status: "created" },
     { $set: { status: "processing", paymentId } },
-    { new: true },
+    { returnDocument: "after" },
   );
   if (!lock) {
     const latest = await PlanPayment.findById(record._id).lean();

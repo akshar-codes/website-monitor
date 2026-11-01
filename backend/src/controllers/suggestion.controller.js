@@ -47,7 +47,7 @@ export const markSuggestionReviewed = asyncHandler(async (req, res) => {
   const suggestion = await Suggestion.findByIdAndUpdate(
     req.params.id,
     { status: "reviewed" },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
 
   if (!suggestion) throw ApiError.notFound("Suggestion not found");

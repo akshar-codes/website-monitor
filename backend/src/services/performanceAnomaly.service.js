@@ -61,7 +61,7 @@ export async function evaluatePerformanceCheck(monitor, check, deps = {}) {
         status: "normal",
       },
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
   );
   if (String(state.lastEvaluatedCheckId || "") === String(check._id))
     return state;

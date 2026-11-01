@@ -36,7 +36,7 @@ export async function deliverBatch() {
           },
           $inc: { attempts: 1 },
         },
-        { sort: { createdAt: 1 }, new: true },
+        { sort: { createdAt: 1 }, returnDocument: "after" },
       ).select("+recipient");
       if (!job) break;
       try {
@@ -125,7 +125,7 @@ async function updateMaintenanceStates() {
         scheduledEnd: { $lte: now },
       },
       { $set: { status: "completed" } },
-      { new: true },
+      { returnDocument: "after" },
     );
     if (!ended) break;
     if (ended.isPublished)
@@ -145,7 +145,7 @@ async function updateMaintenanceStates() {
         scheduledEnd: { $gt: now },
       },
       { $set: { status: "in_progress" } },
-      { new: true },
+      { returnDocument: "after" },
     );
     if (!started) break;
     if (started.isPublished)

@@ -163,7 +163,7 @@ export const updateProfile = async (userId, data) => {
   // document.save() would run the account password invariant against those
   // unselected fields and reject an otherwise valid profile edit.
   const user = await User.findByIdAndUpdate(userId, data, {
-    new: true,
+    returnDocument: "after",
     runValidators: true,
   });
   if (!user) {
