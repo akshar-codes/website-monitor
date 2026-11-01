@@ -15,15 +15,16 @@ const buildGoogleStrategy = () => {
       clientID: def.clientID,
       clientSecret: def.clientSecret,
       callbackURL: def.callbackURL,
+      state: true,
     },
     async (_accessToken, _refreshToken, profile, done) => {
       try {
         const primaryEmail = profile.emails?.[0] || null;
-        // Google's OAuth consent flow only ever surfaces addresses it has
-        // itself verified; `verified` is occasionally absent from the
-        // profile object even though the address is verified, so default
-        // to true rather than penalizing a normal Google account.
-        const emailVerifiedByProvider = primaryEmail?.verified ?? true;
+        // Trust only an explicit verified-email claim. Passport's normalized
+        // email entry may omit this flag, while Google's raw profile exposes
+        // `email_verified`.
+        const emailVerifiedByProvider =
+          primaryEmail?.verified ?? profile._json?.email_verified === true;
 
         const user = await findOrCreateOAuthUser({
           provider: OAUTH_PROVIDERS.GOOGLE,

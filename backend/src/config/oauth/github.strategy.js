@@ -15,6 +15,7 @@ const buildGitHubStrategy = () => {
       clientID: def.clientID,
       clientSecret: def.clientSecret,
       callbackURL: def.callbackURL,
+      state: true,
       scope: def.scope,
     },
     async (_accessToken, _refreshToken, profile, done) => {

@@ -24,9 +24,16 @@ import {
   getEnabledProviders,
 } from "../config/oauth/providers.config.js";
 import { OAUTH_PROVIDERS } from "../config/constants.js";
+import { sendSuccess } from "../utils/apiResponse.js";
 
 const router = Router();
 const enabled = getEnabledProviders();
+
+// The frontend uses this public, non-secret capability response to show
+// only providers whose Passport strategies are mounted on this backend.
+router.get("/providers", (_req, res) =>
+  sendSuccess(res, { data: { providers: enabled } }),
+);
 
 if (enabled[OAUTH_PROVIDERS.GOOGLE]) {
   router.get(
