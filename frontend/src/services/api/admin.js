@@ -75,6 +75,17 @@ export async function updateAdminBillingSettings(payload) {
   return data?.data;
 }
 
+export async function getAdminProbeRegionSettings() {
+  const { data } = await apiClient.get("/admin/probe-region-settings");
+  return data?.data || [];
+}
+export async function updateAdminProbeRegionSettings(regions) {
+  const { data } = await apiClient.put("/admin/probe-region-settings", {
+    regions,
+  });
+  return data?.data || [];
+}
+
 export async function getAdminPlanHistory() {
   const { data } = await apiClient.get("/admin/plans/history");
   return data?.data || [];

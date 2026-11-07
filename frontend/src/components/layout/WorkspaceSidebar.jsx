@@ -45,6 +45,7 @@ const adminLinks = [
   ["Overview", "/admin", LayoutDashboard],
   ["Users", "/admin/users", Users],
   ["Monitors", "/admin/monitors", Signal],
+  ["Probe egress IPs", "/admin/probe-regions", Globe2],
   ["Incidents", "/admin/incidents", TriangleAlert],
   ["Plans", "/admin/plans", CreditCard],
   ["Plan requests", "/admin/plan-requests", ClipboardList],

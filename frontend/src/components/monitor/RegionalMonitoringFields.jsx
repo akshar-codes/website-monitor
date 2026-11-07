@@ -52,6 +52,11 @@ export default function RegionalMonitoringFields({ config = {}, usage }) {
                 <small className="block text-slate-500">
                   {region.operational ? "Probe online" : "Probe unavailable"}
                 </small>
+                {region.egressIps?.length > 0 && (
+                  <small className="mt-1 block text-slate-500">
+                    Allowlist: {region.egressIps.join(", ")}
+                  </small>
+                )}
               </span>
             </label>
           );

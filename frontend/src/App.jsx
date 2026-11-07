@@ -40,6 +40,7 @@ const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminUserDetails = lazy(() => import("./pages/AdminUserDetails"));
 const AdminPlans = lazy(() => import("./pages/AdminPlans"));
+const AdminProbeRegions = lazy(() => import("./pages/AdminProbeRegions"));
 const AdminPlanHistory = lazy(() => import("./pages/AdminPlanHistory"));
 const AdminMonitorDetails = lazy(() => import("./pages/AdminMonitorDetails"));
 const AdminMonitors = lazy(() => import("./pages/AdminMonitors"));
@@ -303,6 +304,14 @@ export default function App() {
                           element={
                             <Suspense fallback={null}>
                               <AdminPlans />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/admin/probe-regions"
+                          element={
+                            <Suspense fallback={null}>
+                              <AdminProbeRegions />
                             </Suspense>
                           }
                         />
