@@ -8,6 +8,10 @@ import {
   getBillingSettings,
   saveBillingSettings,
 } from "../services/billingSettings.service.js";
+import {
+  getProbeRegionSettings,
+  saveProbeRegionSettings,
+} from "../services/probeRegionSettings.service.js";
 
 // ── Controllers: users ───────────────────────────────────────────────────────
 
@@ -163,6 +167,15 @@ export const updateAdminBillingSettings = asyncHandler(async (req, res) =>
   sendSuccess(res, {
     message: "Billing settings saved.",
     data: await saveBillingSettings(req.body, req.user),
+  }),
+);
+export const getAdminProbeRegionSettings = asyncHandler(async (_req, res) =>
+  sendSuccess(res, { data: await getProbeRegionSettings() }),
+);
+export const updateAdminProbeRegionSettings = asyncHandler(async (req, res) =>
+  sendSuccess(res, {
+    message: "Probe egress IPs saved.",
+    data: await saveProbeRegionSettings(req.body.regions, req.user),
   }),
 );
 

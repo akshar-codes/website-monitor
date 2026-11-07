@@ -37,6 +37,8 @@ import {
   getPlanOverview,
   getAdminBillingSettings,
   updateAdminBillingSettings,
+  getAdminProbeRegionSettings,
+  updateAdminProbeRegionSettings,
   getPlanHistory,
   getUserPlanDetails,
   updateUserRole,
@@ -51,6 +53,7 @@ import {
 } from "../controllers/admin.controller.js";
 import { adminDashboardQuerySchema } from "../validators/adminDashboard.validator.js";
 import { updateBillingSettingsSchema } from "../validators/billingSettings.validator.js";
+import { updateProbeRegionSettingsSchema } from "../validators/probeRegionSettings.validator.js";
 import {
   adminMonitorListSchema,
   adminIncidentListSchema,
@@ -85,6 +88,12 @@ router.patch(
   "/suggestions/:id/review",
   validateObjectId("id"),
   markSuggestionReviewed,
+);
+router.get("/probe-region-settings", getAdminProbeRegionSettings);
+router.put(
+  "/probe-region-settings",
+  validate(updateProbeRegionSettingsSchema, "body"),
+  updateAdminProbeRegionSettings,
 );
 router.post(
   "/suggestions/:id/reply",

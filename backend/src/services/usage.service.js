@@ -4,6 +4,7 @@ import StatusSubscriber from "../models/StatusSubscriber.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { hasFeature, FEATURES } from "../config/features.js";
 import ProbeAgent from "../models/ProbeAgent.js";
+import ProbeRegionSettings from "../models/ProbeRegionSettings.js";
 import { PROBE_REGIONS } from "../config/regions.js";
 
 /**
@@ -44,6 +45,15 @@ export const getUsageForUser = async (user) => {
     .lean();
   const activeRegions = new Set(
     activeProbeAgents.map((agent) => agent.regionId),
+  );
+  const configuredEgressIps = await ProbeRegionSettings.find({})
+    .select("regionId egressIps")
+    .lean();
+  const egressIpsByRegion = new Map(
+    configuredEgressIps.map(({ regionId, egressIps }) => [
+      regionId,
+      egressIps || [],
+    ]),
   );
   const statusPages = await StatusPage.find({ owner: ownerId })
     .select("services")
@@ -115,6 +125,7 @@ export const getUsageForUser = async (user) => {
       regions: PROBE_REGIONS.map((region) => ({
         ...region,
         operational: activeRegions.has(region.id),
+        egressIps: egressIpsByRegion.get(region.id) || [],
       })),
     },
     features: {

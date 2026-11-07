@@ -7,7 +7,16 @@ Regional monitoring uses the central API as a coordinator and separate probe-age
 For each deployed agent, add an entry to `PROBE_AGENT_CONFIG` in the backend environment. The key is the agent ID and the value contains its assigned region and a unique secret:
 
 ```json
-{"probe-india-1":{"regionId":"india-mumbai","secret":"REPLACE_WITH_A_RANDOM_SECRET"},"probe-us-1":{"regionId":"us-east","secret":"USE_A_DIFFERENT_RANDOM_SECRET"}}
+{
+  "probe-india-1": {
+    "regionId": "india-mumbai",
+    "secret": "REPLACE_WITH_A_RANDOM_SECRET"
+  },
+  "probe-us-1": {
+    "regionId": "us-east",
+    "secret": "USE_A_DIFFERENT_RANDOM_SECRET"
+  }
+}
 ```
 
 Generate each secret with a cryptographically secure generator (at least 32 random bytes), store it in the central API's secret manager, and distribute the matching value only to that agent. Do not commit real secrets. Restart the API after changing this configuration. The backend accepts signed requests only for configured agent IDs and regions.
@@ -56,5 +65,9 @@ Plan limits are centrally defined in `backend/src/config/plans.js`. The current 
 ## Current scope and limitations
 
 This repository provides the agent runtime and central coordination APIs, but it does not provision cloud infrastructure. Regional percentile and uptime analytics are based on regional results collected after deployment; they do not backfill old global checks. Regional performance anomaly detection currently uses independent per-region baselines. Notification delivery uses the existing notification pipeline and its configured preferences.
+
+## Customer firewall allowlisting
+
+Each probe host must have a stable public outbound IP if customer sites restrict inbound traffic. After deployment, an administrator can enter one or more IPv4/IPv6 egress addresses per region under **Admin → Probe egress IPs**. These values are stored in MongoDB and shown to customers beside each region in the monitor setup form. Keep the values current if a host or its network changes; configure static egress/NAT on the hosting platform first. Add every address that the deployed probe may use.
 
 Before a production rollout, deploy actual agents in each advertised location and run the backend integration suite and frontend production build.

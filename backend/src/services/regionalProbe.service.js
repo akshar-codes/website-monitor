@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import RegionalProbeRun from "../models/RegionalProbeRun.js";
 import RegionalCheck from "../models/RegionalCheck.js";
 import ProbeAgent from "../models/ProbeAgent.js";
+import ProbeRegionSettings from "../models/ProbeRegionSettings.js";
 import RegionalIncident from "../models/RegionalIncident.js";
 import RegionalDailyStat from "../models/RegionalDailyStat.js";
 import RegionalHourlyStat from "../models/RegionalHourlyStat.js";
@@ -152,6 +153,13 @@ export const getRegionsForUser = async (user, deps = {}) => {
   })
     .select("regionId lastHeartbeatAt version")
     .lean();
+  const egressSettings = await (deps.ProbeRegionSettings || ProbeRegionSettings)
+    .find({})
+    .select("regionId egressIps")
+    .lean();
+  const egressByRegion = new Map(
+    egressSettings.map((item) => [item.regionId, item.egressIps || []]),
+  );
   const byRegion = new Map(active.map((agent) => [agent.regionId, agent]));
   const definition = getPlanDefinition(user.plan);
   return {
@@ -159,6 +167,7 @@ export const getRegionsForUser = async (user, deps = {}) => {
       const agent = byRegion.get(region.id);
       return {
         ...region,
+        egressIps: egressByRegion.get(region.id) || [],
         operational: Boolean(agent),
         lastHeartbeatAt: agent?.lastHeartbeatAt || null,
         agentVersion: agent?.version || null,
