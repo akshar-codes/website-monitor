@@ -19,6 +19,10 @@ const envSchema = z
       .default("development"),
     PORT: z.coerce.number().int().positive().default(5000),
 
+    /** Optional restrictions for GET /api/health. */
+    HEALTH_ALLOWED_IPS: z.string().optional().default(""),
+    HEALTH_API_KEY: z.string().optional().default(""),
+
     RAZORPAY_KEY_ID: z.string().optional(),
     RAZORPAY_KEY_SECRET: z.string().optional(),
     RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
@@ -350,6 +354,12 @@ const env = {
   get CORS_ORIGINS() {
     return parsedEnv.CORS_ORIGIN.split(",")
       .map((o) => o.trim())
+      .filter(Boolean);
+  },
+
+  get HEALTH_IP_ALLOWLIST() {
+    return parsedEnv.HEALTH_ALLOWED_IPS.split(",")
+      .map((ip) => ip.trim())
       .filter(Boolean);
   },
 

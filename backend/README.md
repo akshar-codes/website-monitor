@@ -15,7 +15,7 @@ cp .env.example .env
 npm start
 ```
 
-On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`. The API defaults to port `5000`; the health endpoint is `/api/health`.
+On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`. The API defaults to port `5000`; the health endpoint is `/api/health`. Health access is public when `HEALTH_ALLOWED_IPS` and `HEALTH_API_KEY` are both blank. Set either or both to require an exact allowlisted client IP or a matching `x-api-key` / Bearer token. Configure `TRUST_PROXY` correctly when the API is behind a reverse proxy so IP allowlisting uses the actual client address.
 
 ## Commands
 
