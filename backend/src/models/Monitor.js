@@ -1,8 +1,77 @@
 import mongoose from "mongoose";
 import { INTERVAL_PRESETS } from "../config/constants.js";
 
+const apiConfigurationSchema = new mongoose.Schema(
+  {
+    version: { type: Number, enum: [1], default: 1 },
+    method: {
+      type: String,
+      enum: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      required: true,
+    },
+    queryParams: { type: Map, of: String, default: () => new Map() },
+    secretQueryParamNames: { type: [String], default: [] },
+    encryptedQueryParams: {
+      type: Map,
+      of: String,
+      default: () => new Map(),
+      select: false,
+    },
+    headers: { type: Map, of: String, default: () => new Map() },
+    secretHeaderNames: { type: [String], default: [] },
+    encryptedHeaders: {
+      type: Map,
+      of: String,
+      default: () => new Map(),
+      select: false,
+    },
+    bodyConfigured: { type: Boolean, default: false },
+    encryptedBody: {
+      type: String,
+      default: null,
+      maxlength: 100000,
+      select: false,
+    },
+    authentication: {
+      mode: {
+        type: String,
+        enum: ["none", "bearer", "basic"],
+        default: "none",
+      },
+      credentialConfigured: { type: Boolean, default: false },
+      username: { type: String, default: null, select: false },
+      credentialCiphertext: { type: String, default: null, select: false },
+    },
+    expectedStatusCodes: {
+      type: [Number],
+      default: [200],
+      validate: (values) =>
+        values.length > 0 &&
+        values.length <= 20 &&
+        values.every((v) => v >= 100 && v <= 599),
+    },
+    maxResponseTimeMs: { type: Number, min: 1, max: 120000, default: 10000 },
+  },
+  { _id: false, strict: "throw" },
+);
+
 const monitorSchema = new mongoose.Schema(
   {
+    kind: {
+      type: String,
+      enum: ["website", "api"],
+      default: "website",
+    },
+    apiConfig: {
+      type: apiConfigurationSchema,
+      default: undefined,
+      validate: {
+        validator(value) {
+          return this.kind === "api" ? Boolean(value) : value == null;
+        },
+        message: "API configuration is required only for API monitors",
+      },
+    },
     // BREAKING CHANGE: monitors are now owned by a single user rather than
     // being a global/shared resource. Required for plan-based monitor
     // limits and per-user dashboard/incident scoping to be meaningful —
@@ -139,6 +208,30 @@ const monitorSchema = new mongoose.Schema(
     toJSON: {
       virtuals: true,
       transform(_doc, ret) {
+        if (ret.apiConfig) {
+          ret.apiConfig.headers =
+            ret.apiConfig.headers instanceof Map
+              ? Object.fromEntries(ret.apiConfig.headers)
+              : { ...(ret.apiConfig.headers || {}) };
+          ret.apiConfig.queryParams =
+            ret.apiConfig.queryParams instanceof Map
+              ? Object.fromEntries(ret.apiConfig.queryParams)
+              : { ...(ret.apiConfig.queryParams || {}) };
+          for (const name of ret.apiConfig.secretHeaderNames || [])
+            ret.apiConfig.headers[name] = "********";
+          for (const name of ret.apiConfig.secretQueryParamNames || [])
+            ret.apiConfig.queryParams[name] = "********";
+          delete ret.apiConfig.encryptedHeaders;
+          delete ret.apiConfig.encryptedQueryParams;
+          delete ret.apiConfig.encryptedBody;
+          delete ret.apiConfig.body;
+          ret.apiConfig.bodyConfigured = Boolean(ret.apiConfig.bodyConfigured);
+          const auth = ret.apiConfig.authentication || {};
+          ret.apiConfig.authentication = {
+            mode: auth.mode || "none",
+            configured: Boolean(auth.credentialConfigured),
+          };
+        }
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
@@ -151,6 +244,38 @@ const monitorSchema = new mongoose.Schema(
     },
   },
 );
+
+monitorSchema.pre("validate", function validateApiMonitor(next) {
+  if (this.kind === "api") {
+    if (!this.apiConfig)
+      this.invalidate("apiConfig", "API configuration is required.");
+    if ((this.url || "").length > 2048)
+      this.invalidate("url", "API URL cannot exceed 2048 characters.");
+    try {
+      const parsed = new URL(this.url);
+      if (parsed.username || parsed.password)
+        this.invalidate(
+          "url",
+          "API URL must not contain embedded credentials.",
+        );
+      if (parsed.search || parsed.hash)
+        this.invalidate("url", "API URLs cannot contain a query or fragment.");
+    } catch {
+      // The existing URL path validator reports malformed URLs.
+    }
+    if (this.regionalMonitoring?.enabled)
+      this.invalidate(
+        "regionalMonitoring",
+        "Regional monitoring is not available for API monitors yet.",
+      );
+  } else if (this.apiConfig) {
+    this.invalidate(
+      "apiConfig",
+      "API configuration is only valid for API monitors.",
+    );
+  }
+  next();
+});
 
 // ── Indexes ──
 

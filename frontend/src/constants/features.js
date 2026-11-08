@@ -12,6 +12,7 @@ export const FEATURES = Object.freeze({
   UNLIMITED_MONITORS: "unlimitedMonitors",
   FAST_POLLING: "fastPolling",
   RESPONSE_INSPECTION: "responseInspection",
+  API_MONITORING: "apiMonitoring",
 });
 
 /**
@@ -33,6 +34,8 @@ export function planHasFeature(planDefinition, featureKey) {
       return limits.minCheckIntervalSeconds < 300;
     case FEATURES.RESPONSE_INSPECTION:
       return planDefinition.rank >= 1;
+    case FEATURES.API_MONITORING:
+      return (limits.maxApiMonitors ?? 0) > 0;
     default:
       return false;
   }

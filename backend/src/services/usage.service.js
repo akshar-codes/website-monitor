@@ -26,6 +26,10 @@ export const getUsageForUser = async (user) => {
   const definition = getPlanDefinition(plan);
 
   const monitorCount = await Monitor.countDocuments({ owner: ownerId });
+  const apiMonitorCount = await Monitor.countDocuments({
+    owner: ownerId,
+    kind: "api",
+  });
   const regionalMonitors = await Monitor.find({
     owner: ownerId,
     "regionalMonitoring.enabled": true,
@@ -96,6 +100,18 @@ export const getUsageForUser = async (user) => {
       percentUsed,
       atLimit: !unlimited && monitorCount >= monitorLimit,
     },
+    apiMonitors: {
+      used: apiMonitorCount,
+      limit: definition.limits.maxApiMonitors,
+      available: hasFeature(plan, FEATURES.API_MONITORING),
+      remaining:
+        definition.limits.maxApiMonitors == null
+          ? null
+          : Math.max(0, definition.limits.maxApiMonitors - apiMonitorCount),
+      atLimit:
+        definition.limits.maxApiMonitors != null &&
+        apiMonitorCount >= definition.limits.maxApiMonitors,
+    },
     interval: {
       minSeconds: definition.limits.minCheckIntervalSeconds,
     },
@@ -147,6 +163,7 @@ export const getUsageForUser = async (user) => {
         plan,
         FEATURES.REGIONAL_MONITORING,
       ),
+      [FEATURES.API_MONITORING]: hasFeature(plan, FEATURES.API_MONITORING),
     },
   };
 };

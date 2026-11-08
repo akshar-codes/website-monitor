@@ -22,6 +22,7 @@ import {
   getMinCheckInterval,
 } from "../utils/planUtils.js";
 import { logActivity } from "../utils/activityLogger.js";
+import { encryptCredential } from "../utils/credentialEncryption.js";
 import {
   ACTIVITY_CATEGORIES,
   ACTIVITY_ACTIONS,
@@ -30,6 +31,159 @@ import {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const resolveOwnerId = (user) => user.id || user._id.toString();
+
+const getApiMonitorLimit = (plan) =>
+  getPlanDefinition(plan)?.limits.maxApiMonitors ?? 0;
+const toPlainMap = (value) =>
+  value instanceof Map ? Object.fromEntries(value) : { ...(value || {}) };
+const isSensitiveName = (name) =>
+  /(^|[-_])(api[-_]?key|key|access[-_]?token|token|secret|password|credential|auth|authorization)([-_]|$)/i.test(
+    name.replace(/([a-z])([A-Z])/g, "$1-$2"),
+  );
+export const countOwnedApiMonitors = (user, excludeId, model = Monitor) =>
+  model.countDocuments({
+    owner: resolveOwnerId(user),
+    kind: "api",
+    ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+  });
+
+export const assertApiMonitorAllowed = async (
+  user,
+  excludeId,
+  countFn = countOwnedApiMonitors,
+) => {
+  if (!hasFeature(user.plan, FEATURES.API_MONITORING)) {
+    throw ApiError.featureRestricted(
+      "API contract monitoring isn't available on your current plan.",
+    );
+  }
+  const limit = getApiMonitorLimit(user.plan);
+  const used = await countFn(user, excludeId);
+  if (limit != null && used >= limit) {
+    throw ApiError.upgradeRequired(
+      `Your plan allows up to ${limit} API monitors. Upgrade to add more.`,
+    );
+  }
+};
+
+export const secureApiConfig = (config, existing = null) => {
+  const result = { ...config };
+  if (config.body === undefined && existing?.encryptedBody) {
+    result.bodyConfigured = Boolean(existing.bodyConfigured);
+    result.encryptedBody = existing.encryptedBody;
+  } else if (config.body == null || config.body === "") {
+    result.bodyConfigured = false;
+    result.encryptedBody = null;
+  } else {
+    try {
+      result.bodyConfigured = true;
+      result.encryptedBody = encryptCredential(config.body);
+    } catch {
+      throw ApiError.internal("API request body could not be secured.");
+    }
+  }
+  delete result.body;
+  const secureNamedValues = (field, encryptedField, namesField) => {
+    const previousEncrypted = toPlainMap(existing?.[encryptedField]);
+    if (config[field] === undefined && existing?.[encryptedField]) {
+      result[field] = toPlainMap(existing[field]);
+      result[encryptedField] = previousEncrypted;
+      result[namesField] =
+        existing[namesField] || Object.keys(previousEncrypted);
+      return;
+    }
+    const publicValues = {};
+    const encryptedValues = {};
+    for (const [name, value] of Object.entries(config[field] || {})) {
+      if (!isSensitiveName(name)) {
+        publicValues[name] = value;
+        continue;
+      }
+      try {
+        encryptedValues[name] =
+          value === "********" && previousEncrypted[name]
+            ? previousEncrypted[name]
+            : encryptCredential(value);
+      } catch {
+        throw ApiError.internal(
+          "API configuration values could not be secured.",
+        );
+      }
+    }
+    result[field] = publicValues;
+    result[encryptedField] = encryptedValues;
+    result[namesField] = Object.keys(encryptedValues);
+  };
+  secureNamedValues("headers", "encryptedHeaders", "secretHeaderNames");
+  secureNamedValues(
+    "queryParams",
+    "encryptedQueryParams",
+    "secretQueryParamNames",
+  );
+  const previousAuth = existing?.authentication || { mode: "none" };
+  const requested = config.authentication;
+  const auth = requested
+    ? { ...requested }
+    : { mode: previousAuth.mode || "none" };
+  if (auth.mode === "none") {
+    result.authentication = {
+      mode: "none",
+      credentialConfigured: false,
+      username: null,
+      credentialCiphertext: null,
+    };
+    return result;
+  }
+  try {
+    if (auth.mode === "bearer") {
+      if (
+        auth.token !== undefined &&
+        (typeof auth.token !== "string" || !auth.token)
+      )
+        throw new Error("missing");
+      const ciphertext = auth.token
+        ? encryptCredential(auth.token)
+        : previousAuth.mode === "bearer" && previousAuth.credentialCiphertext;
+      if (!ciphertext) throw new Error("missing");
+      result.authentication = {
+        mode: "bearer",
+        credentialConfigured: true,
+        username: null,
+        credentialCiphertext: ciphertext,
+      };
+      return result;
+    }
+    if (auth.mode === "basic") {
+      if (
+        auth.password !== undefined &&
+        (typeof auth.password !== "string" || !auth.password)
+      )
+        throw new Error("missing");
+      const username =
+        auth.username ??
+        (previousAuth.mode === "basic" ? previousAuth.username : null);
+      const ciphertext = auth.password
+        ? encryptCredential(auth.password)
+        : previousAuth.mode === "basic" && previousAuth.credentialCiphertext;
+      if (!username || !ciphertext) throw new Error("missing");
+      result.authentication = {
+        mode: "basic",
+        credentialConfigured: true,
+        username,
+        credentialCiphertext: ciphertext,
+      };
+      return result;
+    }
+    throw new Error("unsupported");
+  } catch (error) {
+    if (error.message === "missing" || error.message === "unsupported") {
+      throw ApiError.badRequest(
+        "API authentication credentials are incomplete or could not be secured.",
+      );
+    }
+    throw ApiError.internal("API credentials could not be secured.");
+  }
+};
 
 export const assertRegionalMonitoringAllowed = async (
   user,
@@ -147,6 +301,30 @@ export const createMonitor = async (data, user) => {
   }
 
   const ownerId = resolveOwnerId(user);
+  // This property is retained only for compatibility with the existing
+  // website form. API methods live under apiConfig.method.
+  delete data.method;
+
+  if ((data.kind || "website") === "api") {
+    if (data.url.length > 2048)
+      throw ApiError.badRequest("API URL cannot exceed 2048 characters.");
+    await assertApiMonitorAllowed(user);
+    if (data.regionalMonitoring?.enabled) {
+      throw ApiError.badRequest(
+        "Regional monitoring is not available for API monitors yet.",
+      );
+    }
+    const parsedUrl = new URL(data.url);
+    if (parsedUrl.username || parsedUrl.password)
+      throw ApiError.badRequest(
+        "API URL must not contain embedded credentials.",
+      );
+    if (parsedUrl.search || parsedUrl.hash)
+      throw ApiError.badRequest(
+        "Place API query parameters in apiConfig.queryParams; API URLs cannot contain a query or fragment.",
+      );
+    data.apiConfig = secureApiConfig(data.apiConfig);
+  }
 
   assertIntervalAllowedForPlan(user.plan, data.interval);
   await assertRegionalMonitoringAllowed(
@@ -157,7 +335,11 @@ export const createMonitor = async (data, user) => {
 
   const existing = await Monitor.findOne({ owner: ownerId, url: data.url });
   if (existing) {
-    throw ApiError.conflict(`You already have a monitor for "${data.url}"`);
+    throw ApiError.conflict(
+      data.kind === "api"
+        ? "You already have a monitor for this URL."
+        : `You already have a monitor for "${data.url}"`,
+    );
   }
 
   const monitor = await Monitor.create({ ...data, owner: ownerId });
@@ -169,7 +351,10 @@ export const createMonitor = async (data, user) => {
     description: `Created monitor "${monitor.name}"`,
     entityType: "Monitor",
     entityId: monitor._id,
-    metadata: { url: monitor.url, interval: monitor.interval },
+    metadata:
+      data.kind === "api"
+        ? { kind: "api", interval: monitor.interval }
+        : { url: monitor.url, interval: monitor.interval },
   });
 
   return monitor;
@@ -258,9 +443,60 @@ export const getMonitorDiagnostics = async (id, user) => {
 
 export const updateMonitor = async (id, data, user) => {
   const ownerId = resolveOwnerId(user);
+  delete data.method;
   const previous = await Monitor.findOne({ _id: id, owner: ownerId })
-    .select("active url interval regionalMonitoring")
+    .select(
+      "active url interval regionalMonitoring kind apiConfig +apiConfig.authentication.credentialCiphertext +apiConfig.authentication.username +apiConfig.encryptedHeaders +apiConfig.encryptedQueryParams +apiConfig.encryptedBody",
+    )
     .lean();
+  if (!previous) throw ApiError.notFound(`Monitor not found with id: ${id}`);
+  const nextKind = data.kind || previous.kind || "website";
+  if (nextKind === "api") {
+    const parsedUrl = new URL(data.url || previous.url);
+    if ((data.url || previous.url).length > 2048)
+      throw ApiError.badRequest("API URL cannot exceed 2048 characters.");
+    if (parsedUrl.username || parsedUrl.password)
+      throw ApiError.badRequest(
+        "API URL must not contain embedded credentials.",
+      );
+    if (parsedUrl.search || parsedUrl.hash)
+      throw ApiError.badRequest(
+        "Place API query parameters in apiConfig.queryParams; API URLs cannot contain a query or fragment.",
+      );
+  }
+  if (
+    nextKind === "api" &&
+    (data.kind === "api" ||
+      data.apiConfig !== undefined ||
+      previous.kind !== "api")
+  ) {
+    await assertApiMonitorAllowed(user, id);
+    if ((data.regionalMonitoring || previous.regionalMonitoring)?.enabled) {
+      throw ApiError.badRequest(
+        "Regional monitoring is not available for API monitors yet.",
+      );
+    }
+    const nextUrl = data.url || previous.url;
+    const parsedUrl = new URL(nextUrl);
+    if (parsedUrl.username || parsedUrl.password)
+      throw ApiError.badRequest(
+        "API URL must not contain embedded credentials.",
+      );
+    if (parsedUrl.search || parsedUrl.hash)
+      throw ApiError.badRequest(
+        "Place API query parameters in apiConfig.queryParams; API URLs cannot contain a query or fragment.",
+      );
+    const nextConfig = data.apiConfig || previous.apiConfig;
+    if (!nextConfig)
+      throw ApiError.badRequest(
+        "API configuration is required for API monitors.",
+      );
+    data.apiConfig = secureApiConfig(nextConfig, previous.apiConfig);
+  }
+  if (nextKind === "website" && data.apiConfig)
+    throw ApiError.badRequest(
+      "API configuration is only valid for API monitors.",
+    );
 
   if (data.performanceAlerts) {
     const configurable = Object.keys(data.performanceAlerts).some(
@@ -300,7 +536,11 @@ export const updateMonitor = async (id, data, user) => {
       _id: { $ne: id },
     });
     if (existing) {
-      throw ApiError.conflict(`You already have a monitor for "${data.url}"`);
+      throw ApiError.conflict(
+        nextKind === "api"
+          ? "You already have a monitor for this URL."
+          : `You already have a monitor for "${data.url}"`,
+      );
     }
   }
 
@@ -311,9 +551,22 @@ export const updateMonitor = async (id, data, user) => {
   // Re-evaluate cadence promptly after a configured interval changes.
   if (data.interval !== undefined) data.nextCheckAt = new Date();
 
+  const update = { ...data };
+  if (nextKind === "website") {
+    update.kind = "website";
+    update.$unset = { apiConfig: 1 };
+    delete update.apiConfig;
+  }
   const monitor = await Monitor.findOneAndUpdate(
     { _id: id, owner: ownerId },
-    data,
+    update.$unset
+      ? {
+          $set: Object.fromEntries(
+            Object.entries(update).filter(([key]) => key !== "$unset"),
+          ),
+          $unset: update.$unset,
+        }
+      : update,
     { returnDocument: "after", runValidators: true },
   );
 
@@ -389,6 +642,39 @@ export const updateMonitor = async (id, data, user) => {
 export const duplicateMonitor = async (id, data, user) => {
   const source = await getMonitorById(id, user);
   const ownerId = resolveOwnerId(user);
+  delete data.method;
+  if (data.kind === undefined && source.kind === "api") {
+    const sourceConfig = source.apiConfig?.toObject?.() || source.apiConfig;
+    data = {
+      ...data,
+      kind: "api",
+      apiConfig: {
+        ...sourceConfig,
+        queryParams: toPlainMap(sourceConfig?.queryParams),
+        headers: toPlainMap(sourceConfig?.headers),
+        authentication: { mode: "none" },
+      },
+    };
+  }
+  if ((data.kind || source.kind || "website") === "api") {
+    if (data.url.length > 2048)
+      throw ApiError.badRequest("API URL cannot exceed 2048 characters.");
+    await assertApiMonitorAllowed(user);
+    if (data.regionalMonitoring?.enabled)
+      throw ApiError.badRequest(
+        "Regional monitoring is not available for API monitors yet.",
+      );
+    const parsedUrl = new URL(data.url);
+    if (parsedUrl.username || parsedUrl.password)
+      throw ApiError.badRequest(
+        "API URL must not contain embedded credentials.",
+      );
+    if (parsedUrl.search || parsedUrl.hash)
+      throw ApiError.badRequest(
+        "Place API query parameters in apiConfig.queryParams; API URLs cannot contain a query or fragment.",
+      );
+    data.apiConfig = secureApiConfig(data.apiConfig);
+  }
   assertIntervalAllowedForPlan(user.plan, data.interval);
   await assertRegionalMonitoringAllowed(
     user,
@@ -397,7 +683,11 @@ export const duplicateMonitor = async (id, data, user) => {
   );
   const existing = await Monitor.findOne({ owner: ownerId, url: data.url });
   if (existing)
-    throw ApiError.conflict(`You already have a monitor for "${data.url}"`);
+    throw ApiError.conflict(
+      data.kind === "api"
+        ? "You already have a monitor for this URL."
+        : `You already have a monitor for "${data.url}"`,
+    );
   const monitor = await Monitor.create({
     ...data,
     owner: ownerId,
@@ -410,11 +700,18 @@ export const duplicateMonitor = async (id, data, user) => {
     description: `Duplicated monitor "${source.name}" as "${monitor.name}"`,
     entityType: "Monitor",
     entityId: monitor._id,
-    metadata: {
-      url: monitor.url,
-      interval: monitor.interval,
-      duplicatedFrom: source._id,
-    },
+    metadata:
+      data.kind === "api"
+        ? {
+            kind: "api",
+            interval: monitor.interval,
+            duplicatedFrom: source._id,
+          }
+        : {
+            url: monitor.url,
+            interval: monitor.interval,
+            duplicatedFrom: source._id,
+          },
   });
   return monitor;
 };

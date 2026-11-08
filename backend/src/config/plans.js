@@ -27,6 +27,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
     price: Object.freeze({ monthly: 0, yearly: 0, currency: "USD" }),
     limits: Object.freeze({
       maxMonitors: 3,
+      maxApiMonitors: 0,
       minCheckIntervalSeconds: 300,
       dataRetentionDays: 7,
       teamMembers: 1,
@@ -39,6 +40,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
     }),
     features: Object.freeze([
       "Up to 3 monitors",
+      "API contract monitoring unavailable",
       "5-minute check interval",
       "7-day data retention",
       "Email incident notifications",
@@ -55,6 +57,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
     price: Object.freeze({ monthly: 12, yearly: 120, currency: "USD" }),
     limits: Object.freeze({
       maxMonitors: 25,
+      maxApiMonitors: 5,
       minCheckIntervalSeconds: 30,
       dataRetentionDays: 30,
       teamMembers: 5,
@@ -67,6 +70,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
     }),
     features: Object.freeze([
       "Up to 25 monitors",
+      "Up to 5 API monitors",
       "30-second check interval",
       "30-day data retention",
       "Team access — up to 5 members",
@@ -84,6 +88,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
     price: Object.freeze({ monthly: 49, yearly: 490, currency: "USD" }),
     limits: Object.freeze({
       maxMonitors: null,
+      maxApiMonitors: 25,
       minCheckIntervalSeconds: 30,
       dataRetentionDays: 365,
       teamMembers: null,
@@ -96,6 +101,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
     }),
     features: Object.freeze([
       "Unlimited monitors",
+      "Up to 25 API monitors",
       "30-second check interval",
       "365-day data retention",
       "Unlimited team members",
