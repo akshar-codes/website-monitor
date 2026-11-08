@@ -38,6 +38,10 @@ export const FAILURE_REASONS = Object.freeze({
   FRONTEND_DOWN: "frontend_down",
   BACKEND_DOWN: "backend_down",
   DATABASE_DOWN: "database_down",
+  TLS_ERROR: "tls_error",
+  INVALID_CONFIGURATION: "invalid_configuration",
+  REDIRECT_ERROR: "redirect_error",
+  UNSUPPORTED_RESPONSE: "unsupported_response",
   UNKNOWN: "unknown",
 });
 

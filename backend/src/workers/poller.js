@@ -4,6 +4,14 @@ import http from "node:http";
 import https from "node:https";
 import { performance } from "node:perf_hooks";
 import { FAILURE_REASONS } from "../config/constants.js";
+import {
+  cleanHostname,
+  isPublicAddress,
+  resolvePublicAddresses,
+  withTimeout,
+} from "../utils/networkSecurity.js";
+
+export { isPublicAddress };
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 const pollerConfig = {
@@ -21,109 +29,6 @@ const SAFE_RESPONSE_HEADERS = [
   "cache-control",
 ];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const cleanHostname = (hostname) =>
-  hostname.replace(/^\[|\]$/g, "").toLowerCase();
-
-const ipv4IsPublic = (address) => {
-  const parts = address.split(".").map(Number);
-  if (
-    parts.length !== 4 ||
-    parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
-  )
-    return false;
-  const [a, b, c] = parts;
-  return !(
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    a >= 224 ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 &&
-      (b === 168 || (b === 0 && c === 0) || (b === 0 && c === 2))) ||
-    (a === 192 && b === 88 && c === 99) ||
-    (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
-    (a === 203 && b === 0 && c === 113) ||
-    a === 255
-  );
-};
-
-const ipv6IsPublic = (address) => {
-  const normalized = address.toLowerCase().split("%", 1)[0];
-  if (normalized === "::" || normalized === "::1") return false;
-  if (normalized.startsWith("::ffff:")) {
-    const mapped = normalized.slice(7);
-    if (isIP(mapped) === 4) return ipv4IsPublic(mapped);
-    const hex = mapped.split(":").join("");
-    if (hex.length === 8) {
-      const v4 = [0, 2, 4, 6]
-        .map((i) => parseInt(hex.slice(i, i + 2), 16))
-        .join(".");
-      return ipv4IsPublic(v4);
-    }
-    return false;
-  }
-  const first = parseInt(normalized.split(":")[0] || "0", 16);
-  return !(
-    (first & 0xfe00) === 0xfc00 || // unique-local
-    (first & 0xffc0) === 0xfe80 || // link-local
-    (first & 0xff00) === 0xff00 || // multicast
-    (first & 0xe000) !== 0x2000 || // outside global-unicast 2000::/3
-    (first === 0x2001 &&
-      parseInt(normalized.split(":")[1] || "0", 16) <= 0x01ff) ||
-    normalized.startsWith("2001:db8:")
-  );
-};
-
-export const isPublicAddress = (address) => {
-  const family = isIP(address);
-  return family === 4
-    ? ipv4IsPublic(address)
-    : family === 6
-      ? ipv6IsPublic(address)
-      : false;
-};
-
-const resolvePublicAddresses = async (hostname) => {
-  const host = cleanHostname(hostname);
-  let addresses;
-  const family = isIP(host);
-  if (family) addresses = [{ address: host, family }];
-  else addresses = await dns.lookup(host, { all: true, verbatim: true });
-  if (
-    !addresses.length ||
-    addresses.some(({ address }) => !isPublicAddress(address))
-  ) {
-    const error = new Error(
-      "Destination resolves to a restricted network address",
-    );
-    error.code = "ERR_BLOCKED_ADDRESS";
-    throw error;
-  }
-  return addresses;
-};
-
-const withTimeout = (promise, timeoutMs) =>
-  new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () =>
-        reject(
-          Object.assign(new Error("Request timed out"), { code: "ETIMEDOUT" }),
-        ),
-      timeoutMs,
-    );
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
 
 export const requestOnce = (url, addresses, timeoutMs, requestOptions = {}) =>
   new Promise((resolve, reject) => {

@@ -141,12 +141,26 @@ healthCheckSchema.index({ checkedAt: 1, _id: 1 });
  * True when every component reports "up".
  */
 healthCheckSchema.virtual("isHealthy").get(function () {
-  return (
-    this.status === HEALTH_STATUS.UP &&
-    this.frontendStatus === HEALTH_STATUS.UP &&
-    this.backendStatus === HEALTH_STATUS.UP &&
-    this.databaseStatus === HEALTH_STATUS.UP
-  );
+  if (this.status !== HEALTH_STATUS.UP) return false;
+  if (
+    this.frontendStatus !== HEALTH_STATUS.UNKNOWN &&
+    this.frontendStatus !== HEALTH_STATUS.UP
+  ) {
+    return false;
+  }
+  if (
+    this.backendStatus !== HEALTH_STATUS.UNKNOWN &&
+    this.backendStatus !== HEALTH_STATUS.UP
+  ) {
+    return false;
+  }
+  if (
+    this.databaseStatus !== HEALTH_STATUS.UNKNOWN &&
+    this.databaseStatus !== HEALTH_STATUS.UP
+  ) {
+    return false;
+  }
+  return true;
 });
 
 // ─────────────────────────────────────────────
