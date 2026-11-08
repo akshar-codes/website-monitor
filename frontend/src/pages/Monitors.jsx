@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { formatUptime } from "../utils/format";
 import RegionalMonitoringFields from "../components/monitor/RegionalMonitoringFields";
+import ApiMonitorFormFields from "../components/monitor/ApiMonitorFormFields";
 
 const STATUS_FILTERS = [
   { label: "All", value: "all" },
@@ -82,6 +83,8 @@ export default function Monitors() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
+  const [monitorKind, setMonitorKind] = useState("website");
+  const [apiConfigState, setApiConfigState] = useState(null);
   const [editMonitor, setEditMonitor] = useState(null);
   const [duplicateSource, setDuplicateSource] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -157,6 +160,9 @@ export default function Monitors() {
 
   const openEdit = (monitor) => {
     setEditMonitor(monitor);
+    setDuplicateSource(null);
+    setMonitorKind(monitor.kind || "website");
+    setApiConfigState(monitor.apiConfig || null);
     setLimitMessage("");
     setFormOpen(true);
   };
@@ -172,6 +178,9 @@ export default function Monitors() {
       return;
     }
     setEditMonitor(null);
+    setDuplicateSource(null);
+    setMonitorKind("website");
+    setApiConfigState(null);
     setLimitMessage("");
     setFormOpen(true);
   };
@@ -294,7 +303,18 @@ export default function Monitors() {
                       }}
                     >
                       <td>
-                        <b className="table-primary">{m.name}</b>
+                        <div className="flex items-center gap-2">
+                          <b className="table-primary">{m.name}</b>
+                          {m.kind === "api" ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 uppercase">
+                              API: {m.apiConfig?.method || "GET"}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 uppercase">
+                              WEB
+                            </span>
+                          )}
+                        </div>
                         <small className="table-secondary">{m.url}</small>
                       </td>
                       <td>
@@ -350,6 +370,8 @@ export default function Monitors() {
                             onClick={() => {
                               setDuplicateSource(m);
                               setEditMonitor(null);
+                              setMonitorKind(m.kind || "website");
+                              setApiConfigState(m.apiConfig || null);
                               setFormOpen(true);
                             }}
                           >
@@ -441,31 +463,79 @@ export default function Monitors() {
               onSubmit={(e) => {
                 e.preventDefault();
                 const form = new FormData(e.currentTarget);
-                handleFormSubmit({
-                  name: form.get("name"),
-                  url: form.get("url"),
-                  interval: Number(form.get("interval")),
-                  method: form.get("method") || "GET",
-                  active: true,
-                  regionalMonitoring: {
-                    enabled: form.get("regionalMonitoring.enabled") === "on",
-                    regions: form.getAll("regionalMonitoring.regions"),
-                  },
-                });
+                if (monitorKind === "api") {
+                  handleFormSubmit({
+                    name: form.get("name"),
+                    url: form.get("url"),
+                    kind: "api",
+                    interval: Number(form.get("interval")),
+                    active: true,
+                    apiConfig:
+                      apiConfigState ||
+                      editMonitor?.apiConfig ||
+                      duplicateSource?.apiConfig ||
+                      {},
+                  });
+                } else {
+                  handleFormSubmit({
+                    name: form.get("name"),
+                    url: form.get("url"),
+                    kind: "website",
+                    interval: Number(form.get("interval")),
+                    method: form.get("method") || "GET",
+                    active: true,
+                    regionalMonitoring: {
+                      enabled: form.get("regionalMonitoring.enabled") === "on",
+                      regions: form.getAll("regionalMonitoring.regions"),
+                    },
+                  });
+                }
               }}
             >
+              {/* Kind Selector */}
+              <div className="flex gap-4 p-2.5 bg-slate-50 rounded-lg border mb-2 text-sm">
+                <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-800">
+                  <input
+                    type="radio"
+                    name="monitorKindRadio"
+                    value="website"
+                    checked={monitorKind === "website"}
+                    onChange={() => setMonitorKind("website")}
+                  />
+                  <span>Website Monitor</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-800">
+                  <input
+                    type="radio"
+                    name="monitorKindRadio"
+                    value="api"
+                    checked={monitorKind === "api"}
+                    onChange={() => setMonitorKind("api")}
+                  />
+                  <span>API Endpoint Monitor</span>
+                </label>
+              </div>
+
               <Input
                 label="Monitor name"
                 name="name"
-                placeholder="e.g. Production Web App"
+                placeholder={
+                  monitorKind === "api"
+                    ? "e.g. User Profile API"
+                    : "e.g. Production Web App"
+                }
                 defaultValue={duplicateSource?.name || editMonitor?.name}
                 required
               />
               <Input
-                label="Website URL"
+                label={monitorKind === "api" ? "API URL" : "Website URL"}
                 name="url"
                 type="url"
-                placeholder="https://example.com"
+                placeholder={
+                  monitorKind === "api"
+                    ? "https://api.example.com/v1/health"
+                    : "https://example.com"
+                }
                 defaultValue={duplicateSource?.url || editMonitor?.url}
                 required
               />
@@ -479,22 +549,34 @@ export default function Monitors() {
                 <option value="600">Every 10 minutes</option>
                 <option value="1800">Every 30 minutes</option>
               </Select>
-              <Select
-                label="HTTP method"
-                name="method"
-                defaultValue={editMonitor?.method || "GET"}
-              >
-                <option>GET</option>
-                <option>HEAD</option>
-                <option>POST</option>
-              </Select>
-              <RegionalMonitoringFields
-                usage={usage}
-                config={
-                  editMonitor?.regionalMonitoring ||
-                  duplicateSource?.regionalMonitoring
-                }
-              />
+              {monitorKind === "website" ? (
+                <>
+                  <Select
+                    label="HTTP method"
+                    name="method"
+                    defaultValue={editMonitor?.method || "GET"}
+                  >
+                    <option>GET</option>
+                    <option>HEAD</option>
+                    <option>POST</option>
+                  </Select>
+                  <RegionalMonitoringFields
+                    usage={usage}
+                    config={
+                      editMonitor?.regionalMonitoring ||
+                      duplicateSource?.regionalMonitoring
+                    }
+                  />
+                </>
+              ) : (
+                <ApiMonitorFormFields
+                  initialConfig={
+                    editMonitor?.apiConfig || duplicateSource?.apiConfig
+                  }
+                  isEdit={Boolean(editMonitor)}
+                  onChange={setApiConfigState}
+                />
+              )}
               <div className="modal-actions">
                 <Button
                   variant="secondary"
