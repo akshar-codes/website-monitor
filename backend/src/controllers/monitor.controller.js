@@ -3,6 +3,8 @@ import * as monitorService from "../services/monitor.service.js";
 import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
 import { poll } from "../workers/poller.js";
 import { classify } from "../workers/classifier.js";
+import { executeApiMonitor } from "../workers/apiExecutor.js";
+import { classifyApiResult } from "../workers/apiClassifier.js";
 import HealthCheck from "../models/HealthCheck.js";
 import Monitor from "../models/Monitor.js";
 import { randomUUID } from "node:crypto";
@@ -62,9 +64,27 @@ export const getMonitorDiagnostics = asyncHandler(async (req, res) => {
 
 export const manualHealthCheck = asyncHandler(async (req, res) => {
   const monitor = await monitorService.getMonitorById(req.params.id, req.user);
-  const result = await poll(monitor.url, { maxRetries: 0 });
-  const classification = classify(result);
-  const responseSnapshot = createHealthResponseSnapshot(result.body);
+  let result;
+  let classification;
+  let responseSnapshot = null;
+
+  if (monitor.kind === "api") {
+    const monitorWithSecrets = await Monitor.findOne({
+      _id: monitor._id,
+      owner: monitor.owner,
+    }).select(
+      "+checkLeaseToken +apiConfig.encryptedQueryParams +apiConfig.encryptedHeaders +apiConfig.encryptedBody +apiConfig.authentication.username +apiConfig.authentication.credentialCiphertext",
+    );
+    result = await executeApiMonitor(monitorWithSecrets || monitor, {
+      maxRetries: 0,
+    });
+    classification = classifyApiResult(result, monitor.apiConfig);
+  } else {
+    result = await poll(monitor.url, { maxRetries: 0 });
+    classification = classify(result);
+    responseSnapshot = createHealthResponseSnapshot(result.body);
+  }
+
   const check = await HealthCheck.create({
     executionKey: `manual:${randomUUID()}`,
     monitor: monitor._id,

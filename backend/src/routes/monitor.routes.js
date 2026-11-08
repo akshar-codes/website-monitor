@@ -28,6 +28,7 @@ import {
 import { validate, validateObjectId } from "../middlewares/validate.js";
 import { requirePermission } from "../middlewares/permission.js";
 import { requireWithinLimit } from "../middlewares/featureAccess.js";
+import { manualCheckLimiter } from "../middlewares/rateLimiter.js";
 import { getMonitorLimit } from "../utils/planUtils.js";
 import { countOwnedMonitors } from "../services/monitor.service.js";
 import {
@@ -47,6 +48,7 @@ router.get(
 
 router.post(
   "/:id/check",
+  manualCheckLimiter,
   requirePermission("monitor:update"),
   validateObjectId("id"),
   manualHealthCheck,

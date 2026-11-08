@@ -5,6 +5,8 @@ import env from "../config/env.js";
 import logger from "../utils/logger.js";
 import { poll } from "./poller.js";
 import { classify } from "./classifier.js";
+import { executeApiMonitor } from "./apiExecutor.js";
+import { classifyApiResult } from "./apiClassifier.js";
 import { handleIncident } from "./incidentManager.js";
 import { updateDailyStat } from "./aggregationManager.js";
 import {
@@ -55,6 +57,7 @@ const processMonitor = async (
   const startedAt = Date.now();
   try {
     if (
+      monitor.kind !== "api" &&
       !initiatedBy &&
       monitor.regionalMonitoring?.enabled &&
       monitor.regionalMonitoring.regions?.length
@@ -66,7 +69,18 @@ const processMonitor = async (
       });
       return null;
     }
-    const pollResult = await poll(monitor.url);
+    let pollResult;
+    let classification;
+    let responseSnapshot = null;
+
+    if (monitor.kind === "api") {
+      pollResult = await executeApiMonitor(monitor);
+      classification = classifyApiResult(pollResult, monitor.apiConfig);
+    } else {
+      pollResult = await poll(monitor.url);
+      classification = classify(pollResult);
+      responseSnapshot = createHealthResponseSnapshot(pollResult.body);
+    }
     if (leaseToken) {
       const current = await Monitor.findOne({
         _id: monitor._id,
@@ -81,8 +95,6 @@ const processMonitor = async (
         return null;
       }
     }
-    const classification = classify(pollResult);
-    const responseSnapshot = createHealthResponseSnapshot(pollResult.body);
     const checkedAt = new Date();
     const executionKey = initiatedBy
       ? `manual:${randomUUID()}`
@@ -164,7 +176,16 @@ const processMonitor = async (
 };
 
 export const runMonitorCheck = async (monitorId, initiatedBy) => {
-  const monitor = await Monitor.findById(monitorId);
+  const query = Monitor.findById(
+    monitorId,
+    "+checkLeaseToken +apiConfig.encryptedQueryParams +apiConfig.encryptedHeaders +apiConfig.encryptedBody +apiConfig.authentication.username +apiConfig.authentication.credentialCiphertext",
+  );
+  const monitor =
+    typeof query?.select === "function"
+      ? await query.select(
+          "+checkLeaseToken +apiConfig.encryptedQueryParams +apiConfig.encryptedHeaders +apiConfig.encryptedBody +apiConfig.authentication.username +apiConfig.authentication.credentialCiphertext",
+        )
+      : await query;
   if (!monitor) return null;
   return processMonitor(monitor, initiatedBy);
 };
@@ -206,7 +227,8 @@ export const claimNextDueMonitor = async (deps = {}) => {
       {
         sort: { nextCheckAt: 1, _id: 1 },
         returnDocument: "after",
-        select: "+checkLeaseToken",
+        select:
+          "+checkLeaseToken +apiConfig.encryptedQueryParams +apiConfig.encryptedHeaders +apiConfig.encryptedBody +apiConfig.authentication.username +apiConfig.authentication.credentialCiphertext",
       },
     )
     .then((monitor) => (monitor ? { monitor, token } : null));

@@ -108,4 +108,14 @@ export const statusTokenLimiter = rateLimit({
   handler: rateLimitHandler,
 });
 
+export const manualCheckLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) =>
+    `${req.user?.id || req.user?._id?.toString() || ipKeyGenerator(req.ip)}:${req.params?.id || ""}`,
+  handler: rateLimitHandler,
+});
+
 export default globalLimiter;
