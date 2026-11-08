@@ -71,9 +71,11 @@ const openIncident = async (monitor, healthCheck, failureCount, deps) => {
     status: INCIDENT_STATUS.ONGOING,
     severity: deriveSeverity(healthCheck.status),
     startedAt,
-    rootCause: healthCheck.failureReason
-      ? `Detected failure: ${healthCheck.failureReason}`
-      : "Monitor reported an unhealthy result.",
+    rootCause:
+      healthCheck.diagnostics?.safeFailureReason ||
+      (healthCheck.failureReason
+        ? `Detected failure: ${healthCheck.failureReason}`
+        : "Monitor reported an unhealthy result."),
     statusHistory: [{ status: INCIDENT_STATUS.ONGOING, changedAt: startedAt }],
   };
 

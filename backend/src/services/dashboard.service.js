@@ -416,6 +416,8 @@ export const getMonitorStats = async (monitorId, { window }, user) => {
       id: monitor._id,
       name: monitor.name,
       url: monitor.url,
+      kind: monitor.kind || "website",
+      apiConfig: monitor.apiConfig,
       active: monitor.active,
       interval: monitor.interval,
       createdAt: monitor.createdAt,

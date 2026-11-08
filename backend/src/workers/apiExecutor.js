@@ -185,15 +185,23 @@ const requestOnceApi = ({
           stream = response.pipe(decompressorStream);
         }
 
+        const chunks = [];
+        stream.on("data", (chunk) => {
+          chunks.push(chunk);
+        });
+
         stream.on("end", () => {
           const downloadMs = performance.now() - bodyStartedAt;
+          const body = Buffer.concat(chunks).toString("utf8");
           done(resolve, {
             status: response.statusCode,
-            headers: Object.fromEntries(
+            headers: response.headers,
+            safeHeaders: Object.fromEntries(
               Object.entries(response.headers).filter(([name]) =>
                 SAFE_RESPONSE_HEADERS.has(name.toLowerCase()),
               ),
             ),
+            body,
             location: response.headers.location,
             timing: {
               ...timing,
@@ -494,6 +502,7 @@ const singleApiPoll = async ({
             responseTime,
             timings,
             headers: response.headers,
+            body: response.body,
             failureReason: null,
             failureCategory: "none",
             safeFailureReason: null,
@@ -501,7 +510,7 @@ const singleApiPoll = async ({
               method,
               finalHost: cleanHostname(currentUrl.hostname),
               path: currentUrl.pathname,
-              headers: response.headers,
+              headers: response.safeHeaders || response.headers,
               redirects,
               timing: timings,
             },
@@ -570,6 +579,7 @@ const singleApiPoll = async ({
         responseTime,
         timings: serializedTimings,
         headers: response.headers,
+        body: response.body,
         failureReason: null,
         failureCategory: "none",
         safeFailureReason: null,
@@ -577,7 +587,7 @@ const singleApiPoll = async ({
           method,
           finalHost: cleanHostname(currentUrl.hostname),
           path: currentUrl.pathname,
-          headers: response.headers,
+          headers: response.safeHeaders || response.headers,
           redirects: redirects.map(({ status, destinationHost }) => ({
             status,
             destinationHost,

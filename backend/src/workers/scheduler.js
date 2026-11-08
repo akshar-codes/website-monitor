@@ -7,6 +7,7 @@ import { poll } from "./poller.js";
 import { classify } from "./classifier.js";
 import { executeApiMonitor } from "./apiExecutor.js";
 import { classifyApiResult } from "./apiClassifier.js";
+import { evaluateAssertions } from "./assertionEvaluator.js";
 import { handleIncident } from "./incidentManager.js";
 import { updateDailyStat } from "./aggregationManager.js";
 import {
@@ -72,10 +73,27 @@ const processMonitor = async (
     let pollResult;
     let classification;
     let responseSnapshot = null;
+    let assertionEvaluation = null;
 
     if (monitor.kind === "api") {
       pollResult = await executeApiMonitor(monitor);
-      classification = classifyApiResult(pollResult, monitor.apiConfig);
+      if (
+        pollResult.transportCompleted &&
+        monitor.apiConfig?.assertions?.length
+      ) {
+        assertionEvaluation = evaluateAssertions(monitor.apiConfig.assertions, {
+          httpStatus: pollResult.httpStatus,
+          responseTime: pollResult.responseTime,
+          headers: pollResult.headers,
+          body: pollResult.body,
+        });
+      }
+      classification = classifyApiResult(
+        pollResult,
+        monitor.apiConfig,
+        assertionEvaluation,
+      );
+      pollResult.body = null;
     } else {
       pollResult = await poll(monitor.url);
       classification = classify(pollResult);
@@ -116,7 +134,13 @@ const processMonitor = async (
           httpStatus: pollResult.httpStatus,
           failureReason: classification.failureReason,
           ...(responseSnapshot ? { rawResponse: responseSnapshot } : {}),
-          diagnostics: pollResult.diagnostics,
+          ...(assertionEvaluation?.results?.length
+            ? {
+                assertionResults: assertionEvaluation.results,
+                assertionSummary: assertionEvaluation.summary,
+              }
+            : {}),
+          diagnostics: classification.diagnostics || pollResult.diagnostics,
           checkedAt,
         },
       },

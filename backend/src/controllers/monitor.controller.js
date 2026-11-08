@@ -5,6 +5,7 @@ import { poll } from "../workers/poller.js";
 import { classify } from "../workers/classifier.js";
 import { executeApiMonitor } from "../workers/apiExecutor.js";
 import { classifyApiResult } from "../workers/apiClassifier.js";
+import { evaluateAssertions } from "../workers/assertionEvaluator.js";
 import HealthCheck from "../models/HealthCheck.js";
 import Monitor from "../models/Monitor.js";
 import { randomUUID } from "node:crypto";
@@ -67,6 +68,7 @@ export const manualHealthCheck = asyncHandler(async (req, res) => {
   let result;
   let classification;
   let responseSnapshot = null;
+  let assertionEvaluation = null;
 
   if (monitor.kind === "api") {
     const monitorWithSecrets = await Monitor.findOne({
@@ -78,7 +80,20 @@ export const manualHealthCheck = asyncHandler(async (req, res) => {
     result = await executeApiMonitor(monitorWithSecrets || monitor, {
       maxRetries: 0,
     });
-    classification = classifyApiResult(result, monitor.apiConfig);
+    if (result.transportCompleted && monitor.apiConfig?.assertions?.length) {
+      assertionEvaluation = evaluateAssertions(monitor.apiConfig.assertions, {
+        httpStatus: result.httpStatus,
+        responseTime: result.responseTime,
+        headers: result.headers,
+        body: result.body,
+      });
+    }
+    classification = classifyApiResult(
+      result,
+      monitor.apiConfig,
+      assertionEvaluation,
+    );
+    result.body = null;
   } else {
     result = await poll(monitor.url, { maxRetries: 0 });
     classification = classify(result);
@@ -99,7 +114,13 @@ export const manualHealthCheck = asyncHandler(async (req, res) => {
     httpStatus: result.httpStatus,
     failureReason: classification.failureReason,
     ...(responseSnapshot ? { rawResponse: responseSnapshot } : {}),
-    diagnostics: result.diagnostics,
+    ...(assertionEvaluation?.results?.length
+      ? {
+          assertionResults: assertionEvaluation.results,
+          assertionSummary: assertionEvaluation.summary,
+        }
+      : {}),
+    diagnostics: classification.diagnostics || result.diagnostics,
     checkedAt: new Date(),
   });
   await pruneMonitorResponseSnapshots(monitor._id);
