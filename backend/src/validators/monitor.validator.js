@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import normalizeUrl from "../utils/normalizeUrl.js";
 import { INTERVAL_PRESETS, MONITOR_SORT_FIELDS } from "../config/constants.js";
@@ -95,6 +96,250 @@ const authCreate = z.discriminatedUnion("mode", [
     })
     .strict(),
 ]);
+const statusCodeAssertionSchema = z
+  .object({
+    id: z
+      .string()
+      .min(1)
+      .max(64)
+      .optional()
+      .default(() => randomUUID()),
+    type: z.literal("statusCode"),
+    property: z.string().max(256).optional().nullable(),
+    comparison: z.enum(["equals", "not_equals"]),
+    targetValue: z.coerce.number().int().min(100).max(599),
+  })
+  .strict();
+
+const responseTimeAssertionSchema = z
+  .object({
+    id: z
+      .string()
+      .min(1)
+      .max(64)
+      .optional()
+      .default(() => randomUUID()),
+    type: z.literal("responseTime"),
+    property: z.string().max(256).optional().nullable(),
+    comparison: z.enum(["less_than", "less_than_or_equal", "greater_than"]),
+    targetValue: z.coerce.number().int().min(1).max(120000),
+  })
+  .strict();
+
+const headerAssertionSchema = z
+  .object({
+    id: z
+      .string()
+      .min(1)
+      .max(64)
+      .optional()
+      .default(() => randomUUID()),
+    type: z.literal("header"),
+    property: z
+      .string()
+      .min(1, "Header name is required")
+      .max(128)
+      .regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/, "Invalid header name"),
+    comparison: z.enum([
+      "exists",
+      "not_exists",
+      "equals",
+      "not_equals",
+      "contains",
+      "not_contains",
+    ]),
+    targetValue: z.string().max(1024).optional().nullable(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (
+      ["equals", "not_equals", "contains", "not_contains"].includes(
+        data.comparison,
+      ) &&
+      (data.targetValue == null || data.targetValue === "")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["targetValue"],
+        message: `targetValue is required for comparison '${data.comparison}'`,
+      });
+    }
+  });
+
+const bodyTextAssertionSchema = z
+  .object({
+    id: z
+      .string()
+      .min(1)
+      .max(64)
+      .optional()
+      .default(() => randomUUID()),
+    type: z.literal("bodyText"),
+    property: z.string().max(256).optional().nullable(),
+    comparison: z.enum([
+      "contains",
+      "not_contains",
+      "equals",
+      "not_equals",
+      "starts_with",
+      "ends_with",
+    ]),
+    targetValue: z.string().min(1, "targetValue cannot be empty").max(4096),
+  })
+  .strict();
+
+const jsonPathAssertionSchema = z
+  .object({
+    id: z
+      .string()
+      .min(1)
+      .max(64)
+      .optional()
+      .default(() => randomUUID()),
+    type: z.literal("jsonPath"),
+    property: z
+      .string()
+      .min(1, "JSONPath expression is required")
+      .max(256)
+      .refine(
+        (val) => val.startsWith("$"),
+        "JSONPath expression must start with '$'",
+      )
+      .refine(
+        (val) => !val.includes(".."),
+        "JSONPath recursive descent ('..') is not supported for security reasons",
+      )
+      .refine(
+        (val) => !val.includes("?("),
+        "JSONPath script expressions are not supported",
+      ),
+    comparison: z.enum([
+      "exists",
+      "not_exists",
+      "equals",
+      "not_equals",
+      "contains",
+      "not_contains",
+      "is_string",
+      "is_number",
+      "is_boolean",
+      "is_array",
+      "is_null",
+      "is_empty",
+      "is_not_empty",
+    ]),
+    targetValue: z
+      .union([z.string().max(4096), z.number(), z.boolean(), z.null()])
+      .optional()
+      .nullable(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (
+      ["equals", "not_equals", "contains", "not_contains"].includes(
+        data.comparison,
+      ) &&
+      data.targetValue === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["targetValue"],
+        message: `targetValue is required for comparison '${data.comparison}'`,
+      });
+    }
+  });
+
+const jsonSchemaAssertionSchema = z
+  .object({
+    id: z
+      .string()
+      .min(1)
+      .max(64)
+      .optional()
+      .default(() => randomUUID()),
+    type: z.literal("jsonSchema"),
+    property: z.string().max(256).optional().nullable(),
+    comparison: z.literal("matches_schema"),
+    targetValue: z.union([z.string().max(65536), z.record(z.any())]),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    let schemaObj = data.targetValue;
+    if (typeof schemaObj === "string") {
+      try {
+        schemaObj = JSON.parse(schemaObj);
+      } catch {
+        ctx.addIssue({
+          code: "custom",
+          path: ["targetValue"],
+          message: "JSON Schema targetValue must be valid JSON",
+        });
+        return;
+      }
+    }
+    if (
+      typeof schemaObj !== "object" ||
+      schemaObj === null ||
+      Array.isArray(schemaObj)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["targetValue"],
+        message: "JSON Schema must be an object",
+      });
+      return;
+    }
+
+    let maxDepth = 0;
+    let hasExternalRef = false;
+    const checkNode = (node, depth) => {
+      if (depth > maxDepth) maxDepth = depth;
+      if (depth > 10) return;
+      if (node && typeof node === "object") {
+        if (
+          typeof node.$ref === "string" &&
+          (node.$ref.startsWith("http://") ||
+            node.$ref.startsWith("https://") ||
+            node.$ref.startsWith("//"))
+        ) {
+          hasExternalRef = true;
+        }
+        for (const child of Object.values(node)) {
+          checkNode(child, depth + 1);
+        }
+      }
+    };
+    checkNode(schemaObj, 1);
+
+    if (maxDepth > 10) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["targetValue"],
+        message: "JSON Schema depth cannot exceed 10 levels",
+      });
+    }
+    if (hasExternalRef) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["targetValue"],
+        message: "External JSON Schema $ref references are not permitted",
+      });
+    }
+  });
+
+export const apiAssertionSchema = z.discriminatedUnion("type", [
+  statusCodeAssertionSchema,
+  responseTimeAssertionSchema,
+  headerAssertionSchema,
+  bodyTextAssertionSchema,
+  jsonPathAssertionSchema,
+  jsonSchemaAssertionSchema,
+]);
+
+export const apiAssertionsListSchema = z
+  .array(apiAssertionSchema)
+  .max(20, "At most 20 assertions allowed");
+
 const apiConfigBase = z
   .object({
     version: z.literal(1).optional().default(1),
@@ -123,6 +368,7 @@ const apiConfigBase = z
       .max(120000)
       .optional()
       .default(10000),
+    assertions: apiAssertionsListSchema.optional().default([]),
   })
   .strict();
 const validateApiConfig = (config, ctx) => {
@@ -147,6 +393,7 @@ const apiConfigUpdate = apiConfigBase
   .extend({
     queryParams: apiQueryField.optional(),
     headers: apiHeadersField.optional(),
+    assertions: apiAssertionsListSchema.optional(),
     authentication: z
       .discriminatedUnion("mode", [
         z.object({ mode: z.literal("none") }).strict(),

@@ -20,6 +20,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "ajv": "^8.20.0",
     "bcrypt": "6.0.0",
     "cloudinary": "^2.11.0",
     "compression": "^1.7.5",
@@ -31,6 +32,7 @@
     "express-rate-limit": "^8.5.2",
     "express-session": "^1.18.1",
     "helmet": "^8.2.0",
+    "jsonpath-plus": "^11.3.0",
     "mongoose": "^9.6.3",
     "morgan": "^1.10.0",
     "multer": "^2.0.1",

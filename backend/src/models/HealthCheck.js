@@ -4,6 +4,37 @@ import { HEALTH_STATUS, FAILURE_REASONS } from "../config/constants.js";
 const STATUS_VALUES = Object.values(HEALTH_STATUS);
 const FAILURE_REASON_VALUES = Object.values(FAILURE_REASONS);
 
+const assertionResultItemSchema = new mongoose.Schema(
+  {
+    assertionId: { type: String, default: null },
+    type: { type: String, required: true },
+    property: { type: String, default: null },
+    comparison: { type: String, required: true },
+    targetValue: { type: mongoose.Schema.Types.Mixed, default: null },
+    actualValue: { type: mongoose.Schema.Types.Mixed, default: null },
+    passed: { type: Boolean, required: true },
+    outcome: {
+      type: String,
+      enum: ["passed", "failed", "error"],
+      required: true,
+    },
+    message: { type: String, default: null, maxlength: 500 },
+    durationMs: { type: Number, default: 0 },
+  },
+  { _id: false },
+);
+
+const assertionSummarySchema = new mongoose.Schema(
+  {
+    total: { type: Number, default: 0 },
+    passed: { type: Number, default: 0 },
+    failed: { type: Number, default: 0 },
+    errors: { type: Number, default: 0 },
+    durationMs: { type: Number, default: 0 },
+  },
+  { _id: false, suppressReservedKeysWarning: true },
+);
+
 // Reusable sub-schema for component-level status
 const componentStatusSchema = {
   type: String,
@@ -86,6 +117,16 @@ const healthCheckSchema = new mongoose.Schema(
     diagnostics: {
       type: mongoose.Schema.Types.Mixed,
       default: null,
+    },
+
+    assertionResults: {
+      type: [assertionResultItemSchema],
+      default: undefined,
+    },
+
+    assertionSummary: {
+      type: assertionSummarySchema,
+      default: undefined,
     },
 
     // ── When the check was performed ──

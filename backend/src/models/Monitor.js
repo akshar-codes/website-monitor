@@ -1,6 +1,52 @@
 import mongoose from "mongoose";
 import { INTERVAL_PRESETS } from "../config/constants.js";
 
+const apiAssertionSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    type: {
+      type: String,
+      enum: [
+        "statusCode",
+        "responseTime",
+        "header",
+        "bodyText",
+        "jsonPath",
+        "jsonSchema",
+      ],
+      required: true,
+    },
+    property: { type: String, default: null, maxlength: 256 },
+    comparison: {
+      type: String,
+      enum: [
+        "equals",
+        "not_equals",
+        "less_than",
+        "less_than_or_equal",
+        "greater_than",
+        "contains",
+        "not_contains",
+        "starts_with",
+        "ends_with",
+        "exists",
+        "not_exists",
+        "is_string",
+        "is_number",
+        "is_boolean",
+        "is_array",
+        "is_null",
+        "is_empty",
+        "is_not_empty",
+        "matches_schema",
+      ],
+      required: true,
+    },
+    targetValue: { type: mongoose.Schema.Types.Mixed, default: null },
+  },
+  { _id: false },
+);
+
 const apiConfigurationSchema = new mongoose.Schema(
   {
     version: { type: Number, enum: [1], default: 1 },
@@ -51,6 +97,11 @@ const apiConfigurationSchema = new mongoose.Schema(
         values.every((v) => v >= 100 && v <= 599),
     },
     maxResponseTimeMs: { type: Number, min: 1, max: 120000, default: 10000 },
+    assertions: {
+      type: [apiAssertionSchema],
+      default: () => [],
+      validate: (values) => Array.isArray(values) && values.length <= 20,
+    },
   },
   { _id: false, strict: "throw" },
 );

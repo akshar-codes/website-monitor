@@ -42,6 +42,8 @@ export const FAILURE_REASONS = Object.freeze({
   INVALID_CONFIGURATION: "invalid_configuration",
   REDIRECT_ERROR: "redirect_error",
   UNSUPPORTED_RESPONSE: "unsupported_response",
+  ASSERTION_FAILURE: "assertion_failure",
+  ASSERTION_ERROR: "assertion_error",
   UNKNOWN: "unknown",
 });
 
