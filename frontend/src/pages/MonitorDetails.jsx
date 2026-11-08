@@ -10,6 +10,8 @@ import MonitorInsights from "../components/monitorDetails/MonitorInsights";
 import { ROUTES } from "../constants/routes";
 import { formatRelative, formatUptime } from "../utils/format";
 import RegionalMonitoringFields from "../components/monitor/RegionalMonitoringFields";
+import ApiMonitorFormFields from "../components/monitor/ApiMonitorFormFields";
+import AssertionResultsDialog from "../components/monitorDetails/AssertionResultsDialog";
 import {
   Page,
   Panel,
@@ -60,6 +62,8 @@ export default function MonitorDetails() {
   const [regionalMetric, setRegionalMetric] = useState("p95");
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [inspectedCheck, setInspectedCheck] = useState(null);
+  const [apiConfigState, setApiConfigState] = useState(null);
 
   const { data, loading, error, refetch } = useMonitorDetails(id, window);
   const { data: regionalResponse } = useMonitorRegionalAnalytics(id, window);
@@ -133,8 +137,19 @@ export default function MonitorDetails() {
   }));
   return (
     <Page
-      eyebrow="MONITOR DETAIL"
-      title={monitor.name || "Monitor"}
+      eyebrow={
+        monitor.kind === "api" ? "API MONITOR DETAIL" : "WEBSITE MONITOR DETAIL"
+      }
+      title={
+        <span className="flex items-center gap-2">
+          {monitor.name || "Monitor"}
+          {monitor.kind === "api" && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-700 uppercase">
+              API: {monitor.apiConfig?.method || "GET"}
+            </span>
+          )}
+        </span>
+      }
       description={monitor.url}
       actions={
         <>
@@ -289,8 +304,63 @@ export default function MonitorDetails() {
               label: "Response",
               render: (v) => (v == null ? "—" : `${v} ms`),
             },
-            { key: "statusCode", label: "HTTP code" },
-            { key: "errorMessage", label: "Details" },
+            {
+              key: "httpStatus",
+              label: "HTTP code",
+              render: (v, r) => v ?? r.statusCode ?? "—",
+            },
+            {
+              key: "assertions",
+              label: "Assertions",
+              render: (_, row) => {
+                if (
+                  !row.assertionSummary &&
+                  (!row.assertionResults || !row.assertionResults.length)
+                ) {
+                  return monitor.kind === "api" ? (
+                    <span className="text-xs text-slate-400">None</span>
+                  ) : (
+                    "—"
+                  );
+                }
+                const summary = row.assertionSummary || {
+                  total: row.assertionResults.length,
+                  passed: row.assertionResults.filter((a) => a.passed).length,
+                  failed: row.assertionResults.filter(
+                    (a) => a.outcome === "failed",
+                  ).length,
+                  errors: row.assertionResults.filter(
+                    (a) => a.outcome === "error",
+                  ).length,
+                };
+                const allPassed = summary.failed === 0 && summary.errors === 0;
+                return (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold ${
+                        allPassed
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {summary.passed}/{summary.total} passed
+                    </span>
+                    <button
+                      type="button"
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium underline"
+                      onClick={() => setInspectedCheck(row)}
+                    >
+                      Inspect
+                    </button>
+                  </div>
+                );
+              },
+            },
+            {
+              key: "errorMessage",
+              label: "Details",
+              render: (v, r) => r.failureReason || v || "—",
+            },
           ]}
           rows={checks}
         />
@@ -434,52 +504,73 @@ export default function MonitorDetails() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   const f = new FormData(e.currentTarget);
-                  handleFormSubmit({
-                    name: f.get("name"),
-                    url: f.get("url"),
-                    interval: Number(f.get("interval")),
-                    regionalMonitoring: {
-                      enabled: f.get("regionalMonitoring.enabled") === "on",
-                      regions: f.getAll("regionalMonitoring.regions"),
-                    },
-                    performanceAlerts: {
-                      enabled: f.get("performanceAlerts.enabled") === "on",
-                      ...(usage?.features?.performanceAlertConfig
-                        ? {
-                            sensitivity: f.get("performanceAlerts.sensitivity"),
-                            ...(f.get("performanceAlerts.thresholdMultiplier")
-                              ? {
-                                  thresholdMultiplier: Number(
-                                    f.get(
-                                      "performanceAlerts.thresholdMultiplier",
+                  if (monitor.kind === "api") {
+                    handleFormSubmit({
+                      name: f.get("name"),
+                      url: f.get("url"),
+                      kind: "api",
+                      interval: Number(f.get("interval")),
+                      apiConfig: apiConfigState || monitor.apiConfig || {},
+                    });
+                  } else {
+                    handleFormSubmit({
+                      name: f.get("name"),
+                      url: f.get("url"),
+                      kind: "website",
+                      interval: Number(f.get("interval")),
+                      regionalMonitoring: {
+                        enabled: f.get("regionalMonitoring.enabled") === "on",
+                        regions: f.getAll("regionalMonitoring.regions"),
+                      },
+                      performanceAlerts: {
+                        enabled: f.get("performanceAlerts.enabled") === "on",
+                        ...(usage?.features?.performanceAlertConfig
+                          ? {
+                              sensitivity: f.get(
+                                "performanceAlerts.sensitivity",
+                              ),
+                              ...(f.get("performanceAlerts.thresholdMultiplier")
+                                ? {
+                                    thresholdMultiplier: Number(
+                                      f.get(
+                                        "performanceAlerts.thresholdMultiplier",
+                                      ),
                                     ),
-                                  ),
-                                }
-                              : {}),
-                            consecutiveBreaches: Number(
-                              f.get("performanceAlerts.consecutiveBreaches"),
-                            ),
-                            cooldownMinutes: Number(
-                              f.get("performanceAlerts.cooldownMinutes"),
-                            ),
-                          }
-                        : {}),
-                    },
-                  });
+                                  }
+                                : {}),
+                              consecutiveBreaches: Number(
+                                f.get("performanceAlerts.consecutiveBreaches"),
+                              ),
+                              cooldownMinutes: Number(
+                                f.get("performanceAlerts.cooldownMinutes"),
+                              ),
+                            }
+                          : {}),
+                      },
+                    });
+                  }
                 }}
               >
                 <Input
                   label="Monitor name"
                   name="name"
-                  placeholder="e.g. My Website"
+                  placeholder={
+                    monitor.kind === "api"
+                      ? "e.g. User Profile API"
+                      : "e.g. My Website"
+                  }
                   defaultValue={monitor.name}
                   required
                 />
                 <Input
-                  label="URL"
+                  label={monitor.kind === "api" ? "API URL" : "URL"}
                   name="url"
                   type="url"
-                  placeholder="https://example.com"
+                  placeholder={
+                    monitor.kind === "api"
+                      ? "https://api.example.com/v1/health"
+                      : "https://example.com"
+                  }
                   defaultValue={monitor.url}
                   required
                 />
@@ -492,78 +583,88 @@ export default function MonitorDetails() {
                   <option value="300">300 seconds</option>
                   <option value="600">600 seconds</option>
                 </Select>
-                <RegionalMonitoringFields
-                  usage={usage}
-                  config={monitor.regionalMonitoring}
-                />
-                <fieldset className="settings-grid rounded-lg border p-3 md:col-span-2">
-                  <legend>Performance degradation alerts</legend>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      name="performanceAlerts.enabled"
-                      defaultChecked={
-                        monitor.performanceAlerts?.enabled !== false
-                      }
-                    />{" "}
-                    Enable sustained latency alerts
-                  </label>
-                  <Select
-                    label="Sensitivity"
-                    name="performanceAlerts.sensitivity"
-                    defaultValue={
-                      monitor.performanceAlerts?.sensitivity || "normal"
-                    }
-                    disabled={!usage?.features?.performanceAlertConfig}
-                  >
-                    <option value="low">Low · substantial changes</option>
-                    <option value="normal">Normal · balanced</option>
-                    <option value="high">High · smaller changes</option>
-                  </Select>
-                  <Input
-                    label="Threshold multiplier (optional)"
-                    name="performanceAlerts.thresholdMultiplier"
-                    type="number"
-                    min="1.1"
-                    max="5"
-                    step="0.1"
-                    placeholder="Use sensitivity preset"
-                    defaultValue={
-                      monitor.performanceAlerts?.thresholdMultiplier ?? ""
-                    }
-                    disabled={!usage?.features?.performanceAlertConfig}
+                {monitor.kind === "api" ? (
+                  <ApiMonitorFormFields
+                    initialConfig={monitor.apiConfig}
+                    isEdit={true}
+                    onChange={setApiConfigState}
                   />
-                  <Input
-                    label="Consecutive breaches"
-                    name="performanceAlerts.consecutiveBreaches"
-                    type="number"
-                    min="2"
-                    max="10"
-                    placeholder="e.g. 3"
-                    defaultValue={
-                      monitor.performanceAlerts?.consecutiveBreaches || 3
-                    }
-                    disabled={!usage?.features?.performanceAlertConfig}
-                  />
-                  <Input
-                    label="Repeat cooldown (minutes)"
-                    name="performanceAlerts.cooldownMinutes"
-                    type="number"
-                    min="5"
-                    max="1440"
-                    placeholder="e.g. 30"
-                    defaultValue={
-                      monitor.performanceAlerts?.cooldownMinutes || 30
-                    }
-                    disabled={!usage?.features?.performanceAlertConfig}
-                  />
-                  {!usage?.features?.performanceAlertConfig && (
-                    <p className="text-sm text-slate-500 md:col-span-2">
-                      Custom sensitivity is available on Pro and Enterprise.
-                      Upgrade to configure it.
-                    </p>
-                  )}
-                </fieldset>
+                ) : (
+                  <>
+                    <RegionalMonitoringFields
+                      usage={usage}
+                      config={monitor.regionalMonitoring}
+                    />
+                    <fieldset className="settings-grid rounded-lg border p-3 md:col-span-2">
+                      <legend>Performance degradation alerts</legend>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          name="performanceAlerts.enabled"
+                          defaultChecked={
+                            monitor.performanceAlerts?.enabled !== false
+                          }
+                        />{" "}
+                        Enable sustained latency alerts
+                      </label>
+                      <Select
+                        label="Sensitivity"
+                        name="performanceAlerts.sensitivity"
+                        defaultValue={
+                          monitor.performanceAlerts?.sensitivity || "normal"
+                        }
+                        disabled={!usage?.features?.performanceAlertConfig}
+                      >
+                        <option value="low">Low · substantial changes</option>
+                        <option value="normal">Normal · balanced</option>
+                        <option value="high">High · smaller changes</option>
+                      </Select>
+                      <Input
+                        label="Threshold multiplier (optional)"
+                        name="performanceAlerts.thresholdMultiplier"
+                        type="number"
+                        min="1.1"
+                        max="5"
+                        step="0.1"
+                        placeholder="Use sensitivity preset"
+                        defaultValue={
+                          monitor.performanceAlerts?.thresholdMultiplier ?? ""
+                        }
+                        disabled={!usage?.features?.performanceAlertConfig}
+                      />
+                      <Input
+                        label="Consecutive breaches"
+                        name="performanceAlerts.consecutiveBreaches"
+                        type="number"
+                        min="2"
+                        max="10"
+                        placeholder="e.g. 3"
+                        defaultValue={
+                          monitor.performanceAlerts?.consecutiveBreaches || 3
+                        }
+                        disabled={!usage?.features?.performanceAlertConfig}
+                      />
+                      <Input
+                        label="Repeat cooldown (minutes)"
+                        name="performanceAlerts.cooldownMinutes"
+                        type="number"
+                        min="5"
+                        max="1440"
+                        placeholder="e.g. 30"
+                        defaultValue={
+                          monitor.performanceAlerts?.cooldownMinutes || 30
+                        }
+                        disabled={!usage?.features?.performanceAlertConfig}
+                      />
+                      {!usage?.features?.performanceAlertConfig && (
+                        <p className="text-sm text-slate-500 md:col-span-2">
+                          Custom sensitivity is available on Pro and Enterprise.
+                          Upgrade to configure it.
+                        </p>
+                      )}
+                    </fieldset>
+                  </>
+                )}
                 <div className="modal-actions">
                   <Button
                     variant="secondary"
@@ -600,6 +701,11 @@ export default function MonitorDetails() {
           </section>
         </div>
       )}
+      <AssertionResultsDialog
+        open={Boolean(inspectedCheck)}
+        onClose={() => setInspectedCheck(null)}
+        check={inspectedCheck}
+      />
     </Page>
   );
 }
