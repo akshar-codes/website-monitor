@@ -148,3 +148,48 @@ export const WINDOW_MS = Object.freeze({
 
 /** Ordered list of valid window keys for use in Zod schemas. */
 export const WINDOW_KEYS = Object.freeze(Object.keys(WINDOW_MS));
+
+// ── SLO & Error Budget ───────────────────────────────────────────────────────
+
+/** Supported SLO rolling windows and their durations in milliseconds. */
+export const SLO_ROLLING_WINDOW_MS = Object.freeze({
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "14d": 14 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
+  "60d": 60 * 24 * 60 * 60 * 1000,
+  "90d": 90 * 24 * 60 * 60 * 1000,
+});
+
+export const SLO_ROLLING_WINDOWS = Object.freeze(
+  Object.keys(SLO_ROLLING_WINDOW_MS),
+);
+
+/** Supported SLO evaluation intervals. */
+export const SLO_EVALUATION_INTERVALS = Object.freeze([
+  "1m",
+  "5m",
+  "15m",
+  "30m",
+  "1h",
+  "6h",
+  "24h",
+]);
+
+/** Supported burn rate analysis windows. */
+export const SLO_BURN_RATE_WINDOWS = Object.freeze(["1h", "6h", "24h", "3d"]);
+
+/** Alert severities for SLO thresholds. */
+export const SLO_SEVERITY = Object.freeze([
+  "critical",
+  "high",
+  "normal",
+  "low",
+]);
+
+/** Fields the SLO list endpoint may sort by. */
+export const SLO_SORT_FIELDS = Object.freeze([
+  "name",
+  "targetPercentage",
+  "createdAt",
+  "updatedAt",
+]);

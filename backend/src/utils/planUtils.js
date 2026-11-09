@@ -38,6 +38,14 @@ export const hasUnlimitedMonitors = (plan) => getMonitorLimit(plan) === null;
 export const getMinCheckInterval = (plan) =>
   getPlanDefinition(plan)?.limits.minCheckIntervalSeconds ?? Infinity;
 
+/** `null` return means the plan has no SLO cap. */
+export const getSloLimit = (plan) => {
+  const definition = getPlanDefinition(plan);
+  return definition ? definition.limits.maxSlos : 0;
+};
+
+export const hasUnlimitedSlos = (plan) => getSloLimit(plan) === null;
+
 /**
  * True when `intervalSeconds` respects the plan's minimum check interval —
  * a smaller interval means more frequent polling, so the requested

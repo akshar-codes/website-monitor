@@ -34,6 +34,11 @@ export const ACTIVITY_ACTIONS = Object.freeze({
   MONITOR_RESUMED: "monitor_resumed",
   MONITOR_DELETED: "monitor_deleted",
 
+  // ── SLO ──
+  SLO_CREATED: "slo_created",
+  SLO_UPDATED: "slo_updated",
+  SLO_DELETED: "slo_deleted",
+
   // ── Incident ──
   INCIDENT_STATUS_UPDATED: "incident_status_updated",
   INCIDENT_AUTO_OPENED: "incident_auto_opened",

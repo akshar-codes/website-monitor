@@ -17,6 +17,7 @@ export const FEATURES = Object.freeze({
   PERFORMANCE_ALERT_CONFIG: "performanceAlertConfig",
   REGIONAL_MONITORING: "regionalMonitoring",
   API_MONITORING: "apiMonitoring",
+  SLO_MANAGEMENT: "sloManagement",
 });
 
 const FEATURE_CHECKS = Object.freeze({
@@ -58,6 +59,13 @@ const FEATURE_CHECKS = Object.freeze({
   [FEATURES.API_MONITORING]: (plan) => {
     const definition = getPlanDefinition(plan);
     return !!definition && definition.limits.maxApiMonitors > 0;
+  },
+  [FEATURES.SLO_MANAGEMENT]: (plan) => {
+    const definition = getPlanDefinition(plan);
+    return (
+      !!definition &&
+      (definition.limits.maxSlos === null || definition.limits.maxSlos > 0)
+    );
   },
 });
 
