@@ -269,7 +269,7 @@ test("Schedule Service: calculateNextEvaluation computes evaluation deadlines", 
   );
   assert.equal(evalIdle.toISOString(), "2026-11-10T13:05:00.000Z");
 
-  // Case 2: Job currently running -> evaluate at started + timeout + grace
+  // Case 2: Job currently running -> evaluate at exact timeout deadline (started + timeout)
   const startedAt = new Date("2026-11-10T12:10:00.000Z");
   const evalRunning = calculateNextEvaluation(
     {
@@ -280,8 +280,8 @@ test("Schedule Service: calculateNextEvaluation computes evaluation deadlines", 
     },
     now,
   );
-  // startedAt + (600 + 120)s = 12:10 + 12m = 12:22:00 UTC
-  assert.equal(evalRunning.toISOString(), "2026-11-10T12:22:00.000Z");
+  // startedAt + 600s = 12:10 + 10m = 12:20:00 UTC (grace period applies to missed runs, not timeouts)
+  assert.equal(evalRunning.toISOString(), "2026-11-10T12:20:00.000Z");
 });
 
 test("Schedule Service: recalculateScheduleForUpdate updates milestones without rewriting history", () => {

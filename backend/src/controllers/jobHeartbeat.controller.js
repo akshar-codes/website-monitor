@@ -13,6 +13,11 @@ export const reportHeartbeat = asyncHandler(async (req, res) => {
   const reqContext = {
     clientIp: req.ip,
     userAgent: req.headers["user-agent"] || null,
+    idempotencyKey:
+      payload.idempotencyKey ||
+      req.headers["idempotency-key"] ||
+      req.headers["x-idempotency-key"] ||
+      null,
   };
 
   const result = await jobHeartbeatService.processHeartbeat(

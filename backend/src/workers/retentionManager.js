@@ -70,20 +70,37 @@ export const pruneJobRuns = async (jobMonitorId, deps = {}) => {
   const incidents = deps.Incident || Incident;
   const cutoff = deps.cutoff;
   const batchSize = deps.batchSize || 500;
-  const keep = deps.keep || MAX_STORED_JOB_RUNS_RESERVED;
+  const keep = deps.keep ?? MAX_STORED_JOB_RUNS_RESERVED;
 
-  const query = { jobMonitor: jobMonitorId };
+  // 1. Identify the 'keep' newest overall runs for this monitor so dormant jobs maintain history
+  let protectedRecentIds = new Set();
+  if (keep > 0) {
+    const recent = await jobRuns
+      .find({ jobMonitor: jobMonitorId })
+      .select("_id")
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(keep)
+      .lean();
+    if (Array.isArray(recent)) {
+      protectedRecentIds = new Set(recent.map((r) => String(r._id)));
+    }
+  }
+
+  // 2. Query expired runs older than cutoff (excluding protected recent runs)
+  const candidateQuery = { jobMonitor: jobMonitorId };
   if (cutoff) {
-    query.createdAt = { $lt: cutoff };
+    candidateQuery.createdAt = { $lt: cutoff };
+  }
+  if (protectedRecentIds.size > 0) {
+    candidateQuery._id = { $nin: Array.from(protectedRecentIds) };
   }
 
   const excess = await jobRuns
-    .find(query)
+    .find(candidateQuery)
     .select(
       "_id status runId scheduledFor startedAt completedAt durationMs exitCode errorMessage failureReason output metadata createdAt",
     )
-    .sort({ createdAt: -1, _id: -1 })
-    .skip(keep)
+    .sort({ createdAt: 1, _id: 1 })
     .limit(batchSize)
     .lean();
 

@@ -191,10 +191,16 @@ export const updateJobMonitor = async (id, payload, user) => {
   const definition = getPlanDefinition(plan);
   const minAllowedInterval = definition?.limits?.minJobIntervalSeconds || 10;
 
+  const effectiveScheduleType = payload.scheduleType || jobMonitor.scheduleType;
+  const effectiveIntervalSeconds =
+    payload.intervalSeconds !== undefined
+      ? payload.intervalSeconds
+      : jobMonitor.intervalSeconds;
+
   if (
-    payload.scheduleType === "interval" &&
-    payload.intervalSeconds &&
-    payload.intervalSeconds < minAllowedInterval
+    effectiveScheduleType === "interval" &&
+    effectiveIntervalSeconds &&
+    effectiveIntervalSeconds < minAllowedInterval
   ) {
     throw ApiError.upgradeRequired(
       `Your plan requires a minimum interval of ${minAllowedInterval} seconds. Upgrade for faster intervals.`,

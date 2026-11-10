@@ -19,6 +19,13 @@ export const jobHeartbeatSchema = z
       .min(1, "runId cannot be empty")
       .max(128, "runId cannot exceed 128 characters")
       .optional(),
+    idempotencyKey: z
+      .string()
+      .trim()
+      .min(1, "idempotencyKey cannot be empty")
+      .max(128, "idempotencyKey cannot exceed 128 characters")
+      .optional()
+      .nullable(),
     scheduledFor: z.preprocess(parseDateString, z.date().optional().nullable()),
     startedAt: z.preprocess(parseDateString, z.date().optional().nullable()),
     completedAt: z.preprocess(parseDateString, z.date().optional().nullable()),

@@ -208,7 +208,7 @@ export const calculateNextEvaluation = (
     const started = new Date(currentRunStartedAt);
     if (!isNaN(started.getTime())) {
       const timeoutDeadline = new Date(
-        started.getTime() + (runTimeoutSeconds + gracePeriodSeconds) * 1000,
+        started.getTime() + runTimeoutSeconds * 1000,
       );
       // If we also have a nextExpectedAt, check which arrives earlier
       if (nextExpectedAt) {

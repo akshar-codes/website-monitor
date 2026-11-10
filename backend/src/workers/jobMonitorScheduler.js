@@ -127,8 +127,9 @@ export const claimNextDueJobMonitor = async () => {
  */
 export const evaluateJobMonitor = async (
   jobMonitorId,
-  { now = new Date(), token = null } = {},
+  { now = new Date(), token = null, signal = null } = {},
 ) => {
+  if (signal?.aborted) return null;
   metrics.lastEvaluationAt = new Date();
 
   const query = token
@@ -155,75 +156,124 @@ export const evaluateJobMonitor = async (
     return null;
   }
 
+  if (signal?.aborted) return null;
   const evaluationDate = now instanceof Date ? now : new Date(now);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // 1. EXECUTION TIMEOUT EVALUATION
+  // 1. EXECUTION TIMEOUT EVALUATION (Evaluates all in-flight started runs)
   // ───────────────────────────────────────────────────────────────────────────
-  if (jobMonitor.currentRunStartedAt) {
-    const startedAtMs = new Date(jobMonitor.currentRunStartedAt).getTime();
-    const timeoutMs =
-      (jobMonitor.runTimeoutSeconds ||
-        JOB_MONITOR_LIMITS.DEFAULT_RUN_TIMEOUT_SECONDS) * 1000;
+  const timeoutMs =
+    (jobMonitor.runTimeoutSeconds ||
+      JOB_MONITOR_LIMITS.DEFAULT_RUN_TIMEOUT_SECONDS) * 1000;
+  const timeoutCutoff = new Date(evaluationDate.getTime() - timeoutMs);
 
-    if (evaluationDate.getTime() >= startedAtMs + timeoutMs) {
-      const durationMs = Math.max(0, evaluationDate.getTime() - startedAtMs);
+  let timedOutCandidates = [];
+  if (typeof JobRun.find === "function") {
+    try {
+      const found = await JobRun.find({
+        jobMonitor: jobMonitor._id,
+        status: JOB_RUN_STATUS.STARTED,
+        startedAt: { $lte: timeoutCutoff },
+      });
+      if (Array.isArray(found)) {
+        timedOutCandidates = [...found];
+      }
+    } catch {
+      // Fallback for mocks
+    }
+  }
 
-      // Attempt atomic transition on JobRun: only if it is still in STARTED state
-      let activeRun = null;
-      if (jobMonitor.currentRunId) {
-        activeRun = await JobRun.findOneAndUpdate(
-          {
-            jobMonitor: jobMonitor._id,
-            runId: jobMonitor.currentRunId,
-            status: JOB_RUN_STATUS.STARTED,
-          },
-          {
-            $set: {
-              status: JOB_RUN_STATUS.TIMED_OUT,
-              completedAt: evaluationDate,
-              durationMs,
-              errorMessage: `Execution timed out after exceeding configured limit of ${jobMonitor.runTimeoutSeconds} seconds.`,
-              failureReason: "execution_timeout",
-            },
-          },
-          { returnDocument: "after" },
+  // Also include currentRunId if set on jobMonitor and timed out
+  if (
+    jobMonitor.currentRunStartedAt &&
+    jobMonitor.currentRunId &&
+    new Date(jobMonitor.currentRunStartedAt).getTime() <= timeoutCutoff.getTime() &&
+    !timedOutCandidates.some((r) => r.runId === jobMonitor.currentRunId)
+  ) {
+    timedOutCandidates.push({
+      jobMonitor: jobMonitor._id,
+      runId: jobMonitor.currentRunId,
+      startedAt: jobMonitor.currentRunStartedAt,
+    });
+  }
+
+  for (const candidate of timedOutCandidates) {
+    if (signal?.aborted) return null;
+    const startedAtMs = new Date(candidate.startedAt || evaluationDate).getTime();
+    const durationMs = Math.max(0, evaluationDate.getTime() - startedAtMs);
+
+    const runQuery = candidate._id
+      ? { _id: candidate._id, status: JOB_RUN_STATUS.STARTED }
+      : {
+          jobMonitor: jobMonitor._id,
+          runId: candidate.runId,
+          status: JOB_RUN_STATUS.STARTED,
+        };
+
+    const activeRun = await JobRun.findOneAndUpdate(
+      runQuery,
+      {
+        $set: {
+          status: JOB_RUN_STATUS.TIMED_OUT,
+          completedAt: evaluationDate,
+          durationMs,
+          errorMessage: `Execution timed out after exceeding configured limit of ${jobMonitor.runTimeoutSeconds} seconds.`,
+          failureReason: "execution_timeout",
+        },
+      },
+      { returnDocument: "after" },
+    );
+
+    if (activeRun) {
+      metrics.timedOutRuns += 1;
+      jobMonitor.lastRunStatus = JOB_RUN_STATUS.TIMED_OUT;
+      jobMonitor.lastFinishedAt = evaluationDate;
+      jobMonitor.lastDurationMs = durationMs;
+      jobMonitor.consecutiveFailures =
+        (jobMonitor.consecutiveFailures || 0) + 1;
+      jobMonitor.consecutiveSuccesses = 0;
+
+      const failureThreshold =
+        jobMonitor.failureThreshold ||
+        JOB_MONITOR_LIMITS.DEFAULT_FAILURE_THRESHOLD;
+      if (jobMonitor.consecutiveFailures >= failureThreshold) {
+        jobMonitor.status = JOB_STATUS.DOWN;
+        await handleJobIncident(jobMonitor, activeRun, {
+          triggerType: "timeout",
+          failureReason: "execution_timeout",
+          consecutiveFailures: jobMonitor.consecutiveFailures,
+        }).catch((err) =>
+          logger.error("Failed handling job timeout incident", {
+            jobMonitorId: String(jobMonitor._id),
+            error: err.message,
+          }),
         );
       }
-
-      if (activeRun) {
-        metrics.timedOutRuns += 1;
-        jobMonitor.lastRunStatus = JOB_RUN_STATUS.TIMED_OUT;
-        jobMonitor.lastFinishedAt = evaluationDate;
-        jobMonitor.lastDurationMs = durationMs;
-        jobMonitor.consecutiveFailures =
-          (jobMonitor.consecutiveFailures || 0) + 1;
-        jobMonitor.consecutiveSuccesses = 0;
-        jobMonitor.currentRunId = null;
-        jobMonitor.currentRunStartedAt = null;
-
-        const failureThreshold =
-          jobMonitor.failureThreshold ||
-          JOB_MONITOR_LIMITS.DEFAULT_FAILURE_THRESHOLD;
-        if (jobMonitor.consecutiveFailures >= failureThreshold) {
-          jobMonitor.status = JOB_STATUS.DOWN;
-          await handleJobIncident(jobMonitor, activeRun, {
-            triggerType: "timeout",
-            failureReason: "execution_timeout",
-            consecutiveFailures: jobMonitor.consecutiveFailures,
-          }).catch((err) =>
-            logger.error("Failed handling job timeout incident", {
-              jobMonitorId: String(jobMonitor._id),
-              error: err.message,
-            }),
-          );
-        }
-      } else {
-        // Run already transitioned or cleared concurrently
-        jobMonitor.currentRunId = null;
-        jobMonitor.currentRunStartedAt = null;
-      }
     }
+  }
+
+  // Update currentRunId / currentRunStartedAt based on remaining in-flight runs
+  let remainingInFlightRun = null;
+  if (typeof JobRun.findOne === "function") {
+    try {
+      remainingInFlightRun = await JobRun.findOne({
+        jobMonitor: jobMonitor._id,
+        status: JOB_RUN_STATUS.STARTED,
+      }).sort({ startedAt: 1, _id: 1 });
+    } catch {
+      // Mock fallback
+    }
+  }
+
+  if (remainingInFlightRun) {
+    jobMonitor.currentRunId = remainingInFlightRun.runId;
+    jobMonitor.currentRunStartedAt = remainingInFlightRun.startedAt;
+  } else if (
+    !jobMonitor.currentRunStartedAt ||
+    new Date(jobMonitor.currentRunStartedAt).getTime() <= timeoutCutoff.getTime()
+  ) {
+    jobMonitor.currentRunId = null;
+    jobMonitor.currentRunStartedAt = null;
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -362,7 +412,9 @@ export const evaluateJobMonitor = async (
     evaluationDate,
   );
 
-  await JobMonitor.updateOne(
+  if (signal?.aborted) return null;
+
+  const updateResult = await JobMonitor.updateOne(
     { _id: jobMonitor._id, ...(token ? { leaseToken: token } : {}) },
     {
       $set: {
@@ -386,6 +438,14 @@ export const evaluateJobMonitor = async (
     },
   );
 
+  if (token && updateResult?.matchedCount === 0) {
+    logger.warn("Job monitor lease lost or expired during evaluation", {
+      jobMonitorId: String(jobMonitor._id),
+      token,
+    });
+    return null;
+  }
+
   metrics.evaluationsCompleted += 1;
   metrics.lastSuccessAt = new Date();
 
@@ -407,9 +467,11 @@ export const runClaimedJobMonitor = async ({ jobMonitor, token }) => {
 
   inFlightJobMonitorIds.add(id);
   const query = { _id: jobMonitor._id, leaseToken: token };
+  const controller = new AbortController();
 
   let timeout;
   let heartbeat;
+  let workPromise;
 
   try {
     heartbeat = setInterval(
@@ -429,7 +491,11 @@ export const runClaimedJobMonitor = async ({ jobMonitor, token }) => {
     );
     heartbeat.unref?.();
 
-    const work = evaluateJobMonitor(jobMonitor._id, { now: new Date(), token });
+    workPromise = evaluateJobMonitor(jobMonitor._id, {
+      now: new Date(),
+      token,
+      signal: controller.signal,
+    });
 
     const deadline = new Promise((_, reject) => {
       timeout = setTimeout(
@@ -440,7 +506,7 @@ export const runClaimedJobMonitor = async ({ jobMonitor, token }) => {
       timeout.unref?.();
     });
 
-    const result = await Promise.race([work, deadline]);
+    const result = await Promise.race([workPromise, deadline]);
     return result;
   } catch (error) {
     metrics.failedSchedulerOperations += 1;
@@ -450,12 +516,23 @@ export const runClaimedJobMonitor = async ({ jobMonitor, token }) => {
       error: error.message,
     });
 
+    // Abort active evaluation to prevent stale database writes
+    controller.abort();
+
+    // Safely wait for the original evaluation to drain before clearing lease
+    if (workPromise) {
+      await Promise.race([
+        workPromise.catch(() => {}),
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+      ]);
+    }
+
     await JobMonitor.updateOne(query, {
       $set: {
         retryAt: new Date(Date.now() + env.JOB_SCHEDULER_RETRY_DELAY_MS),
       },
       $unset: { leaseToken: 1, leaseUntil: 1 },
-    });
+    }).catch(() => {});
 
     return null;
   } finally {
