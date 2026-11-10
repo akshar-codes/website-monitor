@@ -2,6 +2,7 @@ import Monitor from "../models/Monitor.js";
 import StatusPage from "../models/StatusPage.js";
 import StatusSubscriber from "../models/StatusSubscriber.js";
 import Slo from "../models/SLO.js";
+import JobMonitor from "../models/JobMonitor.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { hasFeature, FEATURES } from "../config/features.js";
 import ProbeAgent from "../models/ProbeAgent.js";
@@ -32,6 +33,7 @@ export const getUsageForUser = async (user) => {
     kind: "api",
   });
   const sloCount = await Slo.countDocuments({ owner: ownerId });
+  const jobMonitorCount = await JobMonitor.countDocuments({ owner: ownerId });
   const regionalMonitors = await Monitor.find({
     owner: ownerId,
     "regionalMonitoring.enabled": true,
@@ -125,6 +127,19 @@ export const getUsageForUser = async (user) => {
       atLimit:
         definition.limits.maxSlos != null &&
         sloCount >= definition.limits.maxSlos,
+    },
+    jobMonitors: {
+      used: jobMonitorCount,
+      limit: definition.limits.maxJobMonitors,
+      available: hasFeature(plan, FEATURES.JOB_MONITORING),
+      remaining:
+        definition.limits.maxJobMonitors == null
+          ? null
+          : Math.max(0, definition.limits.maxJobMonitors - jobMonitorCount),
+      atLimit:
+        definition.limits.maxJobMonitors != null &&
+        jobMonitorCount >= definition.limits.maxJobMonitors,
+      minIntervalSeconds: definition.limits.minJobIntervalSeconds,
     },
     interval: {
       minSeconds: definition.limits.minCheckIntervalSeconds,
