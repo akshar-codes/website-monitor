@@ -118,3 +118,16 @@ export const getLatestSnapshot = asyncHandler(async (req, res) => {
 
   sendSuccess(res, { data: snapshot });
 });
+
+/**
+ * GET /api/slos/:id/alert-state
+ * Get current persistent alert state (active alerts, burn rates, forecast).
+ */
+export const getAlertState = asyncHandler(async (req, res) => {
+  const alertState = await sloEvaluationService.getSloAlertState(
+    req.params.id,
+    req.user,
+  );
+
+  sendSuccess(res, { data: alertState });
+});

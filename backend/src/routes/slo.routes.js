@@ -8,6 +8,7 @@ import {
   triggerEvaluation,
   getSnapshots,
   getLatestSnapshot,
+  getAlertState,
 } from "../controllers/slo.controller.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
 import { requirePermission } from "../middlewares/permission.js";
@@ -51,6 +52,10 @@ router
     validateObjectId("id"),
     getLatestSnapshot,
   );
+
+router
+  .route("/:id/alert-state")
+  .get(requirePermission("slo:read"), validateObjectId("id"), getAlertState);
 
 router
   .route("/:id")

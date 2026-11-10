@@ -79,3 +79,12 @@ export async function getLatestSloSnapshot(id) {
   const { data } = await apiClient.get(`/slos/${id}/latest`);
   return data?.data;
 }
+
+/**
+ * GET /api/slos/:id/alert-state
+ * Fetch the current persistent alert state for an SLO.
+ */
+export async function getSloAlertState(id) {
+  const { data } = await apiClient.get(`/slos/${id}/alert-state`);
+  return data?.data;
+}
