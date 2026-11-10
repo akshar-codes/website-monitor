@@ -5,6 +5,9 @@ import {
   getSloById,
   updateSlo,
   deleteSlo,
+  triggerEvaluation,
+  getSnapshots,
+  getLatestSnapshot,
 } from "../controllers/slo.controller.js";
 import { validate, validateObjectId } from "../middlewares/validate.js";
 import { requirePermission } from "../middlewares/permission.js";
@@ -27,6 +30,26 @@ router
     requirePermission("slo:read"),
     validate(listSlosSchema, "query"),
     getSlos,
+  );
+
+router
+  .route("/:id/evaluate")
+  .post(
+    requirePermission("slo:update"),
+    validateObjectId("id"),
+    triggerEvaluation,
+  );
+
+router
+  .route("/:id/snapshots")
+  .get(requirePermission("slo:read"), validateObjectId("id"), getSnapshots);
+
+router
+  .route("/:id/latest")
+  .get(
+    requirePermission("slo:read"),
+    validateObjectId("id"),
+    getLatestSnapshot,
   );
 
 router

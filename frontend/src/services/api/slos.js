@@ -52,3 +52,30 @@ export async function deleteSlo(id) {
 export async function getMonitorSlos(monitorId, params = {}) {
   return getSlos({ ...params, monitorId });
 }
+
+/**
+ * POST /api/slos/:id/evaluate
+ * Trigger on-demand evaluation of an SLO.
+ */
+export async function triggerSloEvaluation(id) {
+  const { data } = await apiClient.post(`/slos/${id}/evaluate`);
+  return data?.data;
+}
+
+/**
+ * GET /api/slos/:id/snapshots
+ * Retrieve paginated historical snapshots for an SLO.
+ */
+export async function getSloSnapshots(id, params = {}) {
+  const { data } = await apiClient.get(`/slos/${id}/snapshots`, { params });
+  return data;
+}
+
+/**
+ * GET /api/slos/:id/latest
+ * Fetch the latest evaluation snapshot for an SLO.
+ */
+export async function getLatestSloSnapshot(id) {
+  const { data } = await apiClient.get(`/slos/${id}/latest`);
+  return data?.data;
+}
