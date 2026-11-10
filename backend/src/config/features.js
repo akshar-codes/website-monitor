@@ -18,6 +18,7 @@ export const FEATURES = Object.freeze({
   REGIONAL_MONITORING: "regionalMonitoring",
   API_MONITORING: "apiMonitoring",
   SLO_MANAGEMENT: "sloManagement",
+  JOB_MONITORING: "jobMonitoring",
 });
 
 const FEATURE_CHECKS = Object.freeze({
@@ -65,6 +66,14 @@ const FEATURE_CHECKS = Object.freeze({
     return (
       !!definition &&
       (definition.limits.maxSlos === null || definition.limits.maxSlos > 0)
+    );
+  },
+  [FEATURES.JOB_MONITORING]: (plan) => {
+    const definition = getPlanDefinition(plan);
+    return (
+      !!definition &&
+      (definition.limits.maxJobMonitors === null ||
+        definition.limits.maxJobMonitors > 0)
     );
   },
 });

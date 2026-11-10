@@ -38,6 +38,10 @@ export const ROLE_PERMISSIONS = Object.freeze({
     "slo:create",
     "slo:update",
     "slo:delete",
+    "job-monitor:read",
+    "job-monitor:create",
+    "job-monitor:update",
+    "job-monitor:delete",
   ]),
 
   [ROLES.ADMIN]: Object.freeze([
@@ -62,6 +66,9 @@ export const ROLE_PERMISSIONS = Object.freeze({
     "slo:read",
     "slo:update",
     "slo:delete",
+    "job-monitor:read",
+    "job-monitor:update",
+    "job-monitor:delete",
   ]),
 });
 

@@ -208,3 +208,62 @@ export const SLO_SORT_FIELDS = Object.freeze([
   "createdAt",
   "updatedAt",
 ]);
+
+// ── Job Monitor (Background Jobs / Cron) ────────────────────────────────────
+
+export const JOB_SCHEDULE_TYPES = Object.freeze({
+  INTERVAL: "interval",
+  CRON: "cron",
+});
+
+export const JOB_SCHEDULE_TYPE_VALUES = Object.freeze(
+  Object.values(JOB_SCHEDULE_TYPES),
+);
+
+export const JOB_STATUS = Object.freeze({
+  UP: "up",
+  DOWN: "down",
+  LATE: "late",
+  PAUSED: "paused",
+  PENDING: "pending",
+});
+
+export const JOB_STATUS_VALUES = Object.freeze(Object.values(JOB_STATUS));
+
+export const JOB_RUN_STATUS = Object.freeze({
+  STARTED: "started",
+  SUCCEEDED: "succeeded",
+  FAILED: "failed",
+  MISSED: "missed",
+  TIMED_OUT: "timed_out",
+});
+
+export const JOB_RUN_STATUS_VALUES = Object.freeze(
+  Object.values(JOB_RUN_STATUS),
+);
+
+export const JOB_SORT_FIELDS = Object.freeze([
+  "name",
+  "status",
+  "lastPingAt",
+  "nextExpectedAt",
+  "createdAt",
+  "updatedAt",
+]);
+
+export const JOB_MONITOR_LIMITS = Object.freeze({
+  MIN_INTERVAL_SECONDS: 10,
+  MAX_INTERVAL_SECONDS: 31536000, // 1 year
+  MIN_GRACE_PERIOD_SECONDS: 10,
+  MAX_GRACE_PERIOD_SECONDS: 86400, // 24 hours
+  DEFAULT_GRACE_PERIOD_SECONDS: 300, // 5 minutes
+  MIN_RUN_TIMEOUT_SECONDS: 10,
+  MAX_RUN_TIMEOUT_SECONDS: 604800, // 7 days
+  DEFAULT_RUN_TIMEOUT_SECONDS: 3600, // 1 hour
+  MIN_FAILURE_THRESHOLD: 1,
+  MAX_FAILURE_THRESHOLD: 10,
+  DEFAULT_FAILURE_THRESHOLD: 1,
+  MIN_RECOVERY_THRESHOLD: 1,
+  MAX_RECOVERY_THRESHOLD: 10,
+  DEFAULT_RECOVERY_THRESHOLD: 1,
+});
