@@ -1,6 +1,7 @@
 import Monitor from "../models/Monitor.js";
 import StatusPage from "../models/StatusPage.js";
 import StatusSubscriber from "../models/StatusSubscriber.js";
+import Slo from "../models/Slo.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { hasFeature, FEATURES } from "../config/features.js";
 import ProbeAgent from "../models/ProbeAgent.js";
@@ -30,6 +31,7 @@ export const getUsageForUser = async (user) => {
     owner: ownerId,
     kind: "api",
   });
+  const sloCount = await Slo.countDocuments({ owner: ownerId });
   const regionalMonitors = await Monitor.find({
     owner: ownerId,
     "regionalMonitoring.enabled": true,
@@ -112,6 +114,18 @@ export const getUsageForUser = async (user) => {
         definition.limits.maxApiMonitors != null &&
         apiMonitorCount >= definition.limits.maxApiMonitors,
     },
+    slos: {
+      used: sloCount,
+      limit: definition.limits.maxSlos,
+      available: hasFeature(plan, FEATURES.SLO_MANAGEMENT),
+      remaining:
+        definition.limits.maxSlos == null
+          ? null
+          : Math.max(0, definition.limits.maxSlos - sloCount),
+      atLimit:
+        definition.limits.maxSlos != null &&
+        sloCount >= definition.limits.maxSlos,
+    },
     interval: {
       minSeconds: definition.limits.minCheckIntervalSeconds,
     },
@@ -164,6 +178,7 @@ export const getUsageForUser = async (user) => {
         FEATURES.REGIONAL_MONITORING,
       ),
       [FEATURES.API_MONITORING]: hasFeature(plan, FEATURES.API_MONITORING),
+      [FEATURES.SLO_MANAGEMENT]: hasFeature(plan, FEATURES.SLO_MANAGEMENT),
     },
   };
 };

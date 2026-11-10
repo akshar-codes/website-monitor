@@ -10,6 +10,10 @@ export const ROUTES = Object.freeze({
   DASHBOARD: "/",
   MONITORS: "/monitors",
   MONITOR_DETAILS: "/monitors/:id",
+  SLOS: "/slos",
+  SLO_DETAILS: "/slos/:id",
+  SLO_NEW: "/slos/new",
+  SLO_EDIT: "/slos/:id/edit",
   SSL_MONITORING: "/ssl",
   INSIGHTS: "/insights",
   INCIDENTS: "/incidents",
@@ -25,3 +29,4 @@ export const ROUTES = Object.freeze({
 });
 
 export const monitorDetailsPath = (monitorId) => `/monitors/${monitorId}`;
+export const sloDetailsPath = (sloId) => `/slos/${sloId}`;
