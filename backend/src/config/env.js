@@ -109,6 +109,25 @@ const envSchema = z
       .positive()
       .default(2),
 
+    // ── SLO evaluation worker ──
+    SLO_EVALUATION_TICK_MS: z.coerce.number().int().positive().default(30_000),
+    SLO_EVALUATION_LEASE_MS: z.coerce
+      .number()
+      .int()
+      .min(10_000)
+      .default(60_000),
+    SLO_EVALUATION_RETRY_DELAY_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30_000),
+    SLO_EVALUATION_CONCURRENCY: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(50)
+      .default(5),
+
     // ── SSL / domain monitoring worker ──
     // Deliberately on its own, much slower cadence than the HTTP
     // health-check worker above — see workers/sslScheduler.js for the
