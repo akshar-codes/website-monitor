@@ -43,6 +43,7 @@ const apiAssertionSchema = new mongoose.Schema(
       required: true,
     },
     targetValue: { type: mongoose.Schema.Types.Mixed, default: null },
+    required: { type: Boolean, default: true },
   },
   { _id: false },
 );

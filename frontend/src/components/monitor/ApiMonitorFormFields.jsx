@@ -77,6 +77,7 @@ export default function ApiMonitorFormFields({
             typeof a.targetValue === "object" && a.targetValue !== null
               ? JSON.stringify(a.targetValue, null, 2)
               : String(a.targetValue ?? ""),
+          required: a.required !== false,
         }))
       : [];
   });
@@ -171,6 +172,7 @@ export default function ApiMonitorFormFields({
         property: a.property?.trim() || null,
         comparison: a.comparison,
         targetValue,
+        required: a.required !== false,
       };
     });
 
@@ -204,6 +206,7 @@ export default function ApiMonitorFormFields({
         property: "",
         comparison: "equals",
         targetValue: "200",
+        required: true,
       },
     ];
     setAssertions(next);
@@ -701,9 +704,25 @@ export default function ApiMonitorFormFields({
                 className="p-2.5 rounded border bg-slate-50/50 space-y-2 text-sm"
               >
                 <div className="flex justify-between items-center">
-                  <span className="font-medium text-xs text-slate-700">
-                    Assertion #{index + 1}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-xs text-slate-700">
+                      Assertion #{index + 1}
+                    </span>
+                    <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={assertion.required !== false}
+                        onChange={(e) =>
+                          updateAssertion(index, "required", e.target.checked)
+                        }
+                      />
+                      <span>
+                        {assertion.required !== false
+                          ? "Required (causes failure)"
+                          : "Informational (optional)"}
+                      </span>
+                    </label>
+                  </div>
                   <button
                     type="button"
                     className="text-red-500 hover:text-red-700"

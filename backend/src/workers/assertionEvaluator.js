@@ -215,14 +215,20 @@ export const evaluateAssertions = (assertions = [], responseContext = {}) => {
             passed =
               typeof rawHeader === "string" && rawHeader.includes(needle);
             if (!passed) {
-              message = `Header '${assertion.property}' does not contain '${needle}'`;
+              const displayVal = isSensitiveHeader(assertion.property)
+                ? "[REDACTED]"
+                : `'${needle}'`;
+              message = `Header '${assertion.property}' does not contain ${displayVal}`;
             }
           } else if (comp === "not_contains") {
             const needle = String(assertion.targetValue ?? "");
             passed =
               typeof rawHeader === "string" && !rawHeader.includes(needle);
             if (!passed) {
-              message = `Header '${assertion.property}' unexpectedly contains '${needle}'`;
+              const displayVal = isSensitiveHeader(assertion.property)
+                ? "[REDACTED]"
+                : `'${needle}'`;
+              message = `Header '${assertion.property}' unexpectedly contains ${displayVal}`;
             }
           } else {
             outcome = "error";

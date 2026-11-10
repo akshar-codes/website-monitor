@@ -121,6 +121,11 @@ export default function AssertionResultsDialog({ open, onClose, check }) {
                         ({item.property})
                       </span>
                     )}
+                    {item.required === false && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-medium">
+                        Informational
+                      </span>
+                    )}
                   </div>
                   <span className="text-slate-400 font-mono text-[11px]">
                     {item.durationMs}ms

@@ -44,9 +44,10 @@ export const classifyApiResult = (
     status = HEALTH_STATUS.DOWN;
     finalFailureReason = FAILURE_REASONS.ASSERTION_ERROR;
     finalFailureCategory = "assertion_error";
-    const firstErr = assertionEvaluation.results?.find(
-      (r) => r.outcome === "error",
-    );
+    const firstErr =
+      assertionEvaluation.results?.find(
+        (r) => r.required && r.outcome === "error",
+      ) || assertionEvaluation.results?.find((r) => r.outcome === "error");
     finalSafeReason =
       firstErr?.message ||
       "One or more API assertions encountered an execution error";
@@ -54,9 +55,10 @@ export const classifyApiResult = (
     status = HEALTH_STATUS.DOWN;
     finalFailureReason = FAILURE_REASONS.ASSERTION_FAILURE;
     finalFailureCategory = "assertion_failure";
-    const firstFail = assertionEvaluation.results?.find(
-      (r) => r.outcome === "failed",
-    );
+    const firstFail =
+      assertionEvaluation.results?.find(
+        (r) => r.required && r.outcome === "failed",
+      ) || assertionEvaluation.results?.find((r) => r.outcome === "failed");
     finalSafeReason = firstFail?.message || "One or more API assertions failed";
   } else if (!expectedStatusCodes.includes(httpStatus)) {
     status = HEALTH_STATUS.DOWN;

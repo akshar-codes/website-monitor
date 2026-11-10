@@ -2,6 +2,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import * as monitorService from "../services/monitor.service.js";
 import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
 import { runMonitorCheck } from "../workers/scheduler.js";
+import ApiError from "../utils/ApiError.js";
 
 // ── Controllers ──────────────────────────────────────────────────────────────
 
@@ -56,7 +57,11 @@ export const getMonitorDiagnostics = asyncHandler(async (req, res) => {
 export const manualHealthCheck = asyncHandler(async (req, res) => {
   await monitorService.getMonitorById(req.params.id, req.user);
   const check = await runMonitorCheck(req.params.id, req.user);
-  if (!check) throw new Error("Monitor check could not be started");
+  if (!check) {
+    throw ApiError.conflict(
+      "A health check is already in progress for this monitor",
+    );
+  }
   sendSuccess(res, { message: "Manual health check completed", data: check });
 });
 
