@@ -327,14 +327,16 @@ const jsonSchemaAssertionSchema = z
     }
   });
 
-export const apiAssertionSchema = z.discriminatedUnion("type", [
-  statusCodeAssertionSchema,
-  responseTimeAssertionSchema,
-  headerAssertionSchema,
-  bodyTextAssertionSchema,
-  jsonPathAssertionSchema,
-  jsonSchemaAssertionSchema,
-]);
+export const apiAssertionSchema = z
+  .discriminatedUnion("type", [
+    statusCodeAssertionSchema,
+    responseTimeAssertionSchema,
+    headerAssertionSchema,
+    bodyTextAssertionSchema,
+    jsonPathAssertionSchema,
+    jsonSchemaAssertionSchema,
+  ])
+  .and(z.object({ required: z.boolean().optional().default(true) }));
 
 export const apiAssertionsListSchema = z
   .array(apiAssertionSchema)

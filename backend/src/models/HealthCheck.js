@@ -10,6 +10,7 @@ const assertionResultItemSchema = new mongoose.Schema(
     type: { type: String, required: true },
     property: { type: String, default: null },
     comparison: { type: String, required: true },
+    required: { type: Boolean, default: true },
     targetValue: { type: mongoose.Schema.Types.Mixed, default: null },
     actualValue: { type: mongoose.Schema.Types.Mixed, default: null },
     passed: { type: Boolean, required: true },

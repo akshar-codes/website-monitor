@@ -1,6 +1,6 @@
 # API Monitor Configuration Contract (v1)
 
-This document defines the Phase 1 contract and plan limits implemented by Phase 2. It covers configuration, validation, ownership, and secret handling only. API requests are not yet executed, and assertions are not yet evaluated or stored as results.
+This document describes the shipped API monitor behavior, configuration, validation, plan limits, and remaining boundaries. API checks execute through the shared monitor pipeline, and assertion results are stored with each check.
 
 ## Resource shape
 
@@ -29,6 +29,8 @@ API monitors use the existing monitor resource and CRUD routes. Existing monitor
 ```
 
 The endpoint target is the top-level `url`. Put query values in `apiConfig.queryParams`; API URLs cannot contain a query string or fragment. Supported methods are `GET`, `POST`, `PUT`, `PATCH`, and `DELETE`. `GET` and `DELETE` bodies are rejected. Authentication is `none`, `bearer`, or `basic`. Expected status codes contain 1-20 unique codes from 100 through 599. The response-time threshold is 1-120,000 ms.
+
+`maxResponseTimeMs` bounds request execution time. A response that completes slowly is not automatically unhealthy; configure a `responseTime` assertion to enforce a latency threshold. Assertions support status code, response time, headers, body text, JSONPath, and JSON Schema. Each assertion accepts `required` (default `true`); a failed or errored required assertion affects health, while an informational assertion is recorded without affecting health. Results are retained with check history. Sensitive header assertion values are redacted in stored results.
 
 Create, update, duplicate, list, and read use the existing `/api/monitors` routes and permissions. All service reads and writes remain scoped to the authenticated owner. The existing API-key v1 endpoints stay read-only and do not return API configuration.
 
@@ -75,12 +77,11 @@ These are explicit conservative initial entitlements; the repository had no prev
 
 ## Compatibility and rollout
 
-No data migration or index migration is required. Missing `kind` values hydrate as `website`, and no existing index definition changes. Deploy code and verify that `ALERT_CREDENTIAL_ENCRYPTION_KEY` is configured before enabling API-monitor availability for a plan. Do not enable API execution until the later execution phase reuses the existing poller's destination validation, DNS pinning, redirect checks, timeout budgets, retry limits, and response-size cap.
+No data migration or index migration is required. Missing `kind` values hydrate as `website`, and no existing index definition changes. Deploy code and verify that `ALERT_CREDENTIAL_ENCRYPTION_KEY` is configured before enabling API-monitor availability for a plan. API requests use destination validation, DNS pinning, redirect checks, timeout budgets, retry limits, and the response-size cap.
 
 ## Next-phase contract boundaries
 
-- A failed required assertion will make an API check unhealthy and use the existing incident thresholds; optional assertion failures will be visible but will not change health.
-- Applicable response assertions will run when an HTTP response exists, including on non-2xx responses.
-- Manual runs will share the scheduled persistence and incident path with duplicate-run protection.
+- Applicable response assertions run when an HTTP response exists, including on non-2xx responses.
+- Manual checks use the shared persistence, incident, statistics, and retention pipeline.
 - API execution from regional agents remains deferred.
-- The assertion input schema and execution status mapping should be versioned when assertion execution is introduced; this phase deliberately rejects and does not persist arbitrary assertion definitions.
+- Assertion definitions are currently version 1; future assertion types or result status changes should preserve compatibility with stored check history.

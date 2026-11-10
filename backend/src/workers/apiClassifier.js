@@ -5,8 +5,7 @@ import { HEALTH_STATUS, FAILURE_REASONS } from "../config/constants.js";
  *
  * Distinguishes transport-level completion from status code acceptance and assertion outcomes:
  * - Transport failures (DNS, TLS, connection, timeouts, size limits) -> DOWN with corresponding failureReason.
- * - Completed HTTP transport with assertion evaluation errors -> DOWN with ASSERTION_ERROR.
- * - Completed HTTP transport with failed assertions -> DOWN with ASSERTION_FAILURE.
+ * - Completed HTTP transport with required assertion errors/failures -> DOWN.
  * - Completed HTTP transport with unexpected status code -> DOWN with HTTP_ERROR.
  * - Completed HTTP transport with accepted status and passing assertions -> UP.
  * - Component statuses for API monitors are always UNKNOWN.

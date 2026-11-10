@@ -52,6 +52,11 @@ const getHeaderCaseInsensitive = (headers, targetHeader) => {
   return undefined;
 };
 
+const isSensitiveHeader = (name) =>
+  /^(set-cookie2?|cookie|authorization|proxy-authorization|www-authenticate)$/i.test(
+    name,
+  ) || /(token|secret|password|credential|api[-_]?key|auth)/i.test(name);
+
 /**
  * Evaluates configured API assertions against a completed, bounded HTTP response.
  *
@@ -115,6 +120,8 @@ export const evaluateAssertions = (assertions = [], responseContext = {}) => {
   let passedCount = 0;
   let failedCount = 0;
   let errorCount = 0;
+  let requiredFailureCount = 0;
+  let requiredErrorCount = 0;
 
   for (const assertion of assertions) {
     const itemStart = performance.now();
@@ -195,13 +202,13 @@ export const evaluateAssertions = (assertions = [], responseContext = {}) => {
             const expectedStr = String(assertion.targetValue ?? "");
             passed = String(rawHeader ?? "") === expectedStr;
             if (!passed) {
-              message = `Header '${assertion.property}' was '${rawHeader}', expected '${expectedStr}'`;
+              message = `Header '${assertion.property}' did not match the expected value`;
             }
           } else if (comp === "not_equals") {
             const expectedStr = String(assertion.targetValue ?? "");
             passed = String(rawHeader ?? "") !== expectedStr;
             if (!passed) {
-              message = `Header '${assertion.property}' equals '${expectedStr}'`;
+              message = `Header '${assertion.property}' unexpectedly matched the expected value`;
             }
           } else if (comp === "contains") {
             const needle = String(assertion.targetValue ?? "");
@@ -514,14 +521,29 @@ export const evaluateAssertions = (assertions = [], responseContext = {}) => {
     if (outcome === "passed") passedCount++;
     else if (outcome === "failed") failedCount++;
     else if (outcome === "error") errorCount++;
+    if (assertion.required !== false && outcome === "failed")
+      requiredFailureCount++;
+    if (assertion.required !== false && outcome === "error")
+      requiredErrorCount++;
 
     results.push({
       assertionId: assertion.id || null,
       type: assertion.type,
       property: assertion.property || null,
       comparison: assertion.comparison,
-      targetValue: safeTruncate(targetValue),
-      actualValue: safeTruncate(actualValue),
+      required: assertion.required !== false,
+      targetValue:
+        assertion.type === "header" && isSensitiveHeader(assertion.property)
+          ? targetValue == null
+            ? null
+            : "[REDACTED]"
+          : safeTruncate(targetValue),
+      actualValue:
+        assertion.type === "header" && isSensitiveHeader(assertion.property)
+          ? actualValue == null
+            ? null
+            : "[REDACTED]"
+          : safeTruncate(actualValue),
       passed,
       outcome,
       message: message ? message.slice(0, 500) : null,
@@ -541,7 +563,7 @@ export const evaluateAssertions = (assertions = [], responseContext = {}) => {
       durationMs: totalDurationMs,
     },
     allPassed: failedCount === 0 && errorCount === 0,
-    hasFailures: failedCount > 0,
-    hasErrors: errorCount > 0,
+    hasFailures: requiredFailureCount > 0,
+    hasErrors: requiredErrorCount > 0,
   };
 };
