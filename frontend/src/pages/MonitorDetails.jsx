@@ -5,10 +5,15 @@ import {
   useMonitorMutations,
   useMonitorRegionalAnalytics,
 } from "../hooks/useMonitors";
+import { useMonitorSlos, useSloMutations } from "../hooks/useSlos";
 import { useUsage } from "../hooks/useUsage";
 import MonitorInsights from "../components/monitorDetails/MonitorInsights";
-import { ROUTES } from "../constants/routes";
+import { ROUTES, sloDetailsPath } from "../constants/routes";
 import { formatRelative, formatUptime } from "../utils/format";
+import { formatPercentage } from "../utils/sloFormat";
+import SloStatusBadge from "../components/slo/SloStatusBadge";
+import ErrorBudgetMeter from "../components/slo/ErrorBudgetMeter";
+import SloFormModal from "../components/slo/SloFormModal";
 import RegionalMonitoringFields from "../components/monitor/RegionalMonitoringFields";
 import ApiMonitorFormFields from "../components/monitor/ApiMonitorFormFields";
 import AssertionResultsDialog from "../components/monitorDetails/AssertionResultsDialog";
@@ -34,6 +39,7 @@ import {
   Globe2,
   Clock3,
   TriangleAlert,
+  Target,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -64,14 +70,23 @@ export default function MonitorDetails() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [inspectedCheck, setInspectedCheck] = useState(null);
   const [apiConfigState, setApiConfigState] = useState(null);
+  const [sloModalOpen, setSloModalOpen] = useState(false);
 
   const { data, loading, error, refetch } = useMonitorDetails(id, window);
   const { data: regionalResponse } = useMonitorRegionalAnalytics(id, window);
+  const { data: monitorSlosRes, refetch: refetchMonitorSlos } =
+    useMonitorSlos(id);
+  const monitorSlos = monitorSlosRes?.data || [];
   const details = data?.data;
   const regionalData = regionalResponse?.data;
 
   const { data: usageData } = useUsage();
   const usage = usageData?.data;
+
+  const { createSlo, submitting: creatingSlo } = useSloMutations(() => {
+    setSloModalOpen(false);
+    refetchMonitorSlos();
+  });
 
   const handleMutationSuccess = useCallback(
     (action) => {
@@ -493,6 +508,79 @@ export default function MonitorDetails() {
         monitorId={id}
         details={details}
         retentionDays={usage?.retention?.days}
+      />
+      <Panel
+        title="Service Level Objectives & Error Budgets"
+        subtitle="Configured reliability commitments and error budgets for this monitor"
+        actions={
+          <Button variant="secondary" onClick={() => setSloModalOpen(true)}>
+            <Target size={14} /> Configure SLO
+          </Button>
+        }
+      >
+        {monitorSlos.length === 0 ? (
+          <p className="text-xs text-slate-500 py-2">
+            No SLOs configured for this monitor yet. Click &quot;Configure
+            SLO&quot; to set an availability target and track error budgets.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
+            {monitorSlos.map((slo) => {
+              const snap = slo.latestSnapshot;
+              return (
+                <Link
+                  key={slo.id || slo._id}
+                  to={sloDetailsPath(slo.id || slo._id)}
+                  className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 transition-colors bg-white dark:bg-slate-900 shadow-sm block group"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <b className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 transition-colors">
+                      {slo.name}
+                    </b>
+                    <SloStatusBadge
+                      enabled={slo.enabled}
+                      sli={snap?.sliPercentage}
+                      target={slo.target}
+                      remainingBudgetSeconds={snap?.remainingBudgetSeconds}
+                      allowedErrorBudgetSeconds={
+                        snap?.allowedErrorBudgetSeconds
+                      }
+                      dataCoveragePct={snap?.dataCoveragePercentage}
+                      alertStatus={slo.alertState?.status}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                    <span>
+                      Target: <b>{formatPercentage(slo.target, 2)}</b>
+                    </span>
+                    <span>
+                      Actual SLI:{" "}
+                      <b className="text-slate-800 dark:text-slate-200">
+                        {formatPercentage(snap?.sliPercentage, 2)}
+                      </b>
+                    </span>
+                    <span>
+                      Window: <b>{slo.window}</b>
+                    </span>
+                  </div>
+                  <ErrorBudgetMeter
+                    allowedErrorBudgetSeconds={snap?.allowedErrorBudgetSeconds}
+                    remainingBudgetSeconds={snap?.remainingBudgetSeconds}
+                    remainingBudgetPercentage={snap?.remainingBudgetPercentage}
+                    compact={true}
+                  />
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </Panel>
+      <SloFormModal
+        isOpen={sloModalOpen}
+        onClose={() => setSloModalOpen(false)}
+        onSubmit={createSlo}
+        initialMonitorId={id}
+        submitting={creatingSlo}
       />
       {(editOpen || deleteOpen) && (
         <div className="modal-backdrop">
