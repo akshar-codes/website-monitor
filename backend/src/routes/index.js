@@ -32,6 +32,7 @@ import integrationRoutes from "./integration.routes.js";
 import notificationRuleRoutes from "./notificationRule.routes.js";
 import alertPolicyRoutes from "./alertPolicy.routes.js";
 import sloRoutes from "./slo.routes.js";
+import jobMonitorRoutes from "./jobMonitor.routes.js";
 import { isAuthenticated } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
 import { ROLES } from "../config/constants.js";
@@ -74,6 +75,7 @@ router.use("/integrations", isAuthenticated, integrationRoutes);
 router.use("/notification-rules", isAuthenticated, notificationRuleRoutes);
 router.use("/alert-policies", isAuthenticated, alertPolicyRoutes);
 router.use("/slos", isAuthenticated, sloRoutes);
+router.use("/job-monitors", isAuthenticated, jobMonitorRoutes);
 router.use("/plan-upgrade-requests", isAuthenticated, planUpgradeRequestRoutes);
 router.use("/suggestions", isAuthenticated, suggestionRoutes);
 

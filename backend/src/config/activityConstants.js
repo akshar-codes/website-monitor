@@ -39,6 +39,14 @@ export const ACTIVITY_ACTIONS = Object.freeze({
   SLO_UPDATED: "slo_updated",
   SLO_DELETED: "slo_deleted",
 
+  // ── Job Monitor ──
+  JOB_MONITOR_CREATED: "job_monitor_created",
+  JOB_MONITOR_UPDATED: "job_monitor_updated",
+  JOB_MONITOR_PAUSED: "job_monitor_paused",
+  JOB_MONITOR_RESUMED: "job_monitor_resumed",
+  JOB_MONITOR_DELETED: "job_monitor_deleted",
+  JOB_MONITOR_TOKEN_ROTATED: "job_monitor_token_rotated",
+
   // ── Incident ──
   INCIDENT_STATUS_UPDATED: "incident_status_updated",
   INCIDENT_AUTO_OPENED: "incident_auto_opened",
