@@ -176,8 +176,22 @@ export const SLO_EVALUATION_INTERVALS = Object.freeze([
   "24h",
 ]);
 
-/** Supported burn rate analysis windows. */
-export const SLO_BURN_RATE_WINDOWS = Object.freeze(["1h", "6h", "24h", "3d"]);
+/** Supported burn rate analysis windows and their durations in milliseconds. */
+export const SLO_BURN_RATE_WINDOW_MS = Object.freeze({
+  "5m": 5 * 60 * 1000,
+  "15m": 15 * 60 * 1000,
+  "30m": 30 * 60 * 1000,
+  "1h": 60 * 60 * 1000,
+  "2h": 2 * 60 * 60 * 1000,
+  "6h": 6 * 60 * 60 * 1000,
+  "12h": 12 * 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "3d": 3 * 24 * 60 * 60 * 1000,
+});
+
+export const SLO_BURN_RATE_WINDOWS = Object.freeze(
+  Object.keys(SLO_BURN_RATE_WINDOW_MS),
+);
 
 /** Alert severities for SLO thresholds. */
 export const SLO_SEVERITY = Object.freeze([

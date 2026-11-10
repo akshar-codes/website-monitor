@@ -267,6 +267,19 @@ const sloSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    alertState: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SloAlertState",
+      default: null,
+    },
+    lastBurnRates: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+    lastExhaustionForecast: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
   },
   {
     timestamps: true,

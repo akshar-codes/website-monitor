@@ -155,6 +155,18 @@ const sloSnapshotSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    burnRates: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+    exhaustionForecast: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    alertEvents: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
     metadata: {
       type: mongoose.Schema.Types.Mixed,
       default: () => ({}),
