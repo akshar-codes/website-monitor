@@ -18,6 +18,8 @@ const IntegrationForm = lazy(() => import("./pages/IntegrationForm"));
 const Suggestions = lazy(() => import("./pages/Suggestions"));
 const AdminSuggestions = lazy(() => import("./pages/AdminSuggestions"));
 const Monitors = lazy(() => import("./pages/Monitors"));
+const Jobs = lazy(() => import("./pages/Jobs"));
+const JobDetails = lazy(() => import("./pages/JobDetails"));
 const Slos = lazy(() => import("./pages/Slos"));
 const SloDetails = lazy(() => import("./pages/SloDetails"));
 const SloFormPage = lazy(() => import("./pages/SloFormPage"));
@@ -143,6 +145,22 @@ export default function App() {
                           element={
                             <Suspense fallback={null}>
                               <MonitorDetails />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/jobs"
+                          element={
+                            <Suspense fallback={null}>
+                              <Jobs />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/jobs/:id"
+                          element={
+                            <Suspense fallback={null}>
+                              <JobDetails />
                             </Suspense>
                           }
                         />
