@@ -113,6 +113,7 @@ export const getJobMonitors = async (query = {}, user) => {
     limit = 20,
     search,
     status = "all",
+    scheduleType = "all",
     active,
     sortBy = "createdAt",
     sortOrder = "desc",
@@ -122,6 +123,10 @@ export const getJobMonitors = async (query = {}, user) => {
 
   if (status && status !== "all") {
     filter.status = status;
+  }
+
+  if (scheduleType && scheduleType !== "all") {
+    filter.scheduleType = scheduleType;
   }
 
   if (typeof active === "boolean") {
@@ -269,10 +274,12 @@ export const deleteJobMonitor = async (id, user) => {
 };
 
 /**
- * Rotates reporting token securely. Preserves previousTokenHash to prevent immediate dropouts.
- * The new plaintext token is returned only in this response.
+ * Rotates reporting token securely. Preserves previousTokenHash to prevent immediate dropouts
+ * unless immediateRevoke is requested. The new plaintext token is returned only in this response.
  */
-export const rotateJobMonitorToken = async (id, user) => {
+export const rotateJobMonitorToken = async (id, optionsOrUser, maybeUser) => {
+  const user = maybeUser || optionsOrUser;
+  const options = maybeUser ? optionsOrUser : {};
   const filter = { _id: id };
   if (user.role !== ROLES.ADMIN) {
     filter.owner = getOwnerId(user);
@@ -285,7 +292,9 @@ export const rotateJobMonitorToken = async (id, user) => {
 
   const { token, prefix, tokenHash } = generateJobToken();
 
-  jobMonitor.previousTokenHash = jobMonitor.tokenHash;
+  jobMonitor.previousTokenHash = options.immediateRevoke
+    ? null
+    : jobMonitor.tokenHash;
   jobMonitor.tokenPrefix = prefix;
   jobMonitor.tokenHash = tokenHash;
   jobMonitor.tokenRotatedAt = new Date();
@@ -299,15 +308,20 @@ export const rotateJobMonitorToken = async (id, user) => {
     description: `Rotated reporting token for job monitor: ${jobMonitor.name}`,
     entityType: "JobMonitor",
     entityId: jobMonitor._id,
-    metadata: { tokenPrefix: prefix },
+    metadata: {
+      tokenPrefix: prefix,
+      immediateRevoke: Boolean(options.immediateRevoke),
+    },
   });
 
   return {
     token, // Returned once upon rotation
     tokenPrefix: prefix,
     tokenRotatedAt: jobMonitor.tokenRotatedAt,
-    message:
-      "Reporting token rotated successfully. Update your background job scripts.",
+    previousTokenRevoked: Boolean(options.immediateRevoke),
+    message: options.immediateRevoke
+      ? "Reporting token rotated and previous token revoked immediately."
+      : "Reporting token rotated successfully. Update your background job scripts.",
   };
 };
 

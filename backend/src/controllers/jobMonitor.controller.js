@@ -82,6 +82,7 @@ export const deleteJobMonitor = asyncHandler(async (req, res) => {
 export const rotateJobMonitorToken = asyncHandler(async (req, res) => {
   const result = await jobMonitorService.rotateJobMonitorToken(
     req.params.id,
+    req.body || {},
     req.user,
   );
 

@@ -55,9 +55,20 @@ export const jobHeartbeatAuth = async (req, res, next) => {
       candidateHash,
       jobMonitor.tokenHash,
     );
-    const matchesPrevious = jobMonitor.previousTokenHash
-      ? compareTokenHashes(candidateHash, jobMonitor.previousTokenHash)
-      : false;
+    let matchesPrevious = false;
+    if (jobMonitor.previousTokenHash) {
+      const ROTATION_GRACE_PERIOD_MS = 15 * 60 * 1000;
+      const isExpired =
+        jobMonitor.tokenRotatedAt &&
+        Date.now() - new Date(jobMonitor.tokenRotatedAt).getTime() >
+          ROTATION_GRACE_PERIOD_MS;
+      if (!isExpired) {
+        matchesPrevious = compareTokenHashes(
+          candidateHash,
+          jobMonitor.previousTokenHash,
+        );
+      }
+    }
 
     if (!matchesCurrent && !matchesPrevious) {
       throw ApiError.unauthorized("Invalid authentication token");

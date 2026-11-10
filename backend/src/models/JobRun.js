@@ -170,6 +170,7 @@ jobRunSchema.index({ jobMonitor: 1, scheduledFor: -1 });
 jobRunSchema.index({ jobMonitor: 1, createdAt: -1 });
 jobRunSchema.index({ jobMonitor: 1, status: 1, createdAt: -1 });
 jobRunSchema.index({ jobMonitor: 1, occurrenceKey: 1 }, { sparse: true });
+jobRunSchema.index({ createdAt: 1 });
 
 // ── Virtuals ──
 jobRunSchema.virtual("isFinished").get(function () {

@@ -9,6 +9,8 @@ import RegionalIncident from "../models/RegionalIncident.js";
 import RegionalDailyStat from "../models/RegionalDailyStat.js";
 import RegionalHourlyStat from "../models/RegionalHourlyStat.js";
 import Monitor from "../models/Monitor.js";
+import JobMonitor from "../models/JobMonitor.js";
+import JobRun from "../models/JobRun.js";
 import env from "../config/env.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { pruneExcessResponseSnapshots } from "../services/healthResponseRetention.service.js";
@@ -58,6 +60,72 @@ export const pruneMonitorHealthChecks = async (monitorId, deps = {}) => {
     }),
   );
   const result = await checks.deleteMany({ _id: { $in: ids } });
+  return result.deletedCount || 0;
+};
+
+export const MAX_STORED_JOB_RUNS_RESERVED = 20;
+
+export const pruneJobRuns = async (jobMonitorId, deps = {}) => {
+  const jobRuns = deps.JobRun || JobRun;
+  const incidents = deps.Incident || Incident;
+  const cutoff = deps.cutoff;
+  const batchSize = deps.batchSize || 500;
+  const keep = deps.keep || MAX_STORED_JOB_RUNS_RESERVED;
+
+  const query = { jobMonitor: jobMonitorId };
+  if (cutoff) {
+    query.createdAt = { $lt: cutoff };
+  }
+
+  const excess = await jobRuns
+    .find(query)
+    .select(
+      "_id status runId scheduledFor startedAt completedAt durationMs exitCode errorMessage failureReason output metadata createdAt",
+    )
+    .sort({ createdAt: -1, _id: -1 })
+    .skip(keep)
+    .limit(batchSize)
+    .lean();
+
+  if (!excess.length) return 0;
+
+  const ids = excess.map(({ _id }) => _id);
+  const refs = await incidents
+    .find({
+      $or: [{ triggerJobRun: { $in: ids } }, { recoveryJobRun: { $in: ids } }],
+    })
+    .select(
+      "triggerJobRun recoveryJobRun triggerJobRunSnapshot recoveryJobRunSnapshot status",
+    )
+    .lean();
+
+  const runById = new Map(excess.map((run) => [String(run._id), run]));
+  const protectedIds = new Set();
+
+  await Promise.all(
+    refs.map((incident) => {
+      const set = {};
+      const trigger = runById.get(String(incident.triggerJobRun));
+      const recovery = runById.get(String(incident.recoveryJobRun));
+      if (trigger && !incident.triggerJobRunSnapshot)
+        set.triggerJobRunSnapshot = trigger;
+      if (recovery && !incident.recoveryJobRunSnapshot)
+        set.recoveryJobRunSnapshot = recovery;
+
+      if (incident.status !== "resolved" && incident.triggerJobRun) {
+        protectedIds.add(String(incident.triggerJobRun));
+      }
+
+      return Object.keys(set).length
+        ? incidents.updateOne({ _id: incident._id }, { $set: set })
+        : null;
+    }),
+  );
+
+  const deletableIds = ids.filter((id) => !protectedIds.has(String(id)));
+  if (!deletableIds.length) return 0;
+
+  const result = await jobRuns.deleteMany({ _id: { $in: deletableIds } });
   return result.deletedCount || 0;
 };
 
@@ -131,6 +199,7 @@ export const runRetentionPass = async (deps = {}) => {
   let dailyStatsDeleted = 0;
   let regionalChecksDeleted = 0;
   let regionalStatsDeleted = 0;
+  let jobRunsDeleted = 0;
 
   if (isDbAvailable) {
     // Keep aggregate history for the plan attached to each monitor owner.
@@ -199,6 +268,36 @@ export const runRetentionPass = async (deps = {}) => {
         regionalStatsDeleted += removed.deletedCount || 0;
       }
     }
+
+    // Prune JobRuns according to plan jobRetentionDays
+    const jobMonitorModel = deps.JobMonitor || JobMonitor;
+    if (jobMonitorModel.find) {
+      const jobMonitorsWithPlans = await jobMonitorModel
+        .find({})
+        .select("_id owner")
+        .populate("owner", "plan")
+        .lean();
+
+      for (const jm of jobMonitorsWithPlans) {
+        const planId = jm.owner?.plan;
+        const planRetentionDays =
+          getPlanDefinition(planId)?.limits.jobRetentionDays;
+        const retentionDays = Number.isFinite(planRetentionDays)
+          ? planRetentionDays
+          : env.MONITOR_RETENTION_DAYS;
+        const cutoff = new Date(now.getTime() - retentionDays * 86_400_000);
+        let deletedForJob;
+        do {
+          deletedForJob = await pruneJobRuns(jm._id, {
+            JobRun: deps.JobRun || JobRun,
+            Incident: incidents,
+            cutoff,
+            batchSize,
+          });
+          jobRunsDeleted += deletedForJob;
+        } while (deletedForJob === batchSize);
+      }
+    }
   } else {
     // Fallback for tests or disconnected environments
     const dailyStatCutoff = new Date(
@@ -265,6 +364,7 @@ export const runRetentionPass = async (deps = {}) => {
       regionalStatsDeleted,
       checksDeleted: 0,
       excessChecksDeleted,
+      jobRunsDeleted,
     };
   }
 
@@ -298,5 +398,6 @@ export const runRetentionPass = async (deps = {}) => {
     checksDeleted: deleted.deletedCount || 0,
     excessChecksDeleted,
     checksProtected: protectedIds.size,
+    jobRunsDeleted,
   };
 };

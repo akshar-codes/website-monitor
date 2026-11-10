@@ -183,6 +183,7 @@ export const listJobMonitorsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().optional(),
   status: z.enum(["all", ...JOB_STATUS_VALUES]).default("all"),
+  scheduleType: z.enum(["all", ...JOB_SCHEDULE_TYPE_VALUES]).default("all"),
   active: z
     .preprocess((val) => {
       if (val === "true" || val === true) return true;
