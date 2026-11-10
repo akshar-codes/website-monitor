@@ -20,6 +20,7 @@ const publicStatus = (status) =>
  * Public text is deliberately generic: internal diagnostics stay private. */
 export async function syncMonitorIncident(incident, action = "updated") {
   try {
+    if (!incident || !incident.monitor) return;
     const monitor = await Monitor.findById(incident.monitor)
       .select("owner name")
       .lean();
@@ -121,5 +122,5 @@ export async function syncMonitorIncident(incident, action = "updated") {
 
 export async function syncIncidentById(incidentId, action) {
   const incident = await Incident.findById(incidentId).lean();
-  if (incident) await syncMonitorIncident(incident, action);
+  if (incident && incident.monitor) await syncMonitorIncident(incident, action);
 }

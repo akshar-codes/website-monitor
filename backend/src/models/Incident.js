@@ -25,10 +25,23 @@ const incidentSchema = new mongoose.Schema(
     monitor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Monitor",
-      required: [true, "Monitor reference is required"],
+      default: null,
+    },
+    jobMonitor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "JobMonitor",
+      default: null,
+    },
+    resourceType: {
+      type: String,
+      enum: ["monitor", "job_monitor"],
+      default: function () {
+        return this.jobMonitor ? "job_monitor" : "monitor";
+      },
+      index: true,
     },
 
-    // ── The health check that triggered this incident ──
+    // ── The health check that triggered this incident (for Monitor) ──
     triggerCheck: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "HealthCheck",
@@ -41,6 +54,23 @@ const incidentSchema = new mongoose.Schema(
     },
     triggerCheckSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
     recoveryCheckSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+
+    // ── The job run that triggered this incident (for JobMonitor) ──
+    triggerJobRun: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "JobRun",
+      default: null,
+    },
+    recoveryJobRun: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "JobRun",
+      default: null,
+    },
+    triggerJobRunSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+    recoveryJobRunSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
 
     // ── Timing ──
 
@@ -140,8 +170,14 @@ incidentSchema.index({ monitor: 1, startedAt: -1 });
 incidentSchema.index({ triggerCheck: 1 });
 incidentSchema.index({ recoveryCheck: 1 });
 
-// Active incidents across all monitors (dashboard alert banner)
+// Incident history for a job monitor, newest first
+incidentSchema.index({ jobMonitor: 1, startedAt: -1 });
+incidentSchema.index({ triggerJobRun: 1 });
+incidentSchema.index({ recoveryJobRun: 1 });
+
+// Active incidents across all resources (dashboard alert banner)
 incidentSchema.index({ status: 1, startedAt: -1 });
+incidentSchema.index({ resourceType: 1, startedAt: -1 });
 
 // Per-monitor active incidents (quick "is this monitor down?" check)
 incidentSchema.index({ monitor: 1, status: 1 });
@@ -150,7 +186,30 @@ incidentSchema.index(
   { monitor: 1 },
   {
     unique: true,
+    name: "uniq_active_monitor_incident",
     partialFilterExpression: {
+      monitor: { $exists: true, $type: "objectId" },
+      status: {
+        $in: [
+          INCIDENT_STATUS.ONGOING,
+          INCIDENT_STATUS.INVESTIGATING,
+          INCIDENT_STATUS.IDENTIFIED,
+        ],
+      },
+    },
+  },
+);
+
+// Per-job-monitor active incidents
+incidentSchema.index({ jobMonitor: 1, status: 1 });
+// At most one unresolved incident per job monitor, including concurrent upserts.
+incidentSchema.index(
+  { jobMonitor: 1 },
+  {
+    unique: true,
+    name: "uniq_active_job_monitor_incident",
+    partialFilterExpression: {
+      jobMonitor: { $exists: true, $type: "objectId" },
       status: {
         $in: [
           INCIDENT_STATUS.ONGOING,
@@ -167,10 +226,37 @@ incidentSchema.index({ severity: 1, startedAt: -1 });
 
 // Duration analytics (mean-time-to-resolve queries)
 incidentSchema.index({ monitor: 1, duration: 1 });
+incidentSchema.index({ jobMonitor: 1, duration: 1 });
 
 // ─────────────────────────────────────────────
 // Middleware
 // ─────────────────────────────────────────────
+
+// Enforce resource exclusivity: every incident belongs to exactly one monitored resource
+incidentSchema.pre("validate", function (next) {
+  const hasMonitor = Boolean(this.monitor);
+  const hasJobMonitor = Boolean(this.jobMonitor);
+
+  if (!hasMonitor && !hasJobMonitor) {
+    this.invalidate(
+      "monitor",
+      "Incident must belong to either a Monitor or a JobMonitor",
+    );
+  } else if (hasMonitor && hasJobMonitor) {
+    this.invalidate(
+      "jobMonitor",
+      "Incident cannot belong to both a Monitor and a JobMonitor simultaneously",
+    );
+  }
+
+  if (this.jobMonitor) {
+    this.resourceType = "job_monitor";
+  } else if (this.monitor) {
+    this.resourceType = "monitor";
+  }
+
+  if (typeof next === "function") next();
+});
 
 incidentSchema.pre("save", async function () {
   if (this.endedAt && this.startedAt) {
@@ -239,6 +325,26 @@ incidentSchema.statics.findActive = function () {
 incidentSchema.statics.findActiveForMonitor = function (monitorId) {
   return this.findOne({
     monitor: monitorId,
+    status: { $ne: INCIDENT_STATUS.RESOLVED },
+  }).sort({ startedAt: -1 });
+};
+
+/**
+ * Find the current active incident for a specific job monitor (if any).
+ */
+incidentSchema.statics.findActiveForJobMonitor = function (jobMonitorId) {
+  return this.findOne({
+    jobMonitor: jobMonitorId,
+    status: { $ne: INCIDENT_STATUS.RESOLVED },
+  }).sort({ startedAt: -1 });
+};
+
+/**
+ * Find the current active incident for either a monitor or job monitor.
+ */
+incidentSchema.statics.findActiveForResource = function (resourceId) {
+  return this.findOne({
+    $or: [{ monitor: resourceId }, { jobMonitor: resourceId }],
     status: { $ne: INCIDENT_STATUS.RESOLVED },
   }).sort({ startedAt: -1 });
 };

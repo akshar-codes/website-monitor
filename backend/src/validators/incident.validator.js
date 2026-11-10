@@ -33,6 +33,8 @@ export const listIncidentsSchema = z
       .optional()
       .default(INCIDENT_STATUS_FILTER_ACTIVE),
     monitorId: optionalObjectIdSchema,
+    jobMonitorId: optionalObjectIdSchema,
+    resourceType: z.enum(["monitor", "job_monitor"]).optional(),
     // Free-text search — matched against the owning monitor's name/URL and
     // the incident's own rootCause/resolutionNotes (see incident.service.js).
     search: z
@@ -104,5 +106,7 @@ export const updateStatusSchema = z.object({
 
 export const downtimeStatsSchema = z.object({
   monitorId: optionalObjectIdSchema,
+  jobMonitorId: optionalObjectIdSchema,
+  resourceType: z.enum(["monitor", "job_monitor"]).optional(),
   window: z.enum(WINDOW_KEYS).optional().default("30d"),
 });

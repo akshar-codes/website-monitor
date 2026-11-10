@@ -52,10 +52,15 @@ const getNotificationContext = async (notification) => {
     (notification.relatedResource?.resourceType === "Monitor"
       ? stringifyId(notification.relatedResource.resourceId)
       : null);
+  let jobMonitorId =
+    notification.metadata?.jobMonitorId ||
+    (notification.relatedResource?.resourceType === "JobMonitor"
+      ? stringifyId(notification.relatedResource.resourceId)
+      : null);
   let incident = null;
   if (incidentId)
     incident = await Incident.findById(incidentId)
-      .select("monitor severity status")
+      .select("monitor jobMonitor severity status")
       .lean();
   if (notification.relatedResource?.resourceType === "RegionalIncident") {
     const regionalIncident = await RegionalIncident.findById(
@@ -67,9 +72,11 @@ const getNotificationContext = async (notification) => {
       monitorId = stringifyId(regionalIncident.monitor);
   }
   if (incident?.monitor) monitorId = stringifyId(incident.monitor);
+  if (incident?.jobMonitor) jobMonitorId = stringifyId(incident.jobMonitor);
   return {
     incidentId,
     monitorId: monitorId ? String(monitorId) : null,
+    jobMonitorId: jobMonitorId ? String(jobMonitorId) : null,
     severity: incident?.severity || notification.priority,
   };
 };
@@ -633,6 +640,7 @@ export const processEscalationBatch = async ({
       }).lean(),
       Incident.findById(execution.incident)
         .populate("monitor", "owner name url")
+        .populate("jobMonitor", "owner name")
         .lean(),
       AlertAcknowledgement.findOne({
         owner: execution.owner,
@@ -645,10 +653,8 @@ export const processEscalationBatch = async ({
       await execution.save();
       continue;
     }
-    if (
-      !policy ||
-      String(incident.monitor?.owner) !== String(execution.owner)
-    ) {
+    const resourceOwner = incident.monitor?.owner || incident.jobMonitor?.owner;
+    if (!policy || String(resourceOwner) !== String(execution.owner)) {
       execution.status = "cancelled";
       execution.lockedUntil = null;
       await execution.save();
@@ -697,11 +703,18 @@ export const processEscalationBatch = async ({
     const payload = {
       eventId: String(execution.eventId),
       type: "incident.created",
-      title: `Escalation: ${incident.monitor?.name || "Monitor incident"}`,
+      title: `Escalation: ${incident.monitor?.name || incident.jobMonitor?.name || "Resource incident"}`,
       message: `Incident ${execution.incident} remains unresolved and unacknowledged.`,
       priority,
       incidentId: String(execution.incident),
-      monitorId: String(incident.monitor?._id),
+      monitorId: incident.monitor
+        ? String(incident.monitor._id)
+        : incident.jobMonitor
+          ? String(incident.jobMonitor._id)
+          : null,
+      jobMonitorId: incident.jobMonitor
+        ? String(incident.jobMonitor._id)
+        : null,
       severity: incident.severity,
       link: `/incidents`,
       createdAt: now.toISOString(),

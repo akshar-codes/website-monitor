@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Incident from "../models/Incident.js";
 import Monitor from "../models/Monitor.js";
+import JobMonitor from "../models/JobMonitor.js";
 import ApiError from "../utils/ApiError.js";
 import {
   WINDOW_MS,
@@ -46,12 +47,23 @@ const resolveMonitorFilter = (ownedIds, monitorId) => {
   return ownedIds.some((id) => id.equals(requested)) ? requested : { $in: [] };
 };
 
-const restoreCheckSnapshots = (incident) => ({
-  ...incident,
-  triggerCheck: incident.triggerCheck || incident.triggerCheckSnapshot || null,
-  recoveryCheck:
-    incident.recoveryCheck || incident.recoveryCheckSnapshot || null,
-});
+const JOB_MONITOR_POPULATE_FIELDS =
+  "name description scheduleType intervalSeconds cronExpression timezone status";
+
+const restoreCheckSnapshots = (incident) => {
+  if (!incident) return null;
+  return {
+    ...incident,
+    triggerCheck:
+      incident.triggerCheck || incident.triggerCheckSnapshot || null,
+    recoveryCheck:
+      incident.recoveryCheck || incident.recoveryCheckSnapshot || null,
+    triggerJobRun:
+      incident.triggerJobRun || incident.triggerJobRunSnapshot || null,
+    recoveryJobRun:
+      incident.recoveryJobRun || incident.recoveryJobRunSnapshot || null,
+  };
+};
 
 // ── List incidents ────────────────────────────────────────────────────────────
 
@@ -62,6 +74,8 @@ export const getIncidents = async (
     severity,
     status,
     monitorId,
+    jobMonitorId,
+    resourceType,
     search,
     window,
     startDate,
@@ -70,8 +84,35 @@ export const getIncidents = async (
   },
   user,
 ) => {
-  const ownedIds = await getOwnedMonitorIds(user);
-  const monitorFilter = resolveMonitorFilter(ownedIds, monitorId);
+  const [ownedMonitorIds, ownedJobMonitorIds] = await Promise.all([
+    getOwnedMonitorIds(user),
+    JobMonitor.find({ owner: user._id || user.id }).distinct("_id"),
+  ]);
+
+  let resourceFilter;
+  if (jobMonitorId) {
+    const requested = new mongoose.Types.ObjectId(jobMonitorId);
+    resourceFilter = ownedJobMonitorIds.some((id) => id.equals(requested))
+      ? { jobMonitor: requested }
+      : { jobMonitor: { $in: [] } };
+  } else if (monitorId) {
+    const requested = new mongoose.Types.ObjectId(monitorId);
+    resourceFilter = ownedMonitorIds.some((id) => id.equals(requested))
+      ? { monitor: requested }
+      : { monitor: { $in: [] } };
+  } else if (resourceType === "job_monitor") {
+    resourceFilter = { jobMonitor: { $in: ownedJobMonitorIds } };
+  } else if (resourceType === "monitor") {
+    resourceFilter = { monitor: { $in: ownedMonitorIds } };
+  } else {
+    // Both monitors and job monitors owned by the user
+    resourceFilter = {
+      $or: [
+        { monitor: { $in: ownedMonitorIds } },
+        { jobMonitor: { $in: ownedJobMonitorIds } },
+      ],
+    };
+  }
 
   const filter = {};
 
@@ -94,23 +135,30 @@ export const getIncidents = async (
 
   if (search) {
     const pattern = new RegExp(escapeRegExp(search), "i");
-    const matchingMonitorIds = await Monitor.find({
-      _id: monitorFilter,
-      $or: [{ name: pattern }, { url: pattern }],
-    }).distinct("_id");
+    const [matchingMonitorIds, matchingJobMonitorIds] = await Promise.all([
+      Monitor.find({
+        _id: { $in: ownedMonitorIds },
+        $or: [{ name: pattern }, { url: pattern }],
+      }).distinct("_id"),
+      JobMonitor.find({
+        _id: { $in: ownedJobMonitorIds },
+        $or: [{ name: pattern }, { description: pattern }],
+      }).distinct("_id"),
+    ]);
 
     filter.$and = [
-      { monitor: monitorFilter },
+      resourceFilter,
       {
         $or: [
           { monitor: { $in: matchingMonitorIds } },
+          { jobMonitor: { $in: matchingJobMonitorIds } },
           { rootCause: pattern },
           { resolutionNotes: pattern },
         ],
       },
     ];
   } else {
-    filter.monitor = monitorFilter;
+    Object.assign(filter, resourceFilter);
   }
 
   const sortDirection = order === "asc" ? 1 : -1;
@@ -119,8 +167,17 @@ export const getIncidents = async (
   const [incidents, total] = await Promise.all([
     Incident.find(filter)
       .populate("monitor", MONITOR_POPULATE_FIELDS)
+      .populate("jobMonitor", JOB_MONITOR_POPULATE_FIELDS)
       .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
       .populate("recoveryCheck", TRIGGER_CHECK_POPULATE_FIELDS)
+      .populate(
+        "triggerJobRun",
+        "runId status scheduledFor startedAt completedAt durationMs exitCode errorMessage",
+      )
+      .populate(
+        "recoveryJobRun",
+        "runId status scheduledFor startedAt completedAt durationMs exitCode errorMessage",
+      )
       .sort({ startedAt: sortDirection })
       .skip(skip)
       .limit(limit)
@@ -139,15 +196,24 @@ export const getIncidents = async (
 // ── Single incident ───────────────────────────────────────────────────────────
 
 export const getIncidentById = async (id, user) => {
-  const ownedIds = await getOwnedMonitorIds(user);
+  const [ownedMonitorIds, ownedJobMonitorIds] = await Promise.all([
+    getOwnedMonitorIds(user),
+    JobMonitor.find({ owner: user._id || user.id }).distinct("_id"),
+  ]);
 
   const incident = await Incident.findOne({
     _id: id,
-    monitor: { $in: ownedIds },
+    $or: [
+      { monitor: { $in: ownedMonitorIds } },
+      { jobMonitor: { $in: ownedJobMonitorIds } },
+    ],
   })
     .populate("monitor", MONITOR_POPULATE_FIELDS)
+    .populate("jobMonitor", JOB_MONITOR_POPULATE_FIELDS)
     .populate("triggerCheck", TRIGGER_CHECK_DETAIL_POPULATE_FIELDS)
     .populate("recoveryCheck", TRIGGER_CHECK_DETAIL_POPULATE_FIELDS)
+    .populate("triggerJobRun")
+    .populate("recoveryJobRun")
     .lean();
 
   if (!incident) {
@@ -165,11 +231,27 @@ export const updateIncidentStatus = async (
   user,
   { admin = false } = {},
 ) => {
-  const ownedIds = admin ? null : await getOwnedMonitorIds(user);
+  const [ownedMonitorIds, ownedJobMonitorIds] = admin
+    ? [null, null]
+    : await Promise.all([
+        getOwnedMonitorIds(user),
+        JobMonitor.find({ owner: user._id || user.id }).distinct("_id"),
+      ]);
+
   const incident = await Incident.findOne({
     _id: id,
-    ...(admin ? {} : { monitor: { $in: ownedIds } }),
-  }).populate("monitor", admin ? "name url owner" : MONITOR_POPULATE_FIELDS);
+    ...(admin
+      ? {}
+      : {
+          $or: [
+            { monitor: { $in: ownedMonitorIds } },
+            { jobMonitor: { $in: ownedJobMonitorIds } },
+          ],
+        }),
+  })
+    .populate("monitor", admin ? "name url owner" : MONITOR_POPULATE_FIELDS)
+    .populate("jobMonitor", admin ? "name owner" : JOB_MONITOR_POPULATE_FIELDS);
+
   if (!incident) {
     throw ApiError.notFound(`Incident not found with id: ${id}`);
   }
@@ -184,7 +266,10 @@ export const updateIncidentStatus = async (
   }
 
   const ownerId = user.id || user._id.toString();
-  const monitorName = incident.monitor?.name || "a monitor";
+  const resourceName =
+    incident.monitor?.name ||
+    incident.jobMonitor?.name ||
+    "a monitored resource";
 
   const logStatusChange = () =>
     logActivity({
@@ -195,7 +280,7 @@ export const updateIncidentStatus = async (
       action: admin
         ? ACTIVITY_ACTIONS.ADMIN_INCIDENT_RESOLVED
         : ACTIVITY_ACTIONS.INCIDENT_STATUS_UPDATED,
-      description: `${admin ? "Administrator resolved" : "Marked"} incident on "${monitorName}" as ${status}`,
+      description: `${admin ? "Administrator resolved" : "Marked"} incident on "${resourceName}" as ${status}`,
       entityType: "Incident",
       entityId: incident._id,
       metadata: {
@@ -203,7 +288,9 @@ export const updateIncidentStatus = async (
         to: status,
         ...(admin
           ? {
-              targetOwner: String(incident.monitor?.owner || ""),
+              targetOwner: String(
+                incident.monitor?.owner || incident.jobMonitor?.owner || "",
+              ),
               reason: resolutionNotes || null,
               rootCause: rootCause || null,
             }
@@ -233,46 +320,86 @@ export const updateIncidentStatus = async (
     );
   }
   await logStatusChange();
-  await syncIncidentById(
-    updatedIncident._id,
-    status === INCIDENT_STATUS.RESOLVED ? "resolved" : "updated",
-  );
+
+  // Only sync to status-page if this incident belongs to an HTTP/API monitor
+  if (incident.monitor) {
+    await syncIncidentById(
+      updatedIncident._id,
+      status === INCIDENT_STATUS.RESOLVED ? "resolved" : "updated",
+    );
+  }
+
   await createNotification({
-    ownerId: incident.monitor?.owner || ownerId,
+    ownerId: incident.monitor?.owner || incident.jobMonitor?.owner || ownerId,
     type:
       status === INCIDENT_STATUS.RESOLVED
         ? "incident_resolved"
         : "incident_updated",
     title:
       status === INCIDENT_STATUS.RESOLVED
-        ? `Incident resolved: ${monitorName}`
-        : `Incident update: ${monitorName}`,
+        ? `Incident resolved: ${resourceName}`
+        : `Incident update: ${resourceName}`,
     message:
       status === INCIDENT_STATUS.RESOLVED
-        ? `The incident for ${monitorName} was marked resolved.`
+        ? `The incident for ${resourceName} was marked resolved.`
         : `Incident status changed to ${status}.`,
     priority: incident.severity === "critical" ? "critical" : "high",
-    link: "/incidents",
+    link: incident.jobMonitor
+      ? `/jobs/${incident.jobMonitor._id || incident.jobMonitor}`
+      : "/incidents",
     relatedResource: { resourceType: "Incident", resourceId: incident._id },
   });
 
   const result = await Incident.findById(updatedIncident._id)
     .populate("monitor", MONITOR_POPULATE_FIELDS)
+    .populate("jobMonitor", JOB_MONITOR_POPULATE_FIELDS)
     .populate("triggerCheck", TRIGGER_CHECK_POPULATE_FIELDS)
     .populate("recoveryCheck", TRIGGER_CHECK_POPULATE_FIELDS)
+    .populate("triggerJobRun")
+    .populate("recoveryJobRun")
     .lean();
   return restoreCheckSnapshots(result);
 };
 
 // ── Downtime statistics ───────────────────────────────────────────────────────
 
-export const getDowntimeStats = async ({ monitorId, window }, user) => {
-  const ownedIds = await getOwnedMonitorIds(user);
+export const getDowntimeStats = async (
+  { monitorId, jobMonitorId, resourceType, window },
+  user,
+) => {
+  const [ownedMonitorIds, ownedJobMonitorIds] = await Promise.all([
+    getOwnedMonitorIds(user),
+    JobMonitor.find({ owner: user._id || user.id }).distinct("_id"),
+  ]);
   const since = msBefore(WINDOW_MS[window]);
+
+  let resourceFilter;
+  if (jobMonitorId) {
+    const requested = new mongoose.Types.ObjectId(jobMonitorId);
+    resourceFilter = ownedJobMonitorIds.some((id) => id.equals(requested))
+      ? { jobMonitor: requested }
+      : { jobMonitor: { $in: [] } };
+  } else if (monitorId) {
+    const requested = new mongoose.Types.ObjectId(monitorId);
+    resourceFilter = ownedMonitorIds.some((id) => id.equals(requested))
+      ? { monitor: requested }
+      : { monitor: { $in: [] } };
+  } else if (resourceType === "job_monitor") {
+    resourceFilter = { jobMonitor: { $in: ownedJobMonitorIds } };
+  } else if (resourceType === "monitor") {
+    resourceFilter = { monitor: { $in: ownedMonitorIds } };
+  } else {
+    resourceFilter = {
+      $or: [
+        { monitor: { $in: ownedMonitorIds } },
+        { jobMonitor: { $in: ownedJobMonitorIds } },
+      ],
+    };
+  }
 
   const matchFilter = {
     startedAt: { $gte: since },
-    monitor: resolveMonitorFilter(ownedIds, monitorId),
+    ...resourceFilter,
   };
 
   const [aggResults, topAffectedMonitors] = await Promise.all([
@@ -341,15 +468,12 @@ export const getDowntimeStats = async ({ monitorId, window }, user) => {
       },
     ]),
 
-    // Top 5 monitors by incident count in the window — a single
-    // aggregation (match → group → sort → limit → lookup) rather than N
-    // per-monitor queries, so this scales with the window's incident
-    // volume rather than the caller's total monitor count.
+    // Top 5 resources by incident count in the window
     Incident.aggregate([
       { $match: matchFilter },
       {
         $group: {
-          _id: "$monitor",
+          _id: { $ifNull: ["$monitor", "$jobMonitor"] },
           incidentCount: { $sum: 1 },
           totalDowntime: { $sum: { $ifNull: ["$duration", 0] } },
           criticalCount: {
@@ -370,13 +494,34 @@ export const getDowntimeStats = async ({ monitorId, window }, user) => {
           pipeline: [{ $project: { name: 1, url: 1 } }],
         },
       },
-      { $unwind: { path: "$monitorInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "jobmonitors",
+          localField: "_id",
+          foreignField: "_id",
+          as: "jobMonitorInfo",
+          pipeline: [{ $project: { name: 1 } }],
+        },
+      },
       {
         $project: {
           _id: 0,
           monitorId: "$_id",
-          name: "$monitorInfo.name",
-          url: "$monitorInfo.url",
+          resourceId: "$_id",
+          name: {
+            $ifNull: [
+              { $arrayElemAt: ["$monitorInfo.name", 0] },
+              { $arrayElemAt: ["$jobMonitorInfo.name", 0] },
+            ],
+          },
+          url: { $arrayElemAt: ["$monitorInfo.url", 0] },
+          resourceType: {
+            $cond: [
+              { $gt: [{ $size: "$jobMonitorInfo" }, 0] },
+              "job_monitor",
+              "monitor",
+            ],
+          },
           incidentCount: 1,
           totalDowntime: 1,
           criticalCount: 1,
