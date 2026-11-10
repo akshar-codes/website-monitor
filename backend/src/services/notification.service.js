@@ -44,6 +44,10 @@ const alertPreferenceKey = (type) => {
       "incident_updated",
       "incident_resolved",
       "global_outage_confirmed",
+      "slo_burn_rate_alert",
+      "slo_budget_warning",
+      "slo_budget_exhausted",
+      "slo_recovered",
     ].includes(type)
   )
     return "incidents";
@@ -92,6 +96,10 @@ export const ALERTABLE_NOTIFICATION_TYPES = new Set([
   "domain_expiring_soon",
   "domain_expired",
   "ssl_invalid",
+  "slo_burn_rate_alert",
+  "slo_budget_warning",
+  "slo_budget_exhausted",
+  "slo_recovered",
 ]);
 
 // ── Dispatch (in-app now; email/push are future extension points) ──────────

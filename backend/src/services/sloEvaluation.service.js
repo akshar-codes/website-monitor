@@ -9,6 +9,7 @@ import ApiError from "../utils/ApiError.js";
 import { ROLES, SLO_ROLLING_WINDOW_MS } from "../config/constants.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { calculateSliFromChecks } from "./sliCalculator.js";
+import { processSloAlerts, getSloAlertState } from "./sloAlert.service.js";
 import logger from "../utils/logger.js";
 
 const resolveOwnerId = (user) => (user.id || user._id).toString();
@@ -152,7 +153,24 @@ export async function evaluateSlo(sloId, options = {}) {
     maintenanceWindows,
     budgetWarningThresholdPercent:
       slo.alertSettings?.budgetWarningThresholdPercent || 20,
+    burnRateThresholds: slo.alertSettings?.burnRateThresholds,
   });
+
+  // Evaluate burn rates, budget thresholds, and alert transitions
+  let alertProcessing = null;
+  try {
+    alertProcessing = await processSloAlerts({
+      slo,
+      evaluationResult: result,
+      now: windowEnd,
+      deps: options.deps,
+    });
+  } catch (alertErr) {
+    logger.error("SLO alert processing encountered error", {
+      sloId: slo._id,
+      error: alertErr.message,
+    });
+  }
 
   let snapshot = null;
   const idempotencyKey = `${slo._id}:${windowEnd.toISOString()}`;
@@ -191,6 +209,9 @@ export async function evaluateSlo(sloId, options = {}) {
         badChecks: result.badChecks,
         degradedChecks: result.degradedChecks,
         unknownChecks: result.unknownChecks,
+        burnRates: result.burnRates || [],
+        exhaustionForecast: result.exhaustionForecast || null,
+        alertEvents: alertProcessing?.alertEvents || [],
         metadata: result.metadata,
         idempotencyKey,
       });
@@ -209,6 +230,11 @@ export async function evaluateSlo(sloId, options = {}) {
     slo.lastSliPercentage = result.sliPercentage;
     slo.lastStatus = result.status;
     slo.lastBudgetConsumptionPercentage = result.budgetConsumptionPercentage;
+    slo.lastBurnRates = result.burnRates || [];
+    slo.lastExhaustionForecast = result.exhaustionForecast || null;
+    if (alertProcessing?.state?._id) {
+      slo.alertState = alertProcessing.state._id;
+    }
 
     if (!skipNextEvaluationUpdate) {
       const nextSeconds = slo.evaluationIntervalSeconds || 3600;
@@ -224,8 +250,16 @@ export async function evaluateSlo(sloId, options = {}) {
     await slo.save();
   }
 
-  return { result, snapshot };
+  return {
+    result,
+    snapshot,
+    alertState: alertProcessing?.state || null,
+    alertEvents: alertProcessing?.alertEvents || [],
+    triggeredConditions: alertProcessing?.triggeredConditions || [],
+  };
 }
+
+export { getSloAlertState };
 
 /**
  * Retrieves paginated historical evaluation snapshots for an SLO.

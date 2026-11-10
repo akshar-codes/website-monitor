@@ -7,6 +7,7 @@ import Monitor from "../src/models/Monitor.js";
 import HealthCheck from "../src/models/HealthCheck.js";
 import User from "../src/models/User.js";
 import SloSnapshot from "../src/models/SloSnapshot.js";
+import SloAlertState from "../src/models/SloAlertState.js";
 import Activity from "../src/models/Activity.js";
 import StatusPage from "../src/models/StatusPage.js";
 import {
@@ -518,6 +519,16 @@ test("SLO Evaluation Service: Persists snapshot idempotently and updates SLO doc
     return inMemorySnapshots.get(query.idempotencyKey) || null;
   });
 
+  t.mock.method(SloAlertState, "findOneAndUpdate", async () => ({
+    _id: "64b000000000000000000099",
+    slo: sloAId,
+    activeAlerts: [],
+    incidentSequence: 1,
+    consecutiveBreaches: 0,
+    consecutiveRecoveries: 1,
+    save: async () => {},
+  }));
+
   const now = new Date("2026-11-09T18:00:00.000Z");
 
   // First evaluation: creates snapshot
@@ -649,6 +660,15 @@ test("SLO API: /api/slos/:id/evaluate, /snapshots and /latest endpoints", async 
     lean: async () => [mockSnapshot],
   }));
   t.mock.method(SloSnapshot, "countDocuments", async () => 1);
+  t.mock.method(SloAlertState, "findOneAndUpdate", async () => ({
+    _id: "64b000000000000000000099",
+    slo: sloAId,
+    activeAlerts: [],
+    incidentSequence: 1,
+    consecutiveBreaches: 0,
+    consecutiveRecoveries: 1,
+    save: async () => {},
+  }));
 
   // 1. POST /api/slos/:id/evaluate
   const evalRes = await request(`/slos/${sloAId}/evaluate`, {

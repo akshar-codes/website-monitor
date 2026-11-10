@@ -16,6 +16,10 @@ export const ALERT_EVENTS = Object.freeze([
   "ssl.expiring",
   "domain.expiring",
   "monitor.ssl_error",
+  "slo.burn_rate",
+  "slo.budget_warning",
+  "slo.budget_exhausted",
+  "slo.recovered",
 ]);
 
 const httpsUrl = z

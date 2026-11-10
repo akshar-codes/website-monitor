@@ -34,6 +34,10 @@ export const TYPE_TO_EVENT = Object.freeze({
   domain_expiring_soon: ["domain.expiring"],
   domain_expired: ["domain.expiring"],
   ssl_invalid: ["monitor.ssl_error"],
+  slo_burn_rate_alert: ["slo.burn_rate"],
+  slo_budget_warning: ["slo.budget_warning"],
+  slo_budget_exhausted: ["slo.budget_exhausted"],
+  slo_recovered: ["slo.recovered"],
 });
 const stringifyId = (value) =>
   value == null ? null : String(value._id || value);
