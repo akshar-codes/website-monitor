@@ -14,6 +14,7 @@ export const FEATURES = Object.freeze({
   RESPONSE_INSPECTION: "responseInspection",
   API_MONITORING: "apiMonitoring",
   SLO_MANAGEMENT: "sloManagement",
+  JOB_MONITORING: "jobMonitoring",
 });
 
 /**
@@ -39,6 +40,8 @@ export function planHasFeature(planDefinition, featureKey) {
       return (limits.maxApiMonitors ?? 0) > 0;
     case FEATURES.SLO_MANAGEMENT:
       return limits.maxSlos === null || (limits.maxSlos ?? 0) > 0;
+    case FEATURES.JOB_MONITORING:
+      return limits.maxJobMonitors === null || (limits.maxJobMonitors ?? 0) > 0;
     default:
       return false;
   }
