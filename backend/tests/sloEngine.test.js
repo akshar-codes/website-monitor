@@ -84,6 +84,9 @@ after(async () => {
       server.close((err) => (err ? reject(err) : resolve())),
     );
   }
+  for (const h of process._getActiveHandles()) {
+    if (h.unref) h.unref();
+  }
 });
 
 const request = (path, { role, userId, plan, method = "GET", body } = {}) =>

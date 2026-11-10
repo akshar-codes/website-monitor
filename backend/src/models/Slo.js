@@ -223,6 +223,50 @@ const sloSchema = new mongoose.Schema(
       type: auditSchema,
       required: true,
     },
+
+    // ── Scheduling & Lease Fields (Background Evaluation) ──
+    nextEvaluationAt: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
+    lastEvaluatedAt: {
+      type: Date,
+      default: null,
+    },
+    evaluationLeaseToken: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    evaluationLeaseUntil: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    evaluationRetryAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    lastSnapshot: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SloSnapshot",
+      default: null,
+    },
+    lastSliPercentage: {
+      type: Number,
+      default: null,
+    },
+    lastStatus: {
+      type: String,
+      enum: ["healthy", "warning", "breached", "insufficient_data", null],
+      default: null,
+    },
+    lastBudgetConsumptionPercentage: {
+      type: Number,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -244,6 +288,7 @@ const sloSchema = new mongoose.Schema(
 sloSchema.index({ owner: 1, monitor: 1, name: 1 }, { unique: true });
 sloSchema.index({ monitor: 1, enabled: 1 });
 sloSchema.index({ owner: 1, createdAt: -1 });
+sloSchema.index({ enabled: 1, nextEvaluationAt: 1, _id: 1 });
 
 // ── Virtuals ──
 sloSchema.virtual("rollingWindowMs").get(function () {
