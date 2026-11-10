@@ -159,6 +159,24 @@ export const evaluateJobMonitor = async (
   if (signal?.aborted) return null;
   const evaluationDate = now instanceof Date ? now : new Date(now);
 
+  const isLeaseValid = async () => {
+    if (signal?.aborted) return false;
+    if (!token) return true;
+    try {
+      const doc = await JobMonitor.findOne({
+        _id: jobMonitor._id,
+        leaseToken: token,
+      }).select("+leaseToken +leaseUntil");
+      if (!doc) return false;
+      if (doc.leaseUntil && new Date(doc.leaseUntil).getTime() < Date.now()) {
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   // ───────────────────────────────────────────────────────────────────────────
   // 1. EXECUTION TIMEOUT EVALUATION (Evaluates all in-flight started runs)
   // ───────────────────────────────────────────────────────────────────────────
@@ -198,7 +216,7 @@ export const evaluateJobMonitor = async (
   }
 
   for (const candidate of timedOutCandidates) {
-    if (signal?.aborted) return null;
+    if (signal?.aborted || !(await isLeaseValid())) return null;
     const startedAtMs = new Date(candidate.startedAt || evaluationDate).getTime();
     const durationMs = Math.max(0, evaluationDate.getTime() - startedAtMs);
 
@@ -217,6 +235,7 @@ export const evaluateJobMonitor = async (
           status: JOB_RUN_STATUS.TIMED_OUT,
           completedAt: evaluationDate,
           durationMs,
+          appliedToMonitor: true,
           errorMessage: `Execution timed out after exceeding configured limit of ${jobMonitor.runTimeoutSeconds} seconds.`,
           failureReason: "execution_timeout",
         },
@@ -225,6 +244,7 @@ export const evaluateJobMonitor = async (
     );
 
     if (activeRun) {
+      if (signal?.aborted || !(await isLeaseValid())) return null;
       metrics.timedOutRuns += 1;
       jobMonitor.lastRunStatus = JOB_RUN_STATUS.TIMED_OUT;
       jobMonitor.lastFinishedAt = evaluationDate;
@@ -277,22 +297,28 @@ export const evaluateJobMonitor = async (
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // 2. MISSED EXECUTION EVALUATION & BOUNDED CATCH-UP
+  // 2. MISSED EXECUTION EVALUATION & STRICT WORK-BOUNDED CATCH-UP
   // ───────────────────────────────────────────────────────────────────────────
-  const MAX_CATCHUP_RUNS = 5;
+  const MAX_CATCHUP_OCCURRENCES = 5;
+  let examinedCount = 0;
   let newMissedCount = 0;
   let lastCreatedMissedRun = null;
   const graceMs =
     (jobMonitor.gracePeriodSeconds ||
       JOB_MONITOR_LIMITS.DEFAULT_GRACE_PERIOD_SECONDS) * 1000;
 
+  let hasMorePastOccurrences = false;
+
   if (jobMonitor.nextExpectedAt) {
     let occurrence = new Date(jobMonitor.nextExpectedAt);
 
     while (
-      newMissedCount < MAX_CATCHUP_RUNS &&
+      examinedCount < MAX_CATCHUP_OCCURRENCES &&
       evaluationDate.getTime() >= occurrence.getTime() + graceMs
     ) {
+      if (signal?.aborted || !(await isLeaseValid())) return null;
+
+      examinedCount += 1;
       const occurrenceIso = occurrence.toISOString();
       const deterministicRunId = `missed_${occurrenceIso.replace(/[:.]/g, "-")}_${String(jobMonitor._id).slice(-6)}`;
 
@@ -315,6 +341,7 @@ export const evaluateJobMonitor = async (
         ) <= graceMs;
 
       if (!existingRun && !isCurrentlyRunningForOccurrence) {
+        if (signal?.aborted || !(await isLeaseValid())) return null;
         try {
           const missedRun = await JobRun.create({
             jobMonitor: jobMonitor._id,
@@ -326,6 +353,7 @@ export const evaluateJobMonitor = async (
             completedAt: evaluationDate,
             receivedAt: evaluationDate,
             durationMs: 0,
+            appliedToMonitor: true,
             errorMessage: `Scheduled execution was missed. Expected by ${new Date(occurrence.getTime() + graceMs).toISOString()} (grace period: ${jobMonitor.gracePeriodSeconds}s).`,
             failureReason: "missed_execution",
           });
@@ -360,6 +388,7 @@ export const evaluateJobMonitor = async (
     }
 
     if (newMissedCount > 0) {
+      if (signal?.aborted || !(await isLeaseValid())) return null;
       jobMonitor.consecutiveMissed =
         (jobMonitor.consecutiveMissed || 0) + newMissedCount;
       jobMonitor.consecutiveFailures =
@@ -388,13 +417,10 @@ export const evaluateJobMonitor = async (
       }
     }
 
-    // Advance nextExpectedAt
-    if (occurrence.getTime() + graceMs <= evaluationDate.getTime()) {
-      // Reached MAX_CATCHUP_RUNS or occurrence is still in the past: jump strictly to next future occurrence
-      jobMonitor.nextExpectedAt = calculateNextRun(jobMonitor, evaluationDate);
-    } else {
-      jobMonitor.nextExpectedAt = occurrence;
-    }
+    // Advance nextExpectedAt to the first unexamined occurrence
+    jobMonitor.nextExpectedAt = occurrence;
+    hasMorePastOccurrences =
+      occurrence.getTime() + graceMs <= evaluationDate.getTime();
   } else {
     // If nextExpectedAt was not set, initialize to next occurrence from now
     jobMonitor.nextExpectedAt = calculateNextRun(jobMonitor, evaluationDate);
@@ -403,16 +429,21 @@ export const evaluateJobMonitor = async (
   // ───────────────────────────────────────────────────────────────────────────
   // 3. SCHEDULE MILESTONE ADVANCEMENT & LEASE RELEASE
   // ───────────────────────────────────────────────────────────────────────────
-  jobMonitor.nextEvaluationAt = calculateNextEvaluation(
-    {
-      ...jobMonitor.toObject(),
-      currentRunStartedAt: jobMonitor.currentRunStartedAt,
-      nextExpectedAt: jobMonitor.nextExpectedAt,
-    },
-    evaluationDate,
-  );
+  if (hasMorePastOccurrences) {
+    // Resume catch-up immediately on subsequent scheduler ticks
+    jobMonitor.nextEvaluationAt = evaluationDate;
+  } else {
+    jobMonitor.nextEvaluationAt = calculateNextEvaluation(
+      {
+        ...jobMonitor.toObject(),
+        currentRunStartedAt: jobMonitor.currentRunStartedAt,
+        nextExpectedAt: jobMonitor.nextExpectedAt,
+      },
+      evaluationDate,
+    );
+  }
 
-  if (signal?.aborted) return null;
+  if (signal?.aborted || !(await isLeaseValid())) return null;
 
   const updateResult = await JobMonitor.updateOne(
     { _id: jobMonitor._id, ...(token ? { leaseToken: token } : {}) },
@@ -472,6 +503,7 @@ export const runClaimedJobMonitor = async ({ jobMonitor, token }) => {
   let timeout;
   let heartbeat;
   let workPromise;
+  let workPromiseSettled = false;
 
   try {
     heartbeat = setInterval(
@@ -495,6 +527,9 @@ export const runClaimedJobMonitor = async ({ jobMonitor, token }) => {
       now: new Date(),
       token,
       signal: controller.signal,
+    }).finally(() => {
+      workPromiseSettled = true;
+      inFlightJobMonitorIds.delete(id);
     });
 
     const deadline = new Promise((_, reject) => {
@@ -519,26 +554,42 @@ export const runClaimedJobMonitor = async ({ jobMonitor, token }) => {
     // Abort active evaluation to prevent stale database writes
     controller.abort();
 
-    // Safely wait for the original evaluation to drain before clearing lease
-    if (workPromise) {
+    // Stop heartbeat lease renewal immediately so lease will expire naturally if work does not drain
+    clearInterval(heartbeat);
+
+    // Safely wait for the original evaluation to drain
+    if (workPromise && !workPromiseSettled) {
       await Promise.race([
         workPromise.catch(() => {}),
         new Promise((resolve) => setTimeout(resolve, 2000)),
       ]);
     }
 
-    await JobMonitor.updateOne(query, {
-      $set: {
-        retryAt: new Date(Date.now() + env.JOB_SCHEDULER_RETRY_DELAY_MS),
-      },
-      $unset: { leaseToken: 1, leaseUntil: 1 },
-    }).catch(() => {});
+    // Fencing rule: do not release ownership while stale work can still create missed runs or incidents.
+    // If work has settled cleanly, release the lease and set retryAt.
+    // If work did NOT settle within the drain window, retain the lease in MongoDB until natural expiration (leaseUntil)
+    // and keep local in-flight tracking alive to prevent concurrent workers from claiming this job.
+    if (workPromiseSettled) {
+      await JobMonitor.updateOne(query, {
+        $set: {
+          retryAt: new Date(Date.now() + env.JOB_SCHEDULER_RETRY_DELAY_MS),
+        },
+        $unset: { leaseToken: 1, leaseUntil: 1 },
+      }).catch(() => {});
+    } else {
+      logger.warn(
+        "Job monitor evaluation did not drain within abort timeout; withholding lease release to prevent concurrent executions",
+        { jobMonitorId: id, token },
+      );
+    }
 
     return null;
   } finally {
     clearTimeout(timeout);
     clearInterval(heartbeat);
-    inFlightJobMonitorIds.delete(id);
+    if (workPromiseSettled) {
+      inFlightJobMonitorIds.delete(id);
+    }
   }
 };
 

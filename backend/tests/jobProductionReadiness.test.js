@@ -13,7 +13,10 @@ import {
   calculateNextEvaluation,
 } from "../src/services/jobSchedule.service.js";
 import { processHeartbeat } from "../src/services/jobHeartbeat.service.js";
-import { evaluateJobMonitor } from "../src/workers/jobMonitorScheduler.js";
+import {
+  evaluateJobMonitor,
+  runClaimedJobMonitor,
+} from "../src/workers/jobMonitorScheduler.js";
 import JobMonitor from "../src/models/JobMonitor.js";
 import JobRun from "../src/models/JobRun.js";
 import Incident from "../src/models/Incident.js";
@@ -236,9 +239,9 @@ test("Heartbeat Idempotency: recovers monitor schedule state on duplicate succee
   }
 });
 
-test("Heartbeat Idempotency: retried terminal heartbeat without runId derives stable occurrence runId", async () => {
+test("Heartbeat Idempotency: retry sequence without scheduledFor across persisted schedule advancement produces exactly one run and increments counters once", async () => {
   const monitorId = new mongoose.Types.ObjectId();
-  const scheduledFor = new Date("2026-11-10T12:00:00.000Z");
+  const initialNextExpectedAt = new Date("2026-11-10T12:00:00.000Z");
 
   const monitorDoc = {
     _id: monitorId,
@@ -246,32 +249,76 @@ test("Heartbeat Idempotency: retried terminal heartbeat without runId derives st
     status: JOB_STATUS.UP,
     scheduleType: "interval",
     intervalSeconds: 300,
-    nextExpectedAt: scheduledFor,
+    nextExpectedAt: initialNextExpectedAt,
+    consecutiveSuccesses: 0,
+    consecutiveFailures: 0,
+    recoveryThreshold: 1,
     toObject() {
       return { ...this };
     },
     save: async () => monitorDoc,
   };
 
-  let createdRunId = null;
+  const storedRuns = new Map();
   const originalJobRunFindOne = JobRun.findOne;
   const originalJobRunCreate = JobRun.create;
 
-  JobRun.findOne = async () => null;
+  JobRun.findOne = async (query) => {
+    for (const run of storedRuns.values()) {
+      if (query.runId && run.runId === query.runId) return run;
+      if (query.$or) {
+        for (const condition of query.$or) {
+          if (condition.runId && run.runId === condition.runId) return run;
+          if (condition.idempotencyKey && run.idempotencyKey === condition.idempotencyKey) return run;
+        }
+      }
+    }
+    return null;
+  };
+
   JobRun.create = async (doc) => {
-    createdRunId = doc.runId;
-    return doc;
+    const runInstance = {
+      _id: new mongoose.Types.ObjectId(),
+      ...doc,
+      save: async () => runInstance,
+    };
+    storedRuns.set(doc.runId, runInstance);
+    return runInstance;
   };
 
   try {
-    await processHeartbeat(monitorDoc, {
+    // Attempt 1: client reports terminal succeeded with stable runId, but WITHOUT scheduledFor
+    const firstResult = await processHeartbeat(monitorDoc, {
       event: "succeeded",
-      scheduledFor: scheduledFor.toISOString(),
+      runId: "stable-run-uuid-1",
       durationMs: 2500,
     });
 
-    // Run ID is deterministic based on occurrence timestamp
-    assert.ok(createdRunId.startsWith("occ_2026-11-10T12-00-00-000Z_"));
+    assert.equal(firstResult.duplicate, false);
+    assert.equal(storedRuns.size, 1);
+    assert.equal(monitorDoc.consecutiveSuccesses, 1);
+
+    // Schedule milestone has advanced from 12:00 to 12:05
+    const advancedNextExpectedAt = monitorDoc.nextExpectedAt;
+    assert.notEqual(advancedNextExpectedAt.getTime(), initialNextExpectedAt.getTime());
+
+    // Attempt 2 (Network Retry): client resends exact same terminal heartbeat without scheduledFor
+    // Note: monitorDoc.nextExpectedAt is already advanced to 12:05!
+    const retryResult = await processHeartbeat(monitorDoc, {
+      event: "succeeded",
+      runId: "stable-run-uuid-1",
+      durationMs: 2500,
+    });
+
+    // Verification:
+    // 1. Detected as duplicate
+    assert.equal(retryResult.duplicate, true);
+    // 2. Exactly one run exists (no duplicate run created)
+    assert.equal(storedRuns.size, 1);
+    // 3. Consecutive successes counter incremented ONLY ONCE (remains 1, not 2)
+    assert.equal(monitorDoc.consecutiveSuccesses, 1);
+    // 4. Schedule milestone remains at advancedNextExpectedAt (not advanced further)
+    assert.equal(monitorDoc.nextExpectedAt.getTime(), advancedNextExpectedAt.getTime());
   } finally {
     JobRun.findOne = originalJobRunFindOne;
     JobRun.create = originalJobRunCreate;
@@ -525,5 +572,149 @@ test("Job Query API: getJobMonitors filters by scheduleType", async () => {
   } finally {
     JobMonitor.find = originalFind;
     JobMonitor.countDocuments = originalCount;
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10. Missed Execution Catch-Up Work Limit
+// ─────────────────────────────────────────────────────────────────────────────
+test("Missed Execution Catch-Up: bounds examined occurrences to MAX_CATCHUP_OCCURRENCES and resumes on subsequent tick", async () => {
+  const monitorId = new mongoose.Types.ObjectId();
+  // 60 past occurrences in historical backlog (1 hour of 1-minute intervals)
+  const initialNextExpected = new Date("2026-11-10T12:00:00.000Z");
+  const evaluationDate = new Date("2026-11-10T13:00:00.000Z");
+
+  const monitorDoc = {
+    _id: monitorId,
+    name: "High Frequency Sync",
+    active: true,
+    status: JOB_STATUS.UP,
+    scheduleType: "interval",
+    intervalSeconds: 60,
+    gracePeriodSeconds: 10,
+    nextExpectedAt: initialNextExpected,
+    toObject() {
+      return { ...this };
+    },
+  };
+
+  let examinedCount = 0;
+  const originalJobMonitorFindOne = JobMonitor.findOne;
+  const originalJobMonitorUpdateOne = JobMonitor.updateOne;
+  const originalJobRunFind = JobRun.find;
+  const originalJobRunFindOne = JobRun.findOne;
+
+  JobMonitor.findOne = () => ({
+    select: async () => monitorDoc,
+  });
+
+  let savedNextExpectedAt = null;
+  let savedNextEvaluationAt = null;
+
+  JobMonitor.updateOne = async (_query, update) => {
+    savedNextExpectedAt = update.$set.nextExpectedAt;
+    savedNextEvaluationAt = update.$set.nextEvaluationAt;
+    return { matchedCount: 1 };
+  };
+
+  JobRun.find = async () => [];
+  // Simulate that existing runs already exist for historical occurrences
+  JobRun.findOne = (query) => {
+    if (query?.status === JOB_RUN_STATUS.STARTED) {
+      return { sort: () => null };
+    }
+    examinedCount += 1;
+    return { runId: "historical-run" };
+  };
+
+  try {
+    const result = await evaluateJobMonitor(monitorId, {
+      now: evaluationDate,
+      token: "test-token",
+    });
+
+    assert.ok(result);
+    // Work bound rule: examined exactly 5 occurrences, not all 60!
+    assert.equal(examinedCount, 5);
+
+    // Advanced nextExpectedAt by 5 intervals (5 * 60s = 300s -> 12:05:00.000Z)
+    assert.equal(savedNextExpectedAt.toISOString(), "2026-11-10T12:05:00.000Z");
+
+    // Resumes catch-up on subsequent scheduler ticks: nextEvaluationAt scheduled for evaluationDate
+    assert.equal(savedNextEvaluationAt.toISOString(), evaluationDate.toISOString());
+  } finally {
+    JobMonitor.findOne = originalJobMonitorFindOne;
+    JobMonitor.updateOne = originalJobMonitorUpdateOne;
+    JobRun.find = originalJobRunFind;
+    JobRun.findOne = originalJobRunFindOne;
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 11. Scheduler Lease Expiration & Fencing Safety
+// ─────────────────────────────────────────────────────────────────────────────
+test("Scheduler Lease Safety: evaluateJobMonitor halts and does not commit writes when lease expires or is stolen", async () => {
+  const monitorId = new mongoose.Types.ObjectId();
+  const evaluationDate = new Date("2026-11-10T12:00:00.000Z");
+
+  const monitorDoc = {
+    _id: monitorId,
+    name: "Stolen Lease Job",
+    active: true,
+    status: JOB_STATUS.UP,
+    scheduleType: "interval",
+    intervalSeconds: 60,
+    gracePeriodSeconds: 10,
+    nextExpectedAt: new Date("2026-11-10T11:00:00.000Z"),
+    leaseToken: "my-token",
+    leaseUntil: new Date("2026-11-10T11:59:00.000Z"), // Expired 1 minute ago!
+    toObject() {
+      return { ...this };
+    },
+  };
+
+  let updateCalled = false;
+  let missedCreated = false;
+  const originalJobMonitorFindOne = JobMonitor.findOne;
+  const originalJobMonitorUpdateOne = JobMonitor.updateOne;
+  const originalJobRunFindOneAndUpdate = JobRun.findOneAndUpdate;
+  const originalJobRunFind = JobRun.find;
+  const originalJobRunFindOne = JobRun.findOne;
+
+  // First call gets monitorDoc; subsequent lease check queries see expired leaseUntil
+  JobMonitor.findOne = () => ({
+    select: async () => monitorDoc,
+  });
+
+  JobMonitor.updateOne = async () => {
+    updateCalled = true;
+    return { matchedCount: 1 };
+  };
+
+  JobRun.find = async () => [];
+  JobRun.findOne = () => ({ sort: () => null });
+  JobRun.findOneAndUpdate = async () => {
+    missedCreated = true;
+    return null;
+  };
+
+  try {
+    const result = await evaluateJobMonitor(monitorId, {
+      now: evaluationDate,
+      token: "my-token",
+    });
+
+    // Fencing rule: execution was halted because lease expired
+    assert.equal(result, null);
+    // No missed runs created by stale worker
+    assert.equal(missedCreated, false);
+    // No updates written to JobMonitor by stale worker
+    assert.equal(updateCalled, false);
+  } finally {
+    JobMonitor.findOne = originalJobMonitorFindOne;
+    JobMonitor.updateOne = originalJobMonitorUpdateOne;
+    JobRun.findOneAndUpdate = originalJobRunFindOneAndUpdate;
+    JobRun.find = originalJobRunFind;
+    JobRun.findOne = originalJobRunFindOne;
   }
 });

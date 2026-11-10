@@ -107,6 +107,20 @@ const jobRunSchema = new mongoose.Schema(
       default: false,
     },
 
+    // ── Idempotency & State Reconciliation ──
+    idempotencyKey: {
+      type: String,
+      trim: true,
+      maxlength: [128, "Idempotency key cannot exceed 128 characters"],
+      default: null,
+      index: true,
+    },
+    appliedToMonitor: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
     // ── Client Request Context ──
     clientIp: {
       type: String,

@@ -50,21 +50,43 @@ export const processHeartbeat = async (
     ? scheduledFor.toISOString()
     : new Date(scheduledFor).toISOString();
 
-  // If no runId is provided, generate a deterministic stable occurrence identifier
-  // rather than a random UUID so that network retries for the same scheduled occurrence are idempotent.
-  const deterministicOccurrenceRunId = `occ_${occurrenceKey.replace(/[:.]/g, "-")}_${String(jobMonitor._id).slice(-6)}`;
+  // If explicit scheduledFor is supplied, derive occurrence runId.
+  // Otherwise, fallback to a unique UUID. Note: reliable retries across schedule advancements
+  // require a stable execution identifier (runId or idempotencyKey).
+  const fallbackRunId = payload.scheduledFor
+    ? `occ_${occurrenceKey.replace(/[:.]/g, "-")}_${String(jobMonitor._id).slice(-6)}`
+    : `run_${randomUUID()}`;
+
+  const runQuery = runId
+    ? idempotencyKey
+      ? {
+          jobMonitor: jobMonitor._id,
+          $or: [{ runId }, { idempotencyKey }],
+        }
+      : {
+          jobMonitor: jobMonitor._id,
+          runId,
+        }
+    : null;
 
   // ───────────────────────────────────────────────────────────────────────────
   // EVENT: STARTED
   // ───────────────────────────────────────────────────────────────────────────
   if (event === "started") {
-    runId = runId || deterministicOccurrenceRunId;
+    runId = runId || fallbackRunId;
 
-    // Check for existing run with this runId
-    let existingRun = await JobRun.findOne({
-      jobMonitor: jobMonitor._id,
-      runId,
-    });
+    // Check for existing run with this runId or idempotencyKey
+    const startedLookupQuery = idempotencyKey
+      ? {
+          jobMonitor: jobMonitor._id,
+          $or: [{ runId }, { idempotencyKey }],
+        }
+      : {
+          jobMonitor: jobMonitor._id,
+          runId,
+        };
+
+    let existingRun = await JobRun.findOne(startedLookupQuery);
 
     if (existingRun) {
       if (existingRun.status === JOB_RUN_STATUS.STARTED) {
@@ -213,8 +235,8 @@ export const processHeartbeat = async (
   if (event === "succeeded") {
     let run = null;
 
-    if (runId) {
-      run = await JobRun.findOne({ jobMonitor: jobMonitor._id, runId });
+    if (runQuery) {
+      run = await JobRun.findOne(runQuery);
     } else if (jobMonitor.currentRunId) {
       // Correlate with active in-flight run if runId wasn't passed
       run = await JobRun.findOne({
@@ -237,40 +259,49 @@ export const processHeartbeat = async (
 
     if (run) {
       if (run.status === JOB_RUN_STATUS.SUCCEEDED) {
-        // Recoverable partial failure check: reconcile JobMonitor if previous attempt failed before save
-        if (
-          jobMonitor.lastRunStatus !== JOB_RUN_STATUS.SUCCEEDED ||
-          jobMonitor.currentRunId === run.runId
-        ) {
-          const newSuccesses =
-            (jobMonitor.consecutiveSuccesses || 0) +
-            (jobMonitor.lastRunStatus !== JOB_RUN_STATUS.SUCCEEDED ? 1 : 0);
-          jobMonitor.consecutiveSuccesses = newSuccesses;
-          jobMonitor.consecutiveFailures = 0;
-          jobMonitor.consecutiveMissed = 0;
-          if (newSuccesses >= (jobMonitor.recoveryThreshold || 1)) {
-            jobMonitor.status = JOB_STATUS.UP;
-          }
-          jobMonitor.lastRunStatus = JOB_RUN_STATUS.SUCCEEDED;
-          jobMonitor.lastPingAt = now;
-          jobMonitor.lastFinishedAt = run.completedAt || now;
-          jobMonitor.lastDurationMs = run.durationMs;
-          jobMonitor.currentRunId = null;
-          jobMonitor.currentRunStartedAt = null;
-          jobMonitor.nextExpectedAt = calculateNextRun(jobMonitor, now);
-          jobMonitor.nextEvaluationAt = calculateNextEvaluation(
-            { ...jobMonitor.toObject(), nextExpectedAt: jobMonitor.nextExpectedAt },
-            now,
-          );
-          await jobMonitor.save();
+        // Idempotency: if this exact run was already counted into monitor stats, do not re-apply!
+        if (run.appliedToMonitor) {
+          return {
+            duplicate: true,
+            message: "Duplicate succeeded heartbeat ignored",
+            runId: run.runId,
+            status: run.status,
+            durationMs: run.durationMs,
+            nextExpectedAt: jobMonitor.nextExpectedAt,
+          };
         }
+
+        // Recoverable partial failure check: reconcile JobMonitor if previous attempt crashed before save
+        const newSuccesses = (jobMonitor.consecutiveSuccesses || 0) + 1;
+        jobMonitor.consecutiveSuccesses = newSuccesses;
+        jobMonitor.consecutiveFailures = 0;
+        jobMonitor.consecutiveMissed = 0;
+        if (newSuccesses >= (jobMonitor.recoveryThreshold || 1)) {
+          jobMonitor.status = JOB_STATUS.UP;
+        }
+        jobMonitor.lastRunStatus = JOB_RUN_STATUS.SUCCEEDED;
+        jobMonitor.lastPingAt = now;
+        jobMonitor.lastFinishedAt = run.completedAt || now;
+        jobMonitor.lastDurationMs = run.durationMs;
+        jobMonitor.currentRunId = null;
+        jobMonitor.currentRunStartedAt = null;
+        jobMonitor.nextExpectedAt = calculateNextRun(jobMonitor, now);
+        jobMonitor.nextEvaluationAt = calculateNextEvaluation(
+          { ...jobMonitor.toObject(), nextExpectedAt: jobMonitor.nextExpectedAt },
+          now,
+        );
+        await jobMonitor.save();
+
+        run.appliedToMonitor = true;
+        await run.save?.();
 
         return {
           duplicate: true,
-          message: "Duplicate succeeded heartbeat ignored",
+          message: "Duplicate succeeded heartbeat reconciled and applied",
           runId: run.runId,
           status: run.status,
           durationMs: run.durationMs,
+          nextExpectedAt: jobMonitor.nextExpectedAt,
         };
       }
 
@@ -325,6 +356,7 @@ export const processHeartbeat = async (
       run.completedAt = completedAt;
       run.durationMs = durationMs ?? null;
       if (runId) run.runId = runId;
+      if (idempotencyKey) run.idempotencyKey = idempotencyKey;
       if (wasMissed) {
         run.late = true;
         run.reconciledLate = true;
@@ -353,7 +385,7 @@ export const processHeartbeat = async (
       await run.save();
     } else {
       // Single-ping execution: no prior started event
-      runId = runId || deterministicOccurrenceRunId;
+      runId = runId || fallbackRunId;
       const completedAt = payload.completedAt ? new Date(payload.completedAt) : now;
       let execStartedAt = payload.startedAt ? new Date(payload.startedAt) : null;
       let durationMs = payload.durationMs;
@@ -372,6 +404,7 @@ export const processHeartbeat = async (
         run = await JobRun.create({
           jobMonitor: jobMonitor._id,
           runId,
+          idempotencyKey,
           occurrenceKey,
           scheduledFor,
           status: JOB_RUN_STATUS.SUCCEEDED,
@@ -380,6 +413,7 @@ export const processHeartbeat = async (
           receivedAt: now,
           durationMs: durationMs ?? 0,
           exitCode: payload.exitCode ?? 0,
+          appliedToMonitor: false,
           output: sanitizeRunOutput(payload.output),
           metadata: sanitizeRunMetadata(payload.metadata),
           clientIp: reqContext.clientIp,
@@ -387,10 +421,9 @@ export const processHeartbeat = async (
         });
       } catch (err) {
         if (err.code === 11000) {
-          const dup = await JobRun.findOne({
-            jobMonitor: jobMonitor._id,
-            runId,
-          });
+          const dup = await JobRun.findOne(
+            runQuery || { jobMonitor: jobMonitor._id, runId },
+          );
           if (dup && dup.status === JOB_RUN_STATUS.SUCCEEDED) {
             return {
               duplicate: true,
@@ -398,6 +431,7 @@ export const processHeartbeat = async (
               runId: dup.runId,
               status: dup.status,
               durationMs: dup.durationMs,
+              nextExpectedAt: jobMonitor.nextExpectedAt,
             };
           }
         }
@@ -460,6 +494,8 @@ export const processHeartbeat = async (
     );
 
     await jobMonitor.save();
+    run.appliedToMonitor = true;
+    await run.save?.();
 
     if (recovered) {
       await handleJobIncident(jobMonitor, run, {
@@ -488,8 +524,8 @@ export const processHeartbeat = async (
   if (event === "failed") {
     let run = null;
 
-    if (runId) {
-      run = await JobRun.findOne({ jobMonitor: jobMonitor._id, runId });
+    if (runQuery) {
+      run = await JobRun.findOne(runQuery);
     } else if (jobMonitor.currentRunId) {
       run = await JobRun.findOne({
         jobMonitor: jobMonitor._id,
@@ -516,39 +552,48 @@ export const processHeartbeat = async (
 
     if (run) {
       if (run.status === JOB_RUN_STATUS.FAILED) {
-        // Recoverable partial failure check: reconcile JobMonitor if previous attempt failed before save
-        if (
-          jobMonitor.lastRunStatus !== JOB_RUN_STATUS.FAILED ||
-          jobMonitor.currentRunId === run.runId
-        ) {
-          const newFailures =
-            (jobMonitor.consecutiveFailures || 0) +
-            (jobMonitor.lastRunStatus !== JOB_RUN_STATUS.FAILED ? 1 : 0);
-          jobMonitor.consecutiveFailures = newFailures;
-          jobMonitor.consecutiveSuccesses = 0;
-          if (newFailures >= (jobMonitor.failureThreshold || 1)) {
-            jobMonitor.status = JOB_STATUS.DOWN;
-          }
-          jobMonitor.lastRunStatus = JOB_RUN_STATUS.FAILED;
-          jobMonitor.lastPingAt = now;
-          jobMonitor.lastFinishedAt = run.completedAt || now;
-          jobMonitor.lastDurationMs = run.durationMs;
-          jobMonitor.currentRunId = null;
-          jobMonitor.currentRunStartedAt = null;
-          jobMonitor.nextExpectedAt = calculateNextRun(jobMonitor, now);
-          jobMonitor.nextEvaluationAt = calculateNextEvaluation(
-            { ...jobMonitor.toObject(), nextExpectedAt: jobMonitor.nextExpectedAt },
-            now,
-          );
-          await jobMonitor.save();
+        // Idempotency: if this exact run was already counted into monitor stats, do not re-apply!
+        if (run.appliedToMonitor) {
+          return {
+            duplicate: true,
+            message: "Duplicate failed heartbeat ignored",
+            runId: run.runId,
+            status: run.status,
+            errorMessage: run.errorMessage,
+            nextExpectedAt: jobMonitor.nextExpectedAt,
+          };
         }
+
+        // Recoverable partial failure check: reconcile JobMonitor if previous attempt crashed before save
+        const newFailures = (jobMonitor.consecutiveFailures || 0) + 1;
+        jobMonitor.consecutiveFailures = newFailures;
+        jobMonitor.consecutiveSuccesses = 0;
+        if (newFailures >= (jobMonitor.failureThreshold || 1)) {
+          jobMonitor.status = JOB_STATUS.DOWN;
+        }
+        jobMonitor.lastRunStatus = JOB_RUN_STATUS.FAILED;
+        jobMonitor.lastPingAt = now;
+        jobMonitor.lastFinishedAt = run.completedAt || now;
+        jobMonitor.lastDurationMs = run.durationMs;
+        jobMonitor.currentRunId = null;
+        jobMonitor.currentRunStartedAt = null;
+        jobMonitor.nextExpectedAt = calculateNextRun(jobMonitor, now);
+        jobMonitor.nextEvaluationAt = calculateNextEvaluation(
+          { ...jobMonitor.toObject(), nextExpectedAt: jobMonitor.nextExpectedAt },
+          now,
+        );
+        await jobMonitor.save();
+
+        run.appliedToMonitor = true;
+        await run.save?.();
 
         return {
           duplicate: true,
-          message: "Duplicate failed heartbeat ignored",
+          message: "Duplicate failed heartbeat reconciled and applied",
           runId: run.runId,
           status: run.status,
           errorMessage: run.errorMessage,
+          nextExpectedAt: jobMonitor.nextExpectedAt,
         };
       }
 
@@ -601,6 +646,7 @@ export const processHeartbeat = async (
       run.durationMs = durationMs ?? null;
       run.errorMessage = errorMessage;
       if (runId) run.runId = runId;
+      if (idempotencyKey) run.idempotencyKey = idempotencyKey;
       if (wasMissed) {
         run.late = true;
         run.reconciledLate = true;
@@ -626,7 +672,7 @@ export const processHeartbeat = async (
       await run.save();
     } else {
       // Single-ping failure: no prior started event
-      runId = runId || deterministicOccurrenceRunId;
+      runId = runId || fallbackRunId;
       const completedAt = payload.completedAt ? new Date(payload.completedAt) : now;
       let execStartedAt = payload.startedAt ? new Date(payload.startedAt) : null;
       let durationMs = payload.durationMs;
@@ -645,6 +691,7 @@ export const processHeartbeat = async (
         run = await JobRun.create({
           jobMonitor: jobMonitor._id,
           runId,
+          idempotencyKey,
           occurrenceKey,
           scheduledFor,
           status: JOB_RUN_STATUS.FAILED,
@@ -654,6 +701,7 @@ export const processHeartbeat = async (
           durationMs: durationMs ?? 0,
           exitCode: payload.exitCode ?? 1,
           errorMessage,
+          appliedToMonitor: false,
           failureReason: payload.failureReason || null,
           output: sanitizeRunOutput(payload.output),
           metadata: sanitizeRunMetadata(payload.metadata),
@@ -662,10 +710,9 @@ export const processHeartbeat = async (
         });
       } catch (err) {
         if (err.code === 11000) {
-          const dup = await JobRun.findOne({
-            jobMonitor: jobMonitor._id,
-            runId,
-          });
+          const dup = await JobRun.findOne(
+            runQuery || { jobMonitor: jobMonitor._id, runId },
+          );
           if (dup && dup.status === JOB_RUN_STATUS.FAILED) {
             return {
               duplicate: true,
@@ -673,6 +720,7 @@ export const processHeartbeat = async (
               runId: dup.runId,
               status: dup.status,
               errorMessage: dup.errorMessage,
+              nextExpectedAt: jobMonitor.nextExpectedAt,
             };
           }
         }
@@ -730,6 +778,8 @@ export const processHeartbeat = async (
     );
 
     await jobMonitor.save();
+    run.appliedToMonitor = true;
+    await run.save?.();
 
     if (failed) {
       await handleJobIncident(jobMonitor, run, {

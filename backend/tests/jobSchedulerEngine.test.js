@@ -502,10 +502,14 @@ test("Downtime Catch-Up: caps synthetic missed runs at MAX_CATCHUP_RUNS = 5 and 
   assert.equal(metrics.missedExecutions, 5);
   assert.equal(monitorUpdate.consecutiveMissed, 5);
 
-  // Jumped nextExpectedAt to the next future run strictly after now (13:00)
+  // Advances nextExpectedAt to next unexamined occurrence (07:00) and resumes catch-up on subsequent ticks
   assert.equal(
     monitorUpdate.nextExpectedAt.toISOString(),
-    "2026-11-10T13:00:00.000Z",
+    "2026-11-10T07:00:00.000Z",
+  );
+  assert.equal(
+    monitorUpdate.nextEvaluationAt.toISOString(),
+    now.toISOString(),
   );
 });
 
