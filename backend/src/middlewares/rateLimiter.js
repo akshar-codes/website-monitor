@@ -21,7 +21,18 @@ const globalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
-  skip: (req) => req.path.startsWith("/internal/probes"),
+  skip: (req) =>
+    req.path.startsWith("/internal/probes") ||
+    req.path.startsWith("/job-heartbeats"),
+});
+
+export const heartbeatRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.params?.jobMonitorId || ipKeyGenerator(req.ip),
+  handler: rateLimitHandler,
 });
 
 export const probeAgentLimiter = rateLimit({

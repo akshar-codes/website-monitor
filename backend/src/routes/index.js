@@ -33,6 +33,7 @@ import notificationRuleRoutes from "./notificationRule.routes.js";
 import alertPolicyRoutes from "./alertPolicy.routes.js";
 import sloRoutes from "./slo.routes.js";
 import jobMonitorRoutes from "./jobMonitor.routes.js";
+import jobHeartbeatRoutes from "./jobHeartbeat.routes.js";
 import { isAuthenticated } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
 import { ROLES } from "../config/constants.js";
@@ -55,6 +56,7 @@ router.use("/plans", planRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/public/status", publicStatusRoutes);
 router.use("/internal/probes", probeAgentAuth, internalProbeRoutes);
+router.use("/job-heartbeats", jobHeartbeatRoutes);
 
 // API key access is isolated to read-only v1 endpoints and rate-limited per key.
 router.use("/v1", requireApiKey, apiKeyLimiter, recordApiKeyUsage, apiV1Routes);
