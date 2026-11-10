@@ -128,6 +128,25 @@ const envSchema = z
       .max(50)
       .default(5),
 
+    // ── Job monitor scheduler worker ──
+    JOB_SCHEDULER_TICK_MS: z.coerce.number().int().positive().default(15_000),
+    JOB_SCHEDULER_LEASE_MS: z.coerce
+      .number()
+      .int()
+      .min(10_000)
+      .default(30_000),
+    JOB_SCHEDULER_RETRY_DELAY_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(15_000),
+    JOB_SCHEDULER_CONCURRENCY: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(50)
+      .default(10),
+
     // ── SSL / domain monitoring worker ──
     // Deliberately on its own, much slower cadence than the HTTP
     // health-check worker above — see workers/sslScheduler.js for the

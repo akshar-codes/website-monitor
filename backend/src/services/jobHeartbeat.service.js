@@ -160,6 +160,34 @@ export const processHeartbeat = async (
         run.status === JOB_RUN_STATUS.TIMED_OUT ||
         run.status === JOB_RUN_STATUS.MISSED
       ) {
+        if (
+          run.status === JOB_RUN_STATUS.TIMED_OUT ||
+          run.status === JOB_RUN_STATUS.MISSED
+        ) {
+          run.late = true;
+          const completedAt = payload.completedAt || now;
+          if (run.startedAt) {
+            run.delaySeconds = Math.max(
+              0,
+              Math.round(
+                (completedAt.getTime() - new Date(run.startedAt).getTime()) /
+                  1000,
+              ),
+            );
+          } else if (run.scheduledFor) {
+            run.delaySeconds = Math.max(
+              0,
+              Math.round(
+                (completedAt.getTime() - new Date(run.scheduledFor).getTime()) /
+                  1000,
+              ),
+            );
+          }
+          if (payload.output) run.output = sanitizeRunOutput(payload.output);
+          if (payload.metadata)
+            run.metadata = sanitizeRunMetadata(payload.metadata);
+          await run.save?.().catch(() => {});
+        }
         throw ApiError.conflict(
           `Cannot mark run as succeeded: run "${run.runId}" is already in terminal state "${run.status}".`,
         );
@@ -244,14 +272,24 @@ export const processHeartbeat = async (
     }
 
     // Update JobMonitor state & advance schedule
-    jobMonitor.status = JOB_STATUS.UP;
+    const newSuccesses = (jobMonitor.consecutiveSuccesses || 0) + 1;
+    jobMonitor.consecutiveSuccesses = newSuccesses;
+    jobMonitor.consecutiveFailures = 0;
+    jobMonitor.consecutiveMissed = 0;
+
+    const recoveryThreshold = jobMonitor.recoveryThreshold || 1;
+    if (jobMonitor.status === JOB_STATUS.DOWN) {
+      if (newSuccesses >= recoveryThreshold) {
+        jobMonitor.status = JOB_STATUS.UP;
+      }
+    } else {
+      jobMonitor.status = JOB_STATUS.UP;
+    }
+
     jobMonitor.lastRunStatus = JOB_RUN_STATUS.SUCCEEDED;
     jobMonitor.lastPingAt = now;
     jobMonitor.lastFinishedAt = run.completedAt || now;
     jobMonitor.lastDurationMs = run.durationMs;
-    jobMonitor.consecutiveSuccesses += 1;
-    jobMonitor.consecutiveFailures = 0;
-    jobMonitor.consecutiveMissed = 0;
     jobMonitor.currentRunId = null;
     jobMonitor.currentRunStartedAt = null;
 
@@ -308,6 +346,34 @@ export const processHeartbeat = async (
         run.status === JOB_RUN_STATUS.TIMED_OUT ||
         run.status === JOB_RUN_STATUS.MISSED
       ) {
+        if (
+          run.status === JOB_RUN_STATUS.TIMED_OUT ||
+          run.status === JOB_RUN_STATUS.MISSED
+        ) {
+          run.late = true;
+          const completedAt = payload.completedAt || now;
+          if (run.startedAt) {
+            run.delaySeconds = Math.max(
+              0,
+              Math.round(
+                (completedAt.getTime() - new Date(run.startedAt).getTime()) /
+                  1000,
+              ),
+            );
+          } else if (run.scheduledFor) {
+            run.delaySeconds = Math.max(
+              0,
+              Math.round(
+                (completedAt.getTime() - new Date(run.scheduledFor).getTime()) /
+                  1000,
+              ),
+            );
+          }
+          if (payload.output) run.output = sanitizeRunOutput(payload.output);
+          if (payload.metadata)
+            run.metadata = sanitizeRunMetadata(payload.metadata);
+          await run.save?.().catch(() => {});
+        }
         throw ApiError.conflict(
           `Cannot mark run as failed: run "${run.runId}" is already in terminal state "${run.status}".`,
         );
@@ -395,13 +461,19 @@ export const processHeartbeat = async (
     }
 
     // Update JobMonitor state & advance schedule
-    jobMonitor.status = JOB_STATUS.DOWN;
+    const newFailures = (jobMonitor.consecutiveFailures || 0) + 1;
+    jobMonitor.consecutiveFailures = newFailures;
+    jobMonitor.consecutiveSuccesses = 0;
+
+    const failureThreshold = jobMonitor.failureThreshold || 1;
+    if (newFailures >= failureThreshold) {
+      jobMonitor.status = JOB_STATUS.DOWN;
+    }
+
     jobMonitor.lastRunStatus = JOB_RUN_STATUS.FAILED;
     jobMonitor.lastPingAt = now;
     jobMonitor.lastFinishedAt = run.completedAt || now;
     jobMonitor.lastDurationMs = run.durationMs;
-    jobMonitor.consecutiveFailures += 1;
-    jobMonitor.consecutiveSuccesses = 0;
     jobMonitor.currentRunId = null;
     jobMonitor.currentRunStartedAt = null;
 

@@ -26,6 +26,10 @@ import {
   start as startSloScheduler,
   stop as stopSloScheduler,
 } from "./workers/sloScheduler.js";
+import {
+  start as startJobScheduler,
+  stop as stopJobScheduler,
+} from "./workers/jobMonitorScheduler.js";
 
 let server = null;
 let shuttingDown = false;
@@ -57,6 +61,7 @@ const shutdown = async (signal, exitCode = 0) => {
   await stopPerformanceNotificationWorker();
   await stopAlertingWorker();
   await stopSloScheduler();
+  await stopJobScheduler();
   if (digestTimer) clearInterval(digestTimer);
 
   if (!server) {
@@ -92,6 +97,7 @@ const startServer = async () => {
   startPerformanceNotificationWorker();
   startAlertingWorker();
   startSloScheduler();
+  startJobScheduler();
   digestTimer = setInterval(
     () =>
       dispatchNotificationDigests().catch((error) =>
