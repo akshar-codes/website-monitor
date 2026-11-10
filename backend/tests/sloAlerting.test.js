@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import express from "express";
 import mongoose from "mongoose";
-import Slo from "../src/models/Slo.js";
+import Slo from "../src/models/SLO.js";
 import Monitor from "../src/models/Monitor.js";
 import HealthCheck from "../src/models/HealthCheck.js";
 import User from "../src/models/User.js";
@@ -766,4 +766,49 @@ test("SLO API: GET /api/slos/:id/alert-state enforces tenant authorization", asy
     userId: userBId,
   });
   assert.equal(foreignRes.status, 403);
+});
+
+test("SLO Alerts: a 100% target with no downtime does not exhaust a zero-sized budget", () => {
+  const triggered = evaluateAlertConditions({
+    slo: {
+      _id: sloAId,
+      name: "Perfect Availability",
+      targetPercentage: 100,
+      alertSettings: { budgetExhaustedAlert: true },
+    },
+    evaluationResult: {
+      status: "healthy",
+      allowedBudgetSeconds: 0,
+      consumedBudgetSeconds: 0,
+      remainingBudgetSeconds: 0,
+      budgetConsumptionPercentage: 0,
+      remainingBudgetPercentage: 100,
+    },
+  });
+  assert.equal(
+    triggered.some((item) => item.alertType === "budget_exhausted"),
+    false,
+  );
+});
+
+test("SLO Alerts: insufficient data preserves active alert state without recovery", async () => {
+  const activeAlerts = [{ alertType: "budget_exhausted", window: null }];
+  const state = {
+    status: "exhausted",
+    activeAlerts,
+    consecutiveBreaches: 3,
+    consecutiveRecoveries: 0,
+    save: async () =>
+      assert.fail("insufficient data must not update alert state"),
+  };
+  const result = await processSloAlerts({
+    slo: { _id: sloAId, monitor: monitorAId, owner: userAId, name: "Unknown" },
+    evaluationResult: { status: "insufficient_data" },
+    deps: { SloAlertState: { findOneAndUpdate: async () => state } },
+  });
+  assert.equal(result.evaluationState, "insufficient_data");
+  assert.equal(result.state.status, "exhausted");
+  assert.equal(result.state.activeAlerts, activeAlerts);
+  assert.equal(result.resolvedAlerts.length, 0);
+  assert.equal(result.state.consecutiveRecoveries, 0);
 });

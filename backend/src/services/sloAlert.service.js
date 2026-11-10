@@ -46,6 +46,8 @@ export function evaluateAlertConditions({
   const {
     burnRates = [],
     remainingBudgetSeconds = 0,
+    allowedBudgetSeconds = 0,
+    consumedBudgetSeconds = 0,
     remainingBudgetPercentage = 100,
     budgetConsumptionPercentage = 0,
     exhaustionForecast = null,
@@ -79,7 +81,8 @@ export function evaluateAlertConditions({
   // 2. Error Budget Exhausted Alert
   if (
     alertSettings.budgetExhaustedAlert !== false &&
-    (remainingBudgetSeconds <= 0 || budgetConsumptionPercentage >= 100)
+    (remainingBudgetSeconds <= 0 || budgetConsumptionPercentage >= 100) &&
+    (allowedBudgetSeconds > 0 || consumedBudgetSeconds > 0)
   ) {
     triggered.push({
       alertType: "budget_exhausted",
@@ -315,6 +318,20 @@ export async function processSloAlerts({
     },
     { upsert: true, returnDocument: "after" },
   );
+
+  // Missing or low coverage is not evidence that an active alert recovered.
+  // Leave its status, active alerts, and recovery counters untouched.
+  if (evaluationResult.status === "insufficient_data") {
+    return {
+      state,
+      triggeredConditions: [],
+      newAlerts: [],
+      resolvedAlerts: [],
+      alertEvents: [],
+      notificationErrors: [],
+      evaluationState: "insufficient_data",
+    };
+  }
 
   // 2. Evaluate currently triggered conditions
   const triggeredConditions = evaluateAlertConditions({

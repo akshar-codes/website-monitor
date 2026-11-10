@@ -1,4 +1,4 @@
-import Slo from "../models/Slo.js";
+import Slo from "../models/SLO.js";
 import Monitor from "../models/Monitor.js";
 import ApiError from "../utils/ApiError.js";
 import { ROLES, SLO_ROLLING_WINDOW_MS } from "../config/constants.js";

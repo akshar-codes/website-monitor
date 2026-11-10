@@ -1,4 +1,4 @@
-import Slo from "../models/Slo.js";
+import Slo from "../models/SLO.js";
 import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import SloSnapshot from "../models/SloSnapshot.js";

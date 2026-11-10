@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import express from "express";
 import mongoose from "mongoose";
-import Slo from "../src/models/Slo.js";
+import Slo from "../src/models/SLO.js";
 import Monitor from "../src/models/Monitor.js";
 import Activity from "../src/models/Activity.js";
 import {

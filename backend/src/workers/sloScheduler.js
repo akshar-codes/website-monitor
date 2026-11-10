@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import Slo from "../models/Slo.js";
+import Slo from "../models/SLO.js";
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
 import { evaluateSlo } from "../services/sloEvaluation.service.js";

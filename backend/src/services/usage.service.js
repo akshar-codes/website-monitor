@@ -1,7 +1,7 @@
 import Monitor from "../models/Monitor.js";
 import StatusPage from "../models/StatusPage.js";
 import StatusSubscriber from "../models/StatusSubscriber.js";
-import Slo from "../models/Slo.js";
+import Slo from "../models/SLO.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { hasFeature, FEATURES } from "../config/features.js";
 import ProbeAgent from "../models/ProbeAgent.js";
