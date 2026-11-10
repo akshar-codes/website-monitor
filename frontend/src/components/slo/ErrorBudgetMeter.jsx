@@ -35,23 +35,21 @@ export default function ErrorBudgetMeter({
     return (
       <div className="w-full space-y-1">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-500 dark:text-slate-400 font-medium">
-            Budget:
-          </span>
+          <span className="text-slate-500 font-medium">Budget:</span>
           <span
             className={`font-semibold ${
               isExhausted
-                ? "text-rose-600 dark:text-rose-400"
+                ? "text-rose-600"
                 : isAtRisk
-                  ? "text-amber-600 dark:text-amber-400"
-                  : "text-emerald-600 dark:text-emerald-400"
+                  ? "text-amber-600"
+                  : "text-emerald-600"
             }`}
           >
             {formatBudgetDuration(remainingBudgetSeconds)} (
             {formatPercentage(remainingBudgetPercentage, 1)})
           </span>
         </div>
-        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
           <div
             className={`h-full transition-all duration-300 ${barColor}`}
             style={{ width: `${visualPct}%` }}
@@ -62,26 +60,26 @@ export default function ErrorBudgetMeter({
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm space-y-5">
+    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
             <span>Error Budget</span>
             {isExhausted ? (
-              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300">
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium bg-rose-50 text-rose-700 border border-rose-200">
                 <ShieldAlert size={13} /> Depleted
               </span>
             ) : isAtRisk ? (
-              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300">
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium bg-amber-50 text-amber-700 border border-amber-200">
                 <AlertTriangle size={13} /> High Consumption
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <CheckCircle size={13} /> Within Budget
               </span>
             )}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Allowable downtime allocation and current consumption status
           </p>
         </div>
@@ -91,10 +89,10 @@ export default function ErrorBudgetMeter({
           <span
             className={`text-xl font-bold tracking-tight ${
               isExhausted
-                ? "text-rose-600 dark:text-rose-400"
+                ? "text-rose-600"
                 : isAtRisk
-                  ? "text-amber-600 dark:text-amber-400"
-                  : "text-emerald-600 dark:text-emerald-400"
+                  ? "text-amber-600"
+                  : "text-emerald-600"
             }`}
           >
             {formatBudgetDuration(remainingBudgetSeconds)}
@@ -116,7 +114,7 @@ export default function ErrorBudgetMeter({
             Total Allowed: {formatDuration(allowedErrorBudgetSeconds)}
           </span>
         </div>
-        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden p-0.5 flex">
+        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden p-0.5 flex">
           <div
             className={`h-full rounded-full transition-all duration-500 ${barColor}`}
             style={{ width: `${visualPct}%` }}
@@ -130,30 +128,26 @@ export default function ErrorBudgetMeter({
       </div>
 
       {/* Telemetry Breakdown Details */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-        <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-          <span className="text-xs text-slate-500 dark:text-slate-400 block">
-            Good Duration
-          </span>
-          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+        <div className="p-2.5 rounded-lg bg-slate-50">
+          <span className="text-xs text-slate-500 block">Good Duration</span>
+          <span className="text-sm font-semibold text-emerald-600">
             {formatDuration(goodDurationSeconds)}
           </span>
         </div>
 
-        <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-          <span className="text-xs text-slate-500 dark:text-slate-400 block">
-            Bad Duration
-          </span>
-          <span className="text-sm font-semibold text-rose-600 dark:text-rose-400">
+        <div className="p-2.5 rounded-lg bg-slate-50">
+          <span className="text-xs text-slate-500 block">Bad Duration</span>
+          <span className="text-sm font-semibold text-rose-600">
             {formatDuration(badDurationSeconds)}
           </span>
         </div>
 
-        <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-          <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+        <div className="p-2.5 rounded-lg bg-slate-50">
+          <span className="text-xs text-slate-500 flex items-center gap-1">
             <Clock size={12} /> Unknown Duration
           </span>
-          <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+          <span className="text-sm font-semibold text-slate-600">
             {formatDuration(unknownDurationSeconds)}
           </span>
           <span className="text-[10px] text-slate-400 block leading-tight mt-0.5">
@@ -161,11 +155,9 @@ export default function ErrorBudgetMeter({
           </span>
         </div>
 
-        <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-          <span className="text-xs text-slate-500 dark:text-slate-400 block">
-            Maintenance
-          </span>
-          <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+        <div className="p-2.5 rounded-lg bg-slate-50">
+          <span className="text-xs text-slate-500 block">Maintenance</span>
+          <span className="text-sm font-semibold text-blue-600">
             {formatDuration(maintenanceDurationSeconds)}
           </span>
           <span className="text-[10px] text-slate-400 block leading-tight mt-0.5">

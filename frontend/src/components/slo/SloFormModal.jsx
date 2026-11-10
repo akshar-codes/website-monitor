@@ -165,26 +165,26 @@ function SloFormDialog({
       aria-modal="true"
       aria-labelledby="slo-modal-title"
     >
-      <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 my-8 overflow-hidden">
+      <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 my-8 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
             <h2
               id="slo-modal-title"
-              className="text-lg font-bold text-slate-900 dark:text-slate-100"
+              className="text-lg font-bold text-slate-900"
             >
               {initialData
                 ? "Edit Service Level Objective"
                 : "Create Service Level Objective"}
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500">
               Configure availability targets, rolling measurement window, and
               error budget alerts.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
             aria-label="Close modal"
           >
             <X size={18} />
@@ -197,7 +197,7 @@ function SloFormDialog({
           className="p-6 space-y-4 max-h-[80vh] overflow-y-auto"
         >
           {(formError || error) && (
-            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300 flex items-start gap-2">
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
               <AlertCircle size={15} className="shrink-0 mt-0.5" />
               <span>
                 {formError ||
@@ -210,14 +210,14 @@ function SloFormDialog({
 
           {/* Monitor selector */}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+            <label className="text-xs font-semibold text-slate-700 block">
               Target Monitor *
             </label>
             <select
               value={monitorId}
               onChange={handleMonitorChange}
               disabled={!!initialData || loadingMonitors}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               {loadingMonitors ? (
                 <option value="">Loading monitors...</option>
@@ -243,7 +243,7 @@ function SloFormDialog({
 
           {/* SLO Name */}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+            <label className="text-xs font-semibold text-slate-700 block">
               SLO Name *
             </label>
             <input
@@ -251,14 +251,14 @@ function SloFormDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Production Web Availability (99.9%)"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               required
             />
           </div>
 
           {/* Description */}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+            <label className="text-xs font-semibold text-slate-700 block">
               Description (Optional)
             </label>
             <textarea
@@ -266,14 +266,14 @@ function SloFormDialog({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What this objective measures and business commitments..."
               rows={2}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
             />
           </div>
 
           {/* Availability Target % */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+              <label className="text-xs font-semibold text-slate-700 block">
                 Availability Target (%) *
               </label>
               <div className="flex items-center gap-1">
@@ -285,7 +285,7 @@ function SloFormDialog({
                     className={`px-2 py-0.5 text-xs rounded border transition-colors ${
                       Number(target) === p
                         ? "bg-emerald-500 text-white border-emerald-600 font-semibold"
-                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                     }`}
                   >
                     {p}%
@@ -300,7 +300,7 @@ function SloFormDialog({
               max="99.999"
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
               required
             />
           </div>
@@ -308,13 +308,13 @@ function SloFormDialog({
           {/* Window & Interval Grid */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+              <label className="text-xs font-semibold text-slate-700 block">
                 Rolling Window
               </label>
               <select
                 value={window}
                 onChange={(e) => setWindow(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 {SLO_WINDOWS.map((w) => (
                   <option key={w.value} value={w.value}>
@@ -325,13 +325,13 @@ function SloFormDialog({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+              <label className="text-xs font-semibold text-slate-700 block">
                 Evaluation Cadence
               </label>
               <select
                 value={evaluationInterval}
                 onChange={(e) => setEvaluationInterval(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 {EVALUATION_INTERVALS.map((i) => (
                   <option key={i.value} value={i.value}>
@@ -343,17 +343,14 @@ function SloFormDialog({
           </div>
 
           {/* Live Allowance Preview */}
-          <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/50 flex items-center justify-between text-xs">
+          <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <Sparkles
-                className="text-emerald-600 dark:text-emerald-400 shrink-0"
-                size={16}
-              />
-              <span className="text-emerald-900 dark:text-emerald-200 font-medium">
+              <Sparkles className="text-emerald-600 shrink-0" size={16} />
+              <span className="text-emerald-900 font-medium">
                 Allowable Downtime ({window} window):
               </span>
             </div>
-            <b className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
+            <b className="text-sm font-bold text-emerald-800">
               {allowableDowntime}
             </b>
           </div>
@@ -366,17 +363,17 @@ function SloFormDialog({
               onChange={(e) => setEnabled(e.target.checked)}
               className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
             />
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+            <span className="text-xs font-medium text-slate-700">
               Enable automated evaluation for this objective
             </span>
           </label>
 
           {/* Advanced Alerting Settings Toggle */}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="pt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={() => setShowAdvancedAlerts(!showAdvancedAlerts)}
-              className="flex items-center justify-between w-full text-xs font-semibold text-slate-600 dark:text-slate-400 py-1 hover:text-slate-900 dark:hover:text-slate-200"
+              className="flex items-center justify-between w-full text-xs font-semibold text-slate-600 py-1 hover:text-slate-900"
             >
               <span>Alert Thresholds & Burn Rate Rules</span>
               {showAdvancedAlerts ? (
@@ -387,7 +384,7 @@ function SloFormDialog({
             </button>
 
             {showAdvancedAlerts && (
-              <div className="mt-3 space-y-3 p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/80 dark:border-slate-700/60 text-xs">
+              <div className="mt-3 space-y-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -395,7 +392,7 @@ function SloFormDialog({
                     onChange={(e) => setBurnRateAlertsEnabled(e.target.checked)}
                     className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
                   />
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  <span className="font-semibold text-slate-700">
                     Enable multi-window burn rate alerts
                   </span>
                 </label>
@@ -413,7 +410,7 @@ function SloFormDialog({
                         max="100"
                         value={burn5mThreshold}
                         onChange={(e) => setBurn5mThreshold(e.target.value)}
-                        className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
+                        className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 bg-white font-mono"
                       />
                     </div>
                     <div>
@@ -427,7 +424,7 @@ function SloFormDialog({
                         max="100"
                         value={burn30mThreshold}
                         onChange={(e) => setBurn30mThreshold(e.target.value)}
-                        className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
+                        className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 bg-white font-mono"
                       />
                     </div>
                     <div>
@@ -441,15 +438,15 @@ function SloFormDialog({
                         max="100"
                         value={burn6hThreshold}
                         onChange={(e) => setBurn6hThreshold(e.target.value)}
-                        className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
+                        className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 bg-white font-mono"
                       />
                     </div>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
                   <div>
-                    <label className="text-[11px] font-medium text-slate-600 dark:text-slate-400 block mb-1">
+                    <label className="text-[11px] font-medium text-slate-600 block mb-1">
                       Budget Warning Threshold (%)
                     </label>
                     <input
@@ -460,12 +457,12 @@ function SloFormDialog({
                       onChange={(e) =>
                         setBudgetWarningThreshold(e.target.value)
                       }
-                      className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
+                      className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 bg-white font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-medium text-slate-600 dark:text-slate-400 block mb-1">
+                    <label className="text-[11px] font-medium text-slate-600 block mb-1">
                       Alert Cooldown (Minutes)
                     </label>
                     <input
@@ -474,7 +471,7 @@ function SloFormDialog({
                       max="1440"
                       value={cooldownMinutes}
                       onChange={(e) => setCooldownMinutes(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
+                      className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 bg-white font-mono"
                     />
                   </div>
                 </div>
@@ -486,7 +483,7 @@ function SloFormDialog({
                     onChange={(e) => setBudgetExhaustedAlert(e.target.checked)}
                     className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
                   />
-                  <span className="text-[11px] text-slate-600 dark:text-slate-300">
+                  <span className="text-[11px] text-slate-600">
                     Dispatch notification immediately when error budget is
                     exhausted (remaining &le; 0)
                   </span>
@@ -496,12 +493,12 @@ function SloFormDialog({
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
             >
               Cancel
             </button>

@@ -65,8 +65,7 @@ export function getSloStatus({
       status: "disabled",
       label: "Disabled",
       tone: "gray",
-      badgeClass:
-        "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300",
+      badgeClass: "bg-gray-100 text-gray-700 border-gray-200",
     };
   }
 
@@ -78,8 +77,7 @@ export function getSloStatus({
       status: "exhausted",
       label: "Budget Exhausted",
       tone: "red",
-      badgeClass:
-        "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300",
+      badgeClass: "bg-rose-100 text-rose-800 border-rose-200",
     };
   }
 
@@ -91,8 +89,7 @@ export function getSloStatus({
       status: "breached",
       label: "Breached",
       tone: "red",
-      badgeClass:
-        "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300",
+      badgeClass: "bg-rose-100 text-rose-800 border-rose-200",
     };
   }
 
@@ -101,8 +98,7 @@ export function getSloStatus({
       status: "insufficient_data",
       label: "Insufficient Data",
       tone: "yellow",
-      badgeClass:
-        "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300",
+      badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
     };
   }
 
@@ -117,8 +113,7 @@ export function getSloStatus({
       status: "warning",
       label: "At Risk",
       tone: "yellow",
-      badgeClass:
-        "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300",
+      badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
     };
   }
 
@@ -126,8 +121,7 @@ export function getSloStatus({
     status: "healthy",
     label: "Healthy",
     tone: "green",
-    badgeClass:
-      "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300",
+    badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-200",
   };
 }
 

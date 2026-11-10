@@ -109,16 +109,13 @@ export default function SloDetails() {
         description="Fetching evaluation snapshots and error budget telemetry."
       >
         <div className="space-y-4 max-w-5xl mx-auto my-6 animate-pulse">
-          <div className="h-28 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+          <div className="h-28 bg-slate-100 rounded-xl" />
           <div className="grid grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="h-20 bg-slate-100 dark:bg-slate-800 rounded-xl"
-              />
+              <div key={i} className="h-20 bg-slate-100 rounded-xl" />
             ))}
           </div>
-          <div className="h-64 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+          <div className="h-64 bg-slate-100 rounded-xl" />
         </div>
       </Page>
     );
@@ -235,16 +232,13 @@ export default function SloDetails() {
     >
       {/* Target monitor link callout */}
       {slo.monitor && (
-        <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs mb-6">
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs mb-6">
           <div className="flex items-center gap-2">
-            <Activity
-              className="text-emerald-600 dark:text-emerald-400"
-              size={16}
-            />
+            <Activity className="text-emerald-600" size={16} />
             <span className="text-slate-500">Target Monitor:</span>
             <Link
               to={monitorDetailsPath(slo.monitor.id || slo.monitor._id)}
-              className="font-semibold text-slate-800 dark:text-slate-100 hover:text-emerald-600 transition-colors flex items-center gap-1"
+              className="font-semibold text-slate-800 hover:text-emerald-600 transition-colors flex items-center gap-1"
             >
               <span>{slo.monitor.name}</span>
               <ExternalLink size={12} />
@@ -388,7 +382,7 @@ export default function SloDetails() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Flame className="text-rose-500" size={18} />
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            <h3 className="text-base font-semibold text-slate-900">
               Multi-Window Burn-Rate Monitoring
             </h3>
           </div>
@@ -425,10 +419,10 @@ export default function SloDetails() {
       </div>
 
       {/* Historical Availability Trend Chart */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm space-y-4 mb-6">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4 mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
               <Calendar size={18} className="text-emerald-600" />
               <span>Availability History & Snapshots</span>
             </h3>
@@ -445,9 +439,9 @@ export default function SloDetails() {
       </div>
 
       {/* Historical Snapshots Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-4 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-900">
             Evaluation Snapshot Log
           </h3>
           <p className="text-xs text-slate-400">
@@ -457,8 +451,8 @@ export default function SloDetails() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
-            <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold uppercase text-slate-500 tracking-wider">
+          <table className="w-full text-left text-xs text-slate-600">
+            <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase text-slate-500 tracking-wider">
               <tr>
                 <th className="py-3 px-4">Evaluation Timestamp</th>
                 <th className="py-3 px-4">SLI Result</th>
@@ -468,7 +462,7 @@ export default function SloDetails() {
                 <th className="py-3 px-4">Version & Trigger</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100">
               {snapshots.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-6 text-center text-slate-400">
@@ -478,12 +472,9 @@ export default function SloDetails() {
                 </tr>
               ) : (
                 snapshots.map((s) => (
-                  <tr
-                    key={s.id || s._id}
-                    className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30"
-                  >
+                  <tr key={s.id || s._id} className="hover:bg-slate-50/60">
                     <td className="py-3 px-4">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 block">
+                      <span className="font-semibold text-slate-800 block">
                         {formatDateTime(s.windowEnd || s.evaluatedAt)}
                       </span>
                       <small className="text-[10px] text-slate-400">
@@ -495,8 +486,8 @@ export default function SloDetails() {
                       <span
                         className={
                           s.sliPercentage >= target
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-rose-600 dark:text-rose-400"
+                            ? "text-emerald-600"
+                            : "text-rose-600"
                         }
                       >
                         {formatPercentage(s.sliPercentage, 3)}
@@ -532,7 +523,7 @@ export default function SloDetails() {
                         className={
                           s.dataCoveragePercentage < 50
                             ? "text-amber-600 font-semibold"
-                            : "text-slate-600 dark:text-slate-300"
+                            : "text-slate-600"
                         }
                       >
                         {formatPercentage(s.dataCoveragePercentage, 1)}
@@ -551,7 +542,7 @@ export default function SloDetails() {
         </div>
 
         {snapshotsPagination && snapshotsPagination.pages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
             <span>
               Page {snapshotsPagination.page} of {snapshotsPagination.pages} (
               {snapshotsPagination.total} snapshots)
@@ -560,7 +551,7 @@ export default function SloDetails() {
               <button
                 onClick={() => setSnapshotsPage((p) => Math.max(1, p - 1))}
                 disabled={snapshotsPage <= 1}
-                className="px-2.5 py-1 rounded border border-slate-200 dark:border-slate-800 disabled:opacity-40"
+                className="px-2.5 py-1 rounded border border-slate-200 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -571,7 +562,7 @@ export default function SloDetails() {
                   )
                 }
                 disabled={snapshotsPage >= snapshotsPagination.pages}
-                className="px-2.5 py-1 rounded border border-slate-200 dark:border-slate-800 disabled:opacity-40"
+                className="px-2.5 py-1 rounded border border-slate-200 disabled:opacity-40"
               >
                 Next
               </button>

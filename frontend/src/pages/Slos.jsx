@@ -150,16 +150,16 @@ export default function Slos() {
         title="Service Level Objectives"
         description="Monitor availability targets, multi-window burn rates, and error budgets."
       >
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-900 dark:to-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-8 max-w-4xl mx-auto my-8 shadow-sm text-center space-y-6">
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-2xl p-8 max-w-4xl mx-auto my-8 shadow-sm text-center space-y-6">
           <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-md">
             <Target size={32} />
           </div>
 
           <div className="space-y-2 max-w-xl mx-auto">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-2xl font-bold text-slate-900">
               Upgrade to Pro for SLO & Error Budget Tracking
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+            <p className="text-sm text-slate-600 leading-relaxed">
               Define precise reliability objectives (99.9%, 99.95%), track
               duration-weighted availability over rolling 30-day windows,
               monitor multi-lookback burn rates (14.4x, 6x, 2x), and forecast
@@ -168,9 +168,9 @@ export default function Slos() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto text-left">
-            <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
+            <div className="p-4 rounded-xl bg-white/80 border border-slate-200/60">
               <ShieldCheck className="text-emerald-500 mb-2" size={20} />
-              <b className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
+              <b className="text-xs font-semibold text-slate-800 block">
                 Duration-Weighted SLI
               </b>
               <p className="text-[11px] text-slate-500 mt-1">
@@ -179,9 +179,9 @@ export default function Slos() {
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
+            <div className="p-4 rounded-xl bg-white/80 border border-slate-200/60">
               <Flame className="text-rose-500 mb-2" size={20} />
-              <b className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
+              <b className="text-xs font-semibold text-slate-800 block">
                 Burn-Rate Monitoring
               </b>
               <p className="text-[11px] text-slate-500 mt-1">
@@ -190,9 +190,9 @@ export default function Slos() {
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
+            <div className="p-4 rounded-xl bg-white/80 border border-slate-200/60">
               <Target className="text-indigo-500 mb-2" size={20} />
-              <b className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
+              <b className="text-xs font-semibold text-slate-800 block">
                 Exhaustion Forecasting
               </b>
               <p className="text-[11px] text-slate-500 mt-1">
@@ -321,7 +321,7 @@ export default function Slos() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search objectives by name or monitor..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
 
@@ -330,7 +330,7 @@ export default function Slos() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
             <option value="all">All States</option>
             <option value="healthy">Healthy</option>
@@ -348,7 +348,7 @@ export default function Slos() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-24 bg-slate-100 dark:bg-slate-800/40 rounded-xl animate-pulse"
+              className="h-24 bg-slate-100 rounded-xl animate-pulse"
             />
           ))}
         </div>
@@ -377,10 +377,10 @@ export default function Slos() {
             : "Define an availability target (e.g. 99.9%) to track error budgets and receive early burn-rate alerts."}
         </Empty>
       ) : (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold uppercase text-slate-500 tracking-wider">
+            <table className="w-full text-left text-xs text-slate-600">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase text-slate-500 tracking-wider">
                 <tr>
                   <th className="py-3 px-4">Objective & Monitor</th>
                   <th className="py-3 px-4">Target</th>
@@ -392,7 +392,7 @@ export default function Slos() {
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-100">
                 {filteredSlos.map((slo) => {
                   const snap = slo.latestSnapshot;
                   const sli = snap?.sliPercentage;
@@ -409,15 +409,15 @@ export default function Slos() {
                       onClick={() =>
                         navigate(sloDetailsPath(slo.id || slo._id))
                       }
-                      className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                      className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
                     >
                       {/* Name & Monitor */}
                       <td className="py-3.5 px-4">
                         <div className="space-y-0.5">
-                          <span className="font-semibold text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 flex items-center gap-1.5">
+                          <span className="font-semibold text-slate-900 group-hover:text-emerald-600 flex items-center gap-1.5">
                             {slo.name}
                             {!slo.enabled && (
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-normal">
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 font-normal">
                                 Disabled
                               </span>
                             )}
@@ -428,7 +428,7 @@ export default function Slos() {
                                 slo.monitor.id || slo.monitor._id,
                               )}
                               onClick={(e) => e.stopPropagation()}
-                              className="text-[11px] text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors block"
+                              className="text-[11px] text-slate-400 hover:text-emerald-600 transition-colors block"
                             >
                               Monitor: {slo.monitor.name}
                             </Link>
@@ -437,7 +437,7 @@ export default function Slos() {
                       </td>
 
                       {/* Target */}
-                      <td className="py-3.5 px-4 font-mono font-medium text-slate-700 dark:text-slate-300">
+                      <td className="py-3.5 px-4 font-mono font-medium text-slate-700">
                         {formatPercentage(slo.target, 2)}
                       </td>
 
@@ -447,8 +447,8 @@ export default function Slos() {
                           <span
                             className={
                               sli >= slo.target
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-rose-600 dark:text-rose-400"
+                                ? "text-emerald-600"
+                                : "text-rose-600"
                             }
                           >
                             {formatPercentage(sli, 2)}
@@ -492,9 +492,7 @@ export default function Slos() {
                       <td className="py-3.5 px-4">
                         <span
                           className={`font-mono text-xs font-semibold ${
-                            burn1h > 1.0
-                              ? "text-rose-600 dark:text-rose-400"
-                              : "text-slate-600 dark:text-slate-300"
+                            burn1h > 1.0 ? "text-rose-600" : "text-slate-600"
                           }`}
                         >
                           {formatBurnRate(burn1h)}
@@ -513,7 +511,7 @@ export default function Slos() {
                               handleEvaluateClick(e, slo.id || slo._id)
                             }
                             disabled={isEvaluating || !slo.enabled}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-40"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-slate-100 transition-colors disabled:opacity-40"
                             title="Evaluate on-demand now"
                             aria-label="Evaluate SLO"
                           >
@@ -534,7 +532,7 @@ export default function Slos() {
                               setEditingSlo(slo);
                               setFormOpen(true);
                             }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                             title="Edit SLO"
                             aria-label="Edit SLO"
                           >
@@ -547,8 +545,8 @@ export default function Slos() {
                             className={`p-1.5 rounded-lg transition-colors ${
                               slo.enabled
                                 ? "text-slate-400 hover:text-amber-600"
-                                : "text-emerald-600 hover:text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40"
-                            } hover:bg-slate-100 dark:hover:bg-slate-800`}
+                                : "text-emerald-600 hover:text-emerald-700 bg-emerald-50"
+                            } hover:bg-slate-100`}
                             title={
                               slo.enabled
                                 ? "Pause evaluation"
@@ -564,7 +562,7 @@ export default function Slos() {
                           <button
                             type="button"
                             onClick={(e) => handleDeleteClick(e, slo)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 transition-colors"
                             title="Delete SLO"
                             aria-label="Delete SLO"
                           >
@@ -581,7 +579,7 @@ export default function Slos() {
 
           {/* Pagination */}
           {pagination && pagination.pages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
               <span>
                 Showing page {pagination.page} of {pagination.pages} (
                 {pagination.total} objectives)
@@ -590,7 +588,7 @@ export default function Slos() {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="px-2.5 py-1 rounded border border-slate-200 dark:border-slate-800 disabled:opacity-40"
+                  className="px-2.5 py-1 rounded border border-slate-200 disabled:opacity-40"
                 >
                   Previous
                 </button>
@@ -599,7 +597,7 @@ export default function Slos() {
                     setPage((p) => Math.min(pagination.pages, p + 1))
                   }
                   disabled={page >= pagination.pages}
-                  className="px-2.5 py-1 rounded border border-slate-200 dark:border-slate-800 disabled:opacity-40"
+                  className="px-2.5 py-1 rounded border border-slate-200 disabled:opacity-40"
                 >
                   Next
                 </button>

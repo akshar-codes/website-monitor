@@ -21,6 +21,8 @@ export function PreferencesProvider({ children }) {
   const [loading, setLoading] = useState(!!user);
 
   const applyPreferences = useCallback((prefs) => {
+    document.documentElement.classList.remove("dark");
+    document.documentElement.classList.add("light");
     document.documentElement.dataset.theme = "light";
     document.documentElement.dataset.timezone = prefs?.timezone || "UTC";
     document.documentElement.dataset.dateFormat =

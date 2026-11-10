@@ -14,7 +14,7 @@ import { formatDateTime } from "../../utils/format";
 export default function SloHistoryChart({ snapshots = [], target = 99.9 }) {
   if (!snapshots || snapshots.length === 0) {
     return (
-      <div className="h-64 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-400">
+      <div className="h-64 flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">
         <span>No historical evaluation snapshots recorded yet.</span>
         <span className="mt-1 text-[11px] text-slate-500">
           Run an on-demand evaluation or wait for the scheduled background
@@ -90,31 +90,31 @@ export default function SloHistoryChart({ snapshots = [], target = 99.9 }) {
               if (active && payload && payload.length) {
                 const data = payload[0].payload;
                 return (
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 shadow-lg text-xs space-y-1">
-                    <b className="text-slate-800 dark:text-slate-200 block">
+                  <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-lg text-xs space-y-1">
+                    <b className="text-slate-800 block">
                       {formatDateTime(data.timestamp)}
                     </b>
                     <div className="flex justify-between gap-4">
                       <span className="text-slate-500">Current SLI:</span>
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      <span className="font-semibold text-emerald-600">
                         {formatPercentage(data.sli, 3)}
                       </span>
                     </div>
                     <div className="flex justify-between gap-4">
                       <span className="text-slate-500">Target:</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      <span className="font-semibold text-slate-700">
                         {formatPercentage(data.target, 2)}
                       </span>
                     </div>
                     <div className="flex justify-between gap-4">
                       <span className="text-slate-500">Budget Remaining:</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      <span className="font-semibold text-slate-700">
                         {formatBudgetDuration(data.remainingBudget)}
                       </span>
                     </div>
                     <div className="flex justify-between gap-4">
                       <span className="text-slate-500">Coverage:</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      <span className="font-semibold text-slate-700">
                         {formatPercentage(data.coverage, 1)}
                       </span>
                     </div>
