@@ -18,6 +18,9 @@ const IntegrationForm = lazy(() => import("./pages/IntegrationForm"));
 const Suggestions = lazy(() => import("./pages/Suggestions"));
 const AdminSuggestions = lazy(() => import("./pages/AdminSuggestions"));
 const Monitors = lazy(() => import("./pages/Monitors"));
+const Slos = lazy(() => import("./pages/Slos"));
+const SloDetails = lazy(() => import("./pages/SloDetails"));
+const SloFormPage = lazy(() => import("./pages/SloFormPage"));
 const StatusPages = lazy(() => import("./pages/StatusPages"));
 const PublicStatus = lazy(() => import("./pages/PublicStatus"));
 const StatusPageManage = lazy(() => import("./pages/StatusPageManage"));
@@ -140,6 +143,38 @@ export default function App() {
                           element={
                             <Suspense fallback={null}>
                               <MonitorDetails />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/slos"
+                          element={
+                            <Suspense fallback={null}>
+                              <Slos />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/slos/new"
+                          element={
+                            <Suspense fallback={null}>
+                              <SloFormPage />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/slos/:id"
+                          element={
+                            <Suspense fallback={null}>
+                              <SloDetails />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/slos/:id/edit"
+                          element={
+                            <Suspense fallback={null}>
+                              <SloFormPage />
                             </Suspense>
                           }
                         />
