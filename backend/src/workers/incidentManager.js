@@ -1,4 +1,5 @@
 import Monitor from "../models/Monitor.js";
+import JobMonitor from "../models/JobMonitor.js";
 import Incident from "../models/Incident.js";
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
@@ -279,6 +280,293 @@ export const handleIncident = async (monitor, healthCheck, overrides = {}) => {
     monitor,
     healthCheck,
     updatedMonitor.consecutiveFailures,
+    deps,
+  );
+};
+
+// ── Job Monitor Incident Management ──────────────────────────────────────────
+
+const jobRunSnapshot = (run) => {
+  if (!run) return null;
+  return {
+    runId: run.runId,
+    status: run.status,
+    scheduledFor: run.scheduledFor,
+    startedAt: run.startedAt,
+    completedAt: run.completedAt,
+    durationMs: run.durationMs,
+    exitCode: run.exitCode,
+    errorMessage: run.errorMessage,
+    failureReason: run.failureReason,
+    late: run.late,
+    delaySeconds: run.delaySeconds,
+  };
+};
+
+const writeJobActivity = (
+  jobMonitor,
+  incident,
+  action,
+  description,
+  metadata,
+  deps,
+) =>
+  deps.logActivity({
+    userId: jobMonitor.owner,
+    category: ACTIVITY_CATEGORIES.INCIDENT,
+    action,
+    description,
+    entityType: "Incident",
+    entityId: incident._id,
+    metadata,
+  });
+
+const openJobIncident = async (
+  jobMonitor,
+  jobRun,
+  { triggerType, failureReason, failureCount },
+  deps,
+) => {
+  const startedAt = jobRun?.completedAt || jobRun?.startedAt || new Date();
+
+  let rootCause =
+    jobRun?.errorMessage ||
+    failureReason ||
+    `Job monitor "${jobMonitor.name}" failed execution.`;
+
+  if (triggerType === "timeout") {
+    rootCause =
+      jobRun?.errorMessage ||
+      `Execution timed out after exceeding limit of ${jobMonitor.runTimeoutSeconds} seconds.`;
+  } else if (triggerType === "missed") {
+    rootCause =
+      jobRun?.errorMessage ||
+      `Scheduled execution was missed past grace period of ${jobMonitor.gracePeriodSeconds} seconds.`;
+  }
+
+  const severity =
+    triggerType === "timeout" || failureCount > 2
+      ? INCIDENT_SEVERITY.CRITICAL
+      : INCIDENT_SEVERITY.MAJOR;
+
+  const incident = {
+    jobMonitor: jobMonitor._id,
+    resourceType: "job_monitor",
+    triggerJobRun: jobRun?._id || null,
+    triggerJobRunSnapshot: jobRunSnapshot(jobRun),
+    status: INCIDENT_STATUS.ONGOING,
+    severity,
+    startedAt,
+    rootCause,
+    statusHistory: [{ status: INCIDENT_STATUS.ONGOING, changedAt: startedAt }],
+  };
+
+  let created = false;
+  try {
+    const result = await deps.Incident.updateOne(
+      { jobMonitor: jobMonitor._id, status: { $in: ACTIVE_STATUSES } },
+      { $setOnInsert: incident },
+      { upsert: true },
+    );
+    created = result.upsertedCount === 1 || Boolean(result.upsertedId);
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+  }
+
+  const activeIncident = await deps.Incident.findOne({
+    jobMonitor: jobMonitor._id,
+    status: { $in: ACTIVE_STATUSES },
+  }).sort({ startedAt: -1 });
+
+  if (!activeIncident || !created) return activeIncident;
+
+  logger.warn("Job incident opened", {
+    incidentId: String(activeIncident._id),
+    jobMonitorId: String(jobMonitor._id),
+    triggerType,
+    failureCount,
+    severity: activeIncident.severity,
+  });
+
+  await writeJobActivity(
+    jobMonitor,
+    activeIncident,
+    ACTIVITY_ACTIONS.INCIDENT_AUTO_OPENED,
+    `Incident opened for job "${jobMonitor.name}" after ${failureCount} consecutive failures (${triggerType}): ${rootCause}`,
+    {
+      jobMonitorId: String(jobMonitor._id),
+      jobMonitorName: jobMonitor.name,
+      triggerType,
+      triggerJobRunId: jobRun ? String(jobRun._id) : null,
+      failureCount,
+    },
+    deps,
+  );
+
+  await notify(
+    {
+      ownerId: jobMonitor.owner,
+      type: NOTIFICATION_TYPES.INCIDENT_OPENED,
+      title: `${jobMonitor.name} is down`,
+      message: `WebMonitor detected ${failureCount} consecutive failure(s) for job "${jobMonitor.name}" (${triggerType}) — severity: ${activeIncident.severity}.`,
+      priority:
+        activeIncident.severity === INCIDENT_SEVERITY.CRITICAL
+          ? NOTIFICATION_PRIORITIES.CRITICAL
+          : NOTIFICATION_PRIORITIES.HIGH,
+      link: `/jobs/${jobMonitor._id}`,
+      relatedResource: {
+        resourceType: "Incident",
+        resourceId: activeIncident._id,
+      },
+      metadata: {
+        jobMonitorId: String(jobMonitor._id),
+        incidentId: String(activeIncident._id),
+        triggerType,
+      },
+    },
+    deps,
+  );
+
+  return activeIncident;
+};
+
+const resolveJobIncident = async (
+  jobMonitor,
+  jobRun,
+  { consecutiveSuccesses },
+  deps,
+) => {
+  const activeIncident = await deps.Incident.findOne({
+    jobMonitor: jobMonitor._id,
+    status: { $in: ACTIVE_STATUSES },
+  }).sort({ startedAt: -1 });
+
+  if (!activeIncident) return null;
+
+  const endedAt = jobRun?.completedAt || new Date();
+  const duration = Math.max(
+    0,
+    Math.round((endedAt - activeIncident.startedAt) / 1000),
+  );
+
+  const resolved = await deps.Incident.findOneAndUpdate(
+    { _id: activeIncident._id, status: { $in: ACTIVE_STATUSES } },
+    {
+      $set: {
+        status: INCIDENT_STATUS.RESOLVED,
+        endedAt,
+        duration,
+        recoveryJobRun: jobRun?._id || null,
+        recoveryJobRunSnapshot: jobRunSnapshot(jobRun),
+        resolutionNotes: `Auto-resolved after ${consecutiveSuccesses} consecutive successful executions.`,
+      },
+      $push: {
+        statusHistory: { status: INCIDENT_STATUS.RESOLVED, changedAt: endedAt },
+      },
+    },
+    { returnDocument: "after" },
+  );
+
+  if (!resolved) return null;
+
+  logger.info("Job incident resolved", {
+    incidentId: String(resolved._id),
+    jobMonitorId: String(jobMonitor._id),
+    durationSeconds: resolved.duration,
+  });
+
+  await writeJobActivity(
+    jobMonitor,
+    resolved,
+    ACTIVITY_ACTIONS.INCIDENT_AUTO_RESOLVED,
+    `Incident for job "${jobMonitor.name}" auto-resolved after ${consecutiveSuccesses} consecutive successful executions`,
+    {
+      jobMonitorId: String(jobMonitor._id),
+      recoveryJobRunId: jobRun ? String(jobRun._id) : null,
+      durationSeconds: resolved.duration,
+    },
+    deps,
+  );
+
+  await notify(
+    {
+      ownerId: jobMonitor.owner,
+      type: NOTIFICATION_TYPES.INCIDENT_RESOLVED,
+      title: `${jobMonitor.name} recovered`,
+      message: `The incident affecting job "${jobMonitor.name}" has been resolved after ${resolved.durationDisplay || `${resolved.duration}s`}.`,
+      priority: NOTIFICATION_PRIORITIES.NORMAL,
+      link: `/jobs/${jobMonitor._id}`,
+      relatedResource: {
+        resourceType: "Incident",
+        resourceId: resolved._id,
+      },
+      metadata: {
+        jobMonitorId: String(jobMonitor._id),
+        incidentId: String(resolved._id),
+      },
+    },
+    deps,
+  );
+
+  return resolved;
+};
+
+/**
+ * Evaluates and processes incident transitions for a JobMonitor.
+ *
+ * Supported triggers:
+ * - "failure": External execution failure report.
+ * - "timeout": Execution exceeded runTimeoutSeconds.
+ * - "missed": Occurrence not started past gracePeriodSeconds.
+ * - "recovery": Execution succeeded past recoveryThreshold.
+ */
+export const handleJobIncident = async (
+  jobMonitor,
+  jobRun,
+  details = {},
+  overrides = {},
+) => {
+  const deps = {
+    JobMonitor,
+    Incident,
+    logActivity,
+    createNotification,
+    ...overrides,
+  };
+
+  const {
+    triggerType = "failure",
+    failureReason = null,
+    consecutiveFailures = jobMonitor.consecutiveFailures || 0,
+    consecutiveSuccesses = jobMonitor.consecutiveSuccesses || 0,
+  } = details;
+
+  if (triggerType === "recovery") {
+    const recoveryThreshold = jobMonitor.recoveryThreshold || 1;
+    if (consecutiveSuccesses < recoveryThreshold) return null;
+    return resolveJobIncident(
+      jobMonitor,
+      jobRun,
+      { consecutiveSuccesses },
+      deps,
+    );
+  }
+
+  const failureThreshold = jobMonitor.failureThreshold || 1;
+  if (consecutiveFailures < failureThreshold) {
+    logger.debug("Job incident threshold not reached", {
+      jobMonitorId: String(jobMonitor._id),
+      failureCount: consecutiveFailures,
+      threshold: failureThreshold,
+      triggerType,
+    });
+    return null;
+  }
+
+  return openJobIncident(
+    jobMonitor,
+    jobRun,
+    { triggerType, failureReason, failureCount: consecutiveFailures },
     deps,
   );
 };

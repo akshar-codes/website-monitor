@@ -12,6 +12,7 @@ import {
   calculateNextRun,
   calculateNextEvaluation,
 } from "../services/jobSchedule.service.js";
+import { handleJobIncident } from "./incidentManager.js";
 
 let intervalId = null;
 let stopped = true;
@@ -206,6 +207,16 @@ export const evaluateJobMonitor = async (
           JOB_MONITOR_LIMITS.DEFAULT_FAILURE_THRESHOLD;
         if (jobMonitor.consecutiveFailures >= failureThreshold) {
           jobMonitor.status = JOB_STATUS.DOWN;
+          await handleJobIncident(jobMonitor, activeRun, {
+            triggerType: "timeout",
+            failureReason: "execution_timeout",
+            consecutiveFailures: jobMonitor.consecutiveFailures,
+          }).catch((err) =>
+            logger.error("Failed handling job timeout incident", {
+              jobMonitorId: String(jobMonitor._id),
+              error: err.message,
+            }),
+          );
         }
       } else {
         // Run already transitioned or cleared concurrently
@@ -220,6 +231,7 @@ export const evaluateJobMonitor = async (
   // ───────────────────────────────────────────────────────────────────────────
   const MAX_CATCHUP_RUNS = 5;
   let newMissedCount = 0;
+  let lastCreatedMissedRun = null;
   const graceMs =
     (jobMonitor.gracePeriodSeconds ||
       JOB_MONITOR_LIMITS.DEFAULT_GRACE_PERIOD_SECONDS) * 1000;
@@ -254,7 +266,7 @@ export const evaluateJobMonitor = async (
 
       if (!existingRun && !isCurrentlyRunningForOccurrence) {
         try {
-          await JobRun.create({
+          const missedRun = await JobRun.create({
             jobMonitor: jobMonitor._id,
             runId: deterministicRunId,
             occurrenceKey: occurrenceIso,
@@ -268,6 +280,7 @@ export const evaluateJobMonitor = async (
             failureReason: "missed_execution",
           });
 
+          lastCreatedMissedRun = missedRun;
           newMissedCount += 1;
           metrics.missedExecutions += 1;
         } catch (err) {
@@ -310,6 +323,16 @@ export const evaluateJobMonitor = async (
         JOB_MONITOR_LIMITS.DEFAULT_FAILURE_THRESHOLD;
       if (jobMonitor.consecutiveFailures >= failureThreshold) {
         jobMonitor.status = JOB_STATUS.DOWN;
+        await handleJobIncident(jobMonitor, lastCreatedMissedRun, {
+          triggerType: "missed",
+          failureReason: "missed_execution",
+          consecutiveFailures: jobMonitor.consecutiveFailures,
+        }).catch((err) =>
+          logger.error("Failed handling job missed incident", {
+            jobMonitorId: String(jobMonitor._id),
+            error: err.message,
+          }),
+        );
       } else if (jobMonitor.status !== JOB_STATUS.DOWN) {
         jobMonitor.status = JOB_STATUS.LATE;
       }
@@ -410,7 +433,8 @@ export const runClaimedJobMonitor = async ({ jobMonitor, token }) => {
 
     const deadline = new Promise((_, reject) => {
       timeout = setTimeout(
-        () => reject(new Error("Job monitor evaluation exceeded lease timeout")),
+        () =>
+          reject(new Error("Job monitor evaluation exceeded lease timeout")),
         env.JOB_SCHEDULER_LEASE_MS - 5000,
       );
       timeout.unref?.();

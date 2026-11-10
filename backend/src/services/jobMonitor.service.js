@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import JobMonitor from "../models/JobMonitor.js";
 import JobRun from "../models/JobRun.js";
+import Incident from "../models/Incident.js";
 import ApiError from "../utils/ApiError.js";
 import { JOB_STATUS, PLANS, ROLES } from "../config/constants.js";
 import { getPlanDefinition } from "../config/plans.js";
@@ -248,6 +249,7 @@ export const deleteJobMonitor = async (id, user) => {
 
   await Promise.all([
     JobRun.deleteMany({ jobMonitor: id }),
+    Incident.deleteMany({ jobMonitor: id }),
     jobMonitor.deleteOne(),
   ]);
 

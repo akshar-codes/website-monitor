@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import JobRun from "../models/JobRun.js";
 import ApiError from "../utils/ApiError.js";
+import logger from "../utils/logger.js";
 import { JOB_STATUS, JOB_RUN_STATUS } from "../config/constants.js";
 import {
   calculateNextRun,
@@ -8,6 +9,7 @@ import {
   sanitizeRunOutput,
   sanitizeRunMetadata,
 } from "./jobSchedule.service.js";
+import { handleJobIncident } from "../workers/incidentManager.js";
 
 /**
  * Processes an incoming heartbeat report for a verified JobMonitor.
@@ -278,9 +280,11 @@ export const processHeartbeat = async (
     jobMonitor.consecutiveMissed = 0;
 
     const recoveryThreshold = jobMonitor.recoveryThreshold || 1;
+    let recovered = false;
     if (jobMonitor.status === JOB_STATUS.DOWN) {
       if (newSuccesses >= recoveryThreshold) {
         jobMonitor.status = JOB_STATUS.UP;
+        recovered = true;
       }
     } else {
       jobMonitor.status = JOB_STATUS.UP;
@@ -300,6 +304,18 @@ export const processHeartbeat = async (
     );
 
     await jobMonitor.save();
+
+    if (recovered) {
+      await handleJobIncident(jobMonitor, run, {
+        triggerType: "recovery",
+        consecutiveSuccesses: newSuccesses,
+      }).catch((err) =>
+        logger.error("Failed handling job recovery incident", {
+          jobMonitorId: String(jobMonitor._id),
+          error: err.message,
+        }),
+      );
+    }
 
     return {
       duplicate: false,
@@ -466,8 +482,10 @@ export const processHeartbeat = async (
     jobMonitor.consecutiveSuccesses = 0;
 
     const failureThreshold = jobMonitor.failureThreshold || 1;
+    let failed = false;
     if (newFailures >= failureThreshold) {
       jobMonitor.status = JOB_STATUS.DOWN;
+      failed = true;
     }
 
     jobMonitor.lastRunStatus = JOB_RUN_STATUS.FAILED;
@@ -484,6 +502,19 @@ export const processHeartbeat = async (
     );
 
     await jobMonitor.save();
+
+    if (failed) {
+      await handleJobIncident(jobMonitor, run, {
+        triggerType: "failure",
+        failureReason: run.failureReason || run.errorMessage,
+        consecutiveFailures: newFailures,
+      }).catch((err) =>
+        logger.error("Failed handling job failure incident", {
+          jobMonitorId: String(jobMonitor._id),
+          error: err.message,
+        }),
+      );
+    }
 
     return {
       duplicate: false,
