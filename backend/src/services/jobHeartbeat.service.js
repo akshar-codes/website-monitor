@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import mongoose from "mongoose";
 import JobRun from "../models/JobRun.js";
 import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
@@ -10,6 +11,8 @@ import {
   sanitizeRunMetadata,
 } from "./jobSchedule.service.js";
 import { handleJobIncident } from "../workers/incidentManager.js";
+
+mongoose.set("transactionAsyncLocalStorage", true);
 
 /**
  * Processes an incoming heartbeat report for a verified JobMonitor.
@@ -31,14 +34,22 @@ export const processHeartbeat = async (
   jobMonitor,
   payload,
   reqContext = {},
+  inTransaction = false,
 ) => {
+  // A heartbeat can update both its JobRun and the monitor summary. Run the
+  // complete state transition in one MongoDB transaction so a process crash
+  // cannot commit only one side of that pair.
+  if (!inTransaction && mongoose.connection.readyState === 1) {
+    return mongoose.connection.transaction(() =>
+      processHeartbeat(jobMonitor, payload, reqContext, true),
+    );
+  }
+
   const now = new Date();
   const { event } = payload;
 
   const idempotencyKey =
-    payload.idempotencyKey ||
-    reqContext.idempotencyKey ||
-    null;
+    payload.idempotencyKey || reqContext.idempotencyKey || null;
 
   let runId = payload.runId || idempotencyKey;
 
@@ -46,9 +57,10 @@ export const processHeartbeat = async (
   const scheduledFor = payload.scheduledFor
     ? new Date(payload.scheduledFor)
     : jobMonitor.nextExpectedAt || startedAt;
-  const occurrenceKey = scheduledFor instanceof Date
-    ? scheduledFor.toISOString()
-    : new Date(scheduledFor).toISOString();
+  const occurrenceKey =
+    scheduledFor instanceof Date
+      ? scheduledFor.toISOString()
+      : new Date(scheduledFor).toISOString();
 
   // If explicit scheduledFor is supplied, derive occurrence runId.
   // Otherwise, fallback to a unique UUID. Note: reliable retries across schedule advancements
@@ -131,10 +143,7 @@ export const processHeartbeat = async (
     let run = await JobRun.findOne({
       jobMonitor: jobMonitor._id,
       status: JOB_RUN_STATUS.MISSED,
-      $or: [
-        { occurrenceKey },
-        { scheduledFor },
-      ],
+      $or: [{ occurrenceKey }, { scheduledFor }],
     });
 
     if (run) {
@@ -250,10 +259,7 @@ export const processHeartbeat = async (
       run = await JobRun.findOne({
         jobMonitor: jobMonitor._id,
         status: JOB_RUN_STATUS.MISSED,
-        $or: [
-          { occurrenceKey },
-          { scheduledFor },
-        ],
+        $or: [{ occurrenceKey }, { scheduledFor }],
       });
     }
 
@@ -287,7 +293,10 @@ export const processHeartbeat = async (
         jobMonitor.currentRunStartedAt = null;
         jobMonitor.nextExpectedAt = calculateNextRun(jobMonitor, now);
         jobMonitor.nextEvaluationAt = calculateNextEvaluation(
-          { ...jobMonitor.toObject(), nextExpectedAt: jobMonitor.nextExpectedAt },
+          {
+            ...jobMonitor.toObject(),
+            nextExpectedAt: jobMonitor.nextExpectedAt,
+          },
           now,
         );
         await jobMonitor.save();
@@ -311,7 +320,9 @@ export const processHeartbeat = async (
       ) {
         if (run.status === JOB_RUN_STATUS.TIMED_OUT) {
           run.late = true;
-          const completedAt = payload.completedAt ? new Date(payload.completedAt) : now;
+          const completedAt = payload.completedAt
+            ? new Date(payload.completedAt)
+            : now;
           if (run.startedAt) {
             run.delaySeconds = Math.max(
               0,
@@ -343,7 +354,9 @@ export const processHeartbeat = async (
       const wasMissed = run.status === JOB_RUN_STATUS.MISSED;
 
       // Transition started/missed -> succeeded
-      const completedAt = payload.completedAt ? new Date(payload.completedAt) : now;
+      const completedAt = payload.completedAt
+        ? new Date(payload.completedAt)
+        : now;
       let durationMs = payload.durationMs;
       if (durationMs == null && run.startedAt) {
         durationMs = Math.max(
@@ -363,7 +376,8 @@ export const processHeartbeat = async (
         run.delaySeconds = Math.max(
           0,
           Math.round(
-            (completedAt.getTime() - new Date(run.scheduledFor).getTime()) / 1000,
+            (completedAt.getTime() - new Date(run.scheduledFor).getTime()) /
+              1000,
           ),
         );
         jobMonitor.consecutiveMissed = Math.max(
@@ -386,8 +400,12 @@ export const processHeartbeat = async (
     } else {
       // Single-ping execution: no prior started event
       runId = runId || fallbackRunId;
-      const completedAt = payload.completedAt ? new Date(payload.completedAt) : now;
-      let execStartedAt = payload.startedAt ? new Date(payload.startedAt) : null;
+      const completedAt = payload.completedAt
+        ? new Date(payload.completedAt)
+        : now;
+      let execStartedAt = payload.startedAt
+        ? new Date(payload.startedAt)
+        : null;
       let durationMs = payload.durationMs;
 
       if (!execStartedAt && durationMs != null) {
@@ -397,7 +415,10 @@ export const processHeartbeat = async (
       }
 
       if (durationMs == null && execStartedAt) {
-        durationMs = Math.max(0, completedAt.getTime() - execStartedAt.getTime());
+        durationMs = Math.max(
+          0,
+          completedAt.getTime() - execStartedAt.getTime(),
+        );
       }
 
       try {
@@ -538,10 +559,7 @@ export const processHeartbeat = async (
       run = await JobRun.findOne({
         jobMonitor: jobMonitor._id,
         status: JOB_RUN_STATUS.MISSED,
-        $or: [
-          { occurrenceKey },
-          { scheduledFor },
-        ],
+        $or: [{ occurrenceKey }, { scheduledFor }],
       });
     }
 
@@ -579,7 +597,10 @@ export const processHeartbeat = async (
         jobMonitor.currentRunStartedAt = null;
         jobMonitor.nextExpectedAt = calculateNextRun(jobMonitor, now);
         jobMonitor.nextEvaluationAt = calculateNextEvaluation(
-          { ...jobMonitor.toObject(), nextExpectedAt: jobMonitor.nextExpectedAt },
+          {
+            ...jobMonitor.toObject(),
+            nextExpectedAt: jobMonitor.nextExpectedAt,
+          },
           now,
         );
         await jobMonitor.save();
@@ -603,7 +624,9 @@ export const processHeartbeat = async (
       ) {
         if (run.status === JOB_RUN_STATUS.TIMED_OUT) {
           run.late = true;
-          const completedAt = payload.completedAt ? new Date(payload.completedAt) : now;
+          const completedAt = payload.completedAt
+            ? new Date(payload.completedAt)
+            : now;
           if (run.startedAt) {
             run.delaySeconds = Math.max(
               0,
@@ -632,7 +655,9 @@ export const processHeartbeat = async (
       }
 
       const wasMissed = run.status === JOB_RUN_STATUS.MISSED;
-      const completedAt = payload.completedAt ? new Date(payload.completedAt) : now;
+      const completedAt = payload.completedAt
+        ? new Date(payload.completedAt)
+        : now;
       let durationMs = payload.durationMs;
       if (durationMs == null && run.startedAt) {
         durationMs = Math.max(
@@ -653,7 +678,8 @@ export const processHeartbeat = async (
         run.delaySeconds = Math.max(
           0,
           Math.round(
-            (completedAt.getTime() - new Date(run.scheduledFor).getTime()) / 1000,
+            (completedAt.getTime() - new Date(run.scheduledFor).getTime()) /
+              1000,
           ),
         );
         jobMonitor.consecutiveMissed = Math.max(
@@ -673,8 +699,12 @@ export const processHeartbeat = async (
     } else {
       // Single-ping failure: no prior started event
       runId = runId || fallbackRunId;
-      const completedAt = payload.completedAt ? new Date(payload.completedAt) : now;
-      let execStartedAt = payload.startedAt ? new Date(payload.startedAt) : null;
+      const completedAt = payload.completedAt
+        ? new Date(payload.completedAt)
+        : now;
+      let execStartedAt = payload.startedAt
+        ? new Date(payload.startedAt)
+        : null;
       let durationMs = payload.durationMs;
 
       if (!execStartedAt && durationMs != null) {
@@ -684,7 +714,10 @@ export const processHeartbeat = async (
       }
 
       if (durationMs == null && execStartedAt) {
-        durationMs = Math.max(0, completedAt.getTime() - execStartedAt.getTime());
+        durationMs = Math.max(
+          0,
+          completedAt.getTime() - execStartedAt.getTime(),
+        );
       }
 
       try {

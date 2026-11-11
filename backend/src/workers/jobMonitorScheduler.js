@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import mongoose from "mongoose";
 import JobMonitor from "../models/JobMonitor.js";
 import JobRun from "../models/JobRun.js";
 import env from "../config/env.js";
@@ -13,6 +14,8 @@ import {
   calculateNextEvaluation,
 } from "../services/jobSchedule.service.js";
 import { handleJobIncident } from "./incidentManager.js";
+
+mongoose.set("transactionAsyncLocalStorage", true);
 
 let intervalId = null;
 let stopped = true;
@@ -127,8 +130,22 @@ export const claimNextDueJobMonitor = async () => {
  */
 export const evaluateJobMonitor = async (
   jobMonitorId,
-  { now = new Date(), token = null, signal = null } = {},
+  { now = new Date(), token = null, signal = null, inTransaction = false } = {},
 ) => {
+  // MISSED runs and their monitor counters are one logical state change. The
+  // transaction also covers the final schedule/lease update, so an aborted
+  // evaluation can safely retry from the original occurrence.
+  if (!inTransaction && mongoose.connection.readyState === 1) {
+    return mongoose.connection.transaction(() =>
+      evaluateJobMonitor(jobMonitorId, {
+        now,
+        token,
+        signal,
+        inTransaction: true,
+      }),
+    );
+  }
+
   if (signal?.aborted) return null;
   metrics.lastEvaluationAt = new Date();
 
@@ -205,7 +222,8 @@ export const evaluateJobMonitor = async (
   if (
     jobMonitor.currentRunStartedAt &&
     jobMonitor.currentRunId &&
-    new Date(jobMonitor.currentRunStartedAt).getTime() <= timeoutCutoff.getTime() &&
+    new Date(jobMonitor.currentRunStartedAt).getTime() <=
+      timeoutCutoff.getTime() &&
     !timedOutCandidates.some((r) => r.runId === jobMonitor.currentRunId)
   ) {
     timedOutCandidates.push({
@@ -217,7 +235,9 @@ export const evaluateJobMonitor = async (
 
   for (const candidate of timedOutCandidates) {
     if (signal?.aborted || !(await isLeaseValid())) return null;
-    const startedAtMs = new Date(candidate.startedAt || evaluationDate).getTime();
+    const startedAtMs = new Date(
+      candidate.startedAt || evaluationDate,
+    ).getTime();
     const durationMs = Math.max(0, evaluationDate.getTime() - startedAtMs);
 
     const runQuery = candidate._id
@@ -290,7 +310,8 @@ export const evaluateJobMonitor = async (
     jobMonitor.currentRunStartedAt = remainingInFlightRun.startedAt;
   } else if (
     !jobMonitor.currentRunStartedAt ||
-    new Date(jobMonitor.currentRunStartedAt).getTime() <= timeoutCutoff.getTime()
+    new Date(jobMonitor.currentRunStartedAt).getTime() <=
+      timeoutCutoff.getTime()
   ) {
     jobMonitor.currentRunId = null;
     jobMonitor.currentRunStartedAt = null;

@@ -56,6 +56,7 @@ Optional Google/GitHub OAuth providers are enabled only when each provider's cli
 ## Database and persistence
 
 - Use a managed or otherwise backed-up MongoDB deployment with TLS and network access restricted to application hosts.
+- Use a replica set or sharded cluster for MongoDB. Job heartbeat transitions and missed-run evaluations use multi-document transactions to keep run records and monitor summaries crash-consistent; standalone MongoDB deployments do not support these transactions.
 - Create and verify the indexes described in [Monitoring operations](../backend/MONITORING_OPERATIONS.md) before receiving production traffic.
 - Keep `backend/uploads` on persistent storage. If running more than one API instance, use shared storage for avatars or migrate the upload implementation to object storage so every instance can serve the same files.
 - Keep MongoDB sessions enabled and ensure the database is reachable from every API instance.

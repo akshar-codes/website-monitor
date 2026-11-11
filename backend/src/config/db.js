@@ -7,6 +7,11 @@ import env from "./env.js";
 import logger from "../utils/logger.js";
 import { maskConnectionString } from "../utils/sanitizeLogData.js";
 
+// Mongoose propagates the active transaction session to model operations
+// inside connection.transaction(). Keep multi-document state transitions
+// atomic without threading a session through every service call.
+mongoose.set("transactionAsyncLocalStorage", true);
+
 const connectDB = async () => {
   logger.info(`Connecting to MongoDB: ${maskConnectionString(env.MONGO_URI)}`);
 
