@@ -23,6 +23,7 @@ import {
 } from "../config/activityConstants.js";
 import { syncIncidentById } from "./statusIncidentSync.service.js";
 import { createNotification } from "./notification.service.js";
+import { findDeploymentsNearIncident } from "./deployment.service.js";
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
@@ -220,7 +221,16 @@ export const getIncidentById = async (id, user) => {
     throw ApiError.notFound(`Incident not found with id: ${id}`);
   }
 
-  return restoreCheckSnapshots(incident);
+  const restored = restoreCheckSnapshots(incident);
+  try {
+    restored.relatedDeployments = await findDeploymentsNearIncident(
+      restored,
+      user,
+    );
+  } catch {
+    restored.relatedDeployments = [];
+  }
+  return restored;
 };
 
 // ── Update status ─────────────────────────────────────────────────────────────

@@ -8,10 +8,12 @@ import mongoose from "mongoose";
 import DeploymentIntegration from "../models/DeploymentIntegration.js";
 import DeploymentEvent from "../models/DeploymentEvent.js";
 import Monitor from "../models/Monitor.js";
+import HealthCheck from "../models/HealthCheck.js";
+import Incident from "../models/Incident.js";
 import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import env from "../config/env.js";
-import { PLANS, ROLES, WINDOW_MS } from "../config/constants.js";
+import { PLANS, ROLES, WINDOW_MS, HEALTH_STATUS } from "../config/constants.js";
 import { getPlanDefinition } from "../config/plans.js";
 import { expireSubscriptionIfDue } from "./subscriptionLifecycle.service.js";
 import {
@@ -719,4 +721,474 @@ export const getDeploymentByIdForMonitor = async (
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
+};
+
+/**
+ * Resolves window duration in minutes from query options.
+ */
+const resolveWindowMinutes = (options = {}) => {
+  if (options.window) {
+    const trimmed = String(options.window).trim().toLowerCase();
+    if (trimmed === "15m") return 15;
+    if (trimmed === "30m") return 30;
+    if (trimmed === "1h") return 60;
+    if (trimmed === "2h") return 120;
+    if (trimmed === "6h") return 360;
+    if (trimmed === "24h" || trimmed === "1d") return 1440;
+  }
+  const mins = parseInt(options.windowMinutes, 10);
+  return Number.isInteger(mins) && mins >= 5 && mins <= 1440 ? mins : 30;
+};
+
+/**
+ * Calculate statistical aggregates (sample count, availability, failure rate, median, p95)
+ * for a list of scheduled health checks.
+ */
+export const calculateCheckStats = (checks = []) => {
+  const total = checks.length;
+  if (total === 0) {
+    return {
+      sampleCount: 0,
+      successfulChecks: 0,
+      failedChecks: 0,
+      degradedChecks: 0,
+      availability: null,
+      failureRate: null,
+      medianResponseTime: null,
+      p95ResponseTime: null,
+      hasSufficientSamples: false,
+    };
+  }
+
+  let successfulChecks = 0;
+  let failedChecks = 0;
+  let degradedChecks = 0;
+  const validResponseTimes = [];
+
+  for (const c of checks) {
+    if (c.status === HEALTH_STATUS.UP) {
+      successfulChecks++;
+    } else if (c.status === HEALTH_STATUS.DOWN) {
+      failedChecks++;
+    } else if (c.status === HEALTH_STATUS.DEGRADED) {
+      degradedChecks++;
+    } else {
+      failedChecks++;
+    }
+
+    if (
+      c.responseTime != null &&
+      Number.isFinite(c.responseTime) &&
+      c.responseTime >= 0
+    ) {
+      validResponseTimes.push(c.responseTime);
+    }
+  }
+
+  validResponseTimes.sort((a, b) => a - b);
+  const n = validResponseTimes.length;
+
+  let median = null;
+  if (n > 0) {
+    if (n === 1) {
+      median = validResponseTimes[0];
+    } else if (n % 2 === 1) {
+      median = validResponseTimes[Math.floor(n / 2)];
+    } else {
+      median = (validResponseTimes[n / 2 - 1] + validResponseTimes[n / 2]) / 2;
+    }
+    median = Math.round(median * 100) / 100;
+  }
+
+  let p95 = null;
+  if (n >= 5) {
+    const idx = Math.ceil(0.95 * n) - 1;
+    p95 = Math.round(validResponseTimes[Math.max(0, idx)] * 100) / 100;
+  } else if (n > 0) {
+    p95 = Math.round(validResponseTimes[n - 1] * 100) / 100;
+  }
+
+  const availability = Math.round((successfulChecks / total) * 10000) / 100;
+  const failureRate = Math.round((failedChecks / total) * 10000) / 100;
+
+  return {
+    sampleCount: total,
+    successfulChecks,
+    failedChecks,
+    degradedChecks,
+    availability,
+    failureRate,
+    medianResponseTime: median,
+    p95ResponseTime: p95,
+    hasSufficientSamples: total >= 3,
+  };
+};
+
+/**
+ * Calculates differences and percentage shifts between before and after metric sets.
+ */
+export const calculateMetricDiffs = (before, after) => {
+  const diff = {
+    availabilityChange: null,
+    failureRateChange: null,
+    medianResponseTimeChangeMs: null,
+    medianResponseTimeChangePercent: null,
+    p95ResponseTimeChangeMs: null,
+    p95ResponseTimeChangePercent: null,
+  };
+
+  if (before.availability != null && after.availability != null) {
+    diff.availabilityChange =
+      Math.round((after.availability - before.availability) * 100) / 100;
+  }
+
+  if (before.failureRate != null && after.failureRate != null) {
+    diff.failureRateChange =
+      Math.round((after.failureRate - before.failureRate) * 100) / 100;
+  }
+
+  if (before.medianResponseTime != null && after.medianResponseTime != null) {
+    diff.medianResponseTimeChangeMs =
+      Math.round((after.medianResponseTime - before.medianResponseTime) * 100) /
+      100;
+    if (before.medianResponseTime > 0) {
+      diff.medianResponseTimeChangePercent =
+        Math.round(
+          ((after.medianResponseTime - before.medianResponseTime) /
+            before.medianResponseTime) *
+            10000,
+        ) / 100;
+    }
+  }
+
+  if (before.p95ResponseTime != null && after.p95ResponseTime != null) {
+    diff.p95ResponseTimeChangeMs =
+      Math.round((after.p95ResponseTime - before.p95ResponseTime) * 100) / 100;
+    if (before.p95ResponseTime > 0) {
+      diff.p95ResponseTimeChangePercent =
+        Math.round(
+          ((after.p95ResponseTime - before.p95ResponseTime) /
+            before.p95ResponseTime) *
+            10000,
+        ) / 100;
+    }
+  }
+
+  return diff;
+};
+
+/**
+ * Evaluates objective empirical evidence for possible regressions.
+ * Reports temporal association without speculative root-cause claims.
+ */
+export const evaluateRegressionEvidence = ({
+  before,
+  after,
+  diff,
+  relatedIncidents = [],
+  isWindowIncomplete = false,
+}) => {
+  const evidence = [];
+  let isSuspectedRegression = false;
+
+  // 1. Incidents started after deployment
+  const postDeployIncidents = relatedIncidents.filter(
+    (inc) => inc.timingRelation === "started_after_deployment",
+  );
+  if (postDeployIncidents.length > 0) {
+    isSuspectedRegression = true;
+    evidence.push(
+      `${postDeployIncidents.length} incident${
+        postDeployIncidents.length > 1 ? "s" : ""
+      } began after deployment.`,
+    );
+  }
+
+  // 2. Failure rate increase
+  if (diff.failureRateChange != null && diff.failureRateChange >= 5.0) {
+    isSuspectedRegression = true;
+    evidence.push(
+      `Failure rate increased by +${diff.failureRateChange}% (from ${before.failureRate}% to ${after.failureRate}%, ${after.failedChecks} failed checks).`,
+    );
+  } else if (
+    before.availability != null &&
+    after.availability != null &&
+    diff.availabilityChange != null &&
+    diff.availabilityChange <= -5.0
+  ) {
+    isSuspectedRegression = true;
+    evidence.push(
+      `Availability dropped by ${diff.availabilityChange}% (from ${before.availability}% to ${after.availability}%).`,
+    );
+  }
+
+  // 3. Response time regression
+  if (
+    diff.medianResponseTimeChangePercent != null &&
+    diff.medianResponseTimeChangePercent >= 20.0 &&
+    diff.medianResponseTimeChangeMs >= 30.0 &&
+    before.hasSufficientSamples &&
+    after.hasSufficientSamples
+  ) {
+    isSuspectedRegression = true;
+    evidence.push(
+      `Median response time degraded by +${diff.medianResponseTimeChangeMs} ms (+${diff.medianResponseTimeChangePercent}%) from ${before.medianResponseTime} ms to ${after.medianResponseTime} ms.`,
+    );
+  } else if (
+    diff.p95ResponseTimeChangePercent != null &&
+    diff.p95ResponseTimeChangePercent >= 25.0 &&
+    diff.p95ResponseTimeChangeMs >= 50.0 &&
+    before.hasSufficientSamples &&
+    after.hasSufficientSamples
+  ) {
+    isSuspectedRegression = true;
+    evidence.push(
+      `P95 latency degraded by +${diff.p95ResponseTimeChangeMs} ms (+${diff.p95ResponseTimeChangePercent}%) from ${before.p95ResponseTime} ms to ${after.p95ResponseTime} ms.`,
+    );
+  }
+
+  // 4. Data sufficiency
+  if (!before.hasSufficientSamples || !after.hasSufficientSamples) {
+    if (evidence.length === 0) {
+      evidence.push(
+        `Insufficient sample history (${before.sampleCount} before / ${after.sampleCount} after) to establish a statistically confident comparison.`,
+      );
+      return {
+        status: "insufficient_data",
+        evidence,
+      };
+    }
+  }
+
+  if (isSuspectedRegression) {
+    return {
+      status: "suspected_regression",
+      evidence,
+    };
+  }
+
+  if (before.sampleCount > 0 && after.sampleCount > 0) {
+    evidence.push(
+      "Response times and failure rates remained stable within expected operational variance.",
+    );
+  }
+
+  return {
+    status: "normal",
+    evidence,
+  };
+};
+
+/**
+ * Performance impact analysis comparing health before and after a specific deployment.
+ */
+export const getDeploymentImpact = async (
+  monitorId,
+  deploymentId,
+  user,
+  options = {},
+) => {
+  const userId = getUserId(user);
+
+  // 1. Confirm monitor exists and is owned by caller
+  const monitor = await Monitor.findOne({
+    _id: monitorId,
+    owner: userId,
+  }).lean();
+  if (!monitor) {
+    throw ApiError.notFound("Monitor not found");
+  }
+
+  // 2. Confirm deployment exists, is owned by caller, and affected monitor
+  const deployment = await DeploymentEvent.findOne({
+    _id: deploymentId,
+    owner: userId,
+    monitors: monitor._id,
+  }).lean();
+  if (!deployment) {
+    throw ApiError.notFound("Deployment event not found");
+  }
+
+  // 3. Resolve comparison interval
+  const windowMinutes = resolveWindowMinutes(options);
+  const windowMs = windowMinutes * 60 * 1000;
+  const deployedTime = new Date(deployment.deployedAt).getTime();
+
+  const beforeStart = new Date(deployedTime - windowMs);
+  const beforeEnd = new Date(deployedTime);
+  const afterStart = new Date(deployedTime);
+  const afterEnd = new Date(deployedTime + windowMs);
+
+  const nowTime = Date.now();
+  const effectiveAfterEnd = new Date(Math.min(afterEnd.getTime(), nowTime));
+  const isWindowIncomplete = nowTime < afterEnd.getTime();
+  const elapsedAfterMinutes = Math.max(
+    1,
+    Math.round((effectiveAfterEnd.getTime() - afterStart.getTime()) / 60000),
+  );
+
+  // 4. Fetch scheduled health checks for before and after windows
+  const [beforeChecks, afterChecks] = await Promise.all([
+    HealthCheck.find({
+      monitor: monitor._id,
+      checkedAt: { $gte: beforeStart, $lt: beforeEnd },
+      scheduled: true,
+    })
+      .select("status responseTime checkedAt")
+      .sort({ checkedAt: 1 })
+      .lean(),
+    HealthCheck.find({
+      monitor: monitor._id,
+      checkedAt: { $gte: afterStart, $lte: effectiveAfterEnd },
+      scheduled: true,
+    })
+      .select("status responseTime checkedAt")
+      .sort({ checkedAt: 1 })
+      .lean(),
+  ]);
+
+  // 5. Query overlapping incidents for this monitor (excluding job monitors)
+  const rawIncidents = await Incident.find({
+    monitor: monitor._id,
+    startedAt: { $lte: afterEnd },
+    $or: [{ endedAt: null }, { endedAt: { $gte: beforeStart } }],
+  })
+    .select("title message status severity startedAt endedAt duration")
+    .sort({ startedAt: 1 })
+    .lean();
+
+  const relatedIncidents = rawIncidents.map((inc) => {
+    const incStart = new Date(inc.startedAt).getTime();
+    const incEnd = inc.endedAt ? new Date(inc.endedAt).getTime() : null;
+
+    let timingRelation = "ongoing_during_deployment";
+    if (incStart >= deployedTime) {
+      timingRelation = "started_after_deployment";
+    } else if (incEnd !== null && incEnd <= deployedTime) {
+      timingRelation = "resolved_before_deployment";
+    }
+
+    const duration =
+      inc.duration != null
+        ? inc.duration
+        : incEnd
+          ? Math.round((incEnd - incStart) / 1000)
+          : Math.round((nowTime - incStart) / 1000);
+
+    const timeDeltaSeconds = Math.round((incStart - deployedTime) / 1000);
+
+    return {
+      id: inc._id.toString(),
+      title: inc.title || inc.message || "Monitor Incident",
+      status: inc.status,
+      severity: inc.severity || "minor",
+      startedAt: inc.startedAt,
+      endedAt: inc.endedAt || null,
+      duration,
+      timingRelation,
+      timeDeltaSeconds,
+    };
+  });
+
+  // 6. Aggregate metrics and diffs
+  const beforeStats = calculateCheckStats(beforeChecks);
+  const afterStats = calculateCheckStats(afterChecks);
+  const diff = calculateMetricDiffs(beforeStats, afterStats);
+
+  // 7. Regression evaluation
+  const correlation = evaluateRegressionEvidence({
+    before: beforeStats,
+    after: afterStats,
+    diff,
+    relatedIncidents,
+    isWindowIncomplete,
+  });
+
+  return {
+    deployment: {
+      id: deployment._id?.toString() || deployment.id,
+      version: deployment.version,
+      commitSha: deployment.commitSha || null,
+      environment: deployment.environment,
+      deployedAt: deployment.deployedAt,
+      source: deployment.source,
+      url: deployment.url || null,
+    },
+    monitor: {
+      id: monitor._id?.toString() || monitor.id,
+      name: monitor.name,
+      url: monitor.url,
+    },
+    window: {
+      windowMinutes,
+      beforeStart,
+      beforeEnd,
+      afterStart,
+      afterEnd,
+      effectiveAfterEnd,
+      isWindowIncomplete,
+      elapsedAfterMinutes,
+    },
+    metrics: {
+      before: beforeStats,
+      after: afterStats,
+      diff,
+    },
+    correlation,
+    relatedIncidents,
+  };
+};
+
+/**
+ * Find deployments associated with a monitor that occurred temporally near an incident.
+ * Centralizes the correlation logic so incident details can expose relevant releases.
+ */
+export const findDeploymentsNearIncident = async (
+  incident,
+  user,
+  windowMinutes = 120,
+) => {
+  if (!incident || !incident.monitor) return [];
+
+  const monitorId = incident.monitor._id || incident.monitor;
+  const userId = getUserId(user);
+  const incStartTime = new Date(incident.startedAt).getTime();
+  if (isNaN(incStartTime)) return [];
+
+  const lookbackMs = windowMinutes * 60 * 1000;
+  const lookforwardMs = 30 * 60 * 1000; // 30 minutes after incident started
+  const rangeStart = new Date(incStartTime - lookbackMs);
+  const rangeEnd = new Date(incStartTime + lookforwardMs);
+
+  const deployments = await DeploymentEvent.find({
+    owner: userId,
+    monitors: monitorId,
+    deployedAt: { $gte: rangeStart, $lte: rangeEnd },
+  })
+    .select("version commitSha environment deployedAt source url description")
+    .sort({ deployedAt: -1 })
+    .limit(10)
+    .lean();
+
+  return deployments.map((d) => {
+    const depTime = new Date(d.deployedAt).getTime();
+    const timeDeltaSeconds = Math.round((incStartTime - depTime) / 1000);
+    const temporalRelation =
+      depTime <= incStartTime
+        ? "deployed_before_incident"
+        : "deployed_after_incident";
+
+    return {
+      id: d._id?.toString() || d.id,
+      version: d.version,
+      commitSha: d.commitSha || null,
+      environment: d.environment,
+      deployedAt: d.deployedAt,
+      source: d.source,
+      url: d.url || null,
+      description: d.description || null,
+      timeDeltaSeconds,
+      temporalRelation,
+    };
+  });
 };

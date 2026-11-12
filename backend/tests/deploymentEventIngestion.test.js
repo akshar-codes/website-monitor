@@ -6,6 +6,8 @@ import { createHash, createHmac, randomBytes } from "node:crypto";
 import DeploymentIntegration from "../src/models/DeploymentIntegration.js";
 import DeploymentEvent from "../src/models/DeploymentEvent.js";
 import Monitor from "../src/models/Monitor.js";
+import HealthCheck from "../src/models/HealthCheck.js";
+import Incident from "../src/models/Incident.js";
 import User from "../src/models/User.js";
 import ApiKey from "../src/models/ApiKey.js";
 import Activity from "../src/models/Activity.js";
@@ -20,6 +22,11 @@ import {
   revokeDeploymentIntegration,
   deleteDeploymentIntegration,
   recordDeploymentEvent,
+  calculateCheckStats,
+  calculateMetricDiffs,
+  evaluateRegressionEvidence,
+  getDeploymentImpact,
+  findDeploymentsNearIncident,
 } from "../src/services/deployment.service.js";
 import { encryptCredential } from "../src/utils/credentialEncryption.js";
 
@@ -1247,6 +1254,299 @@ test("Phase 2: Monitor-scoped deployment listing and individual retrieval", asyn
     },
   );
   assert.equal(singleNotFoundRes.status, 404);
+});
+
+test("Phase 3: Impact Analysis - statistical calculation and safe boundary handling", () => {
+  // 1. Empty checks
+  const emptyStats = calculateCheckStats([]);
+  assert.equal(emptyStats.sampleCount, 0);
+  assert.equal(emptyStats.availability, null);
+  assert.equal(emptyStats.failureRate, null);
+  assert.equal(emptyStats.medianResponseTime, null);
+  assert.equal(emptyStats.p95ResponseTime, null);
+  assert.equal(emptyStats.hasSufficientSamples, false);
+
+  // 2. Populated checks with failures
+  const checks = [
+    { status: "up", responseTime: 100 },
+    { status: "up", responseTime: 120 },
+    { status: "up", responseTime: 140 },
+    { status: "down", responseTime: 200 },
+    { status: "up", responseTime: 250 },
+  ];
+  const populated = calculateCheckStats(checks);
+  assert.equal(populated.sampleCount, 5);
+  assert.equal(populated.successfulChecks, 4);
+  assert.equal(populated.failedChecks, 1);
+  assert.equal(populated.availability, 80.0);
+  assert.equal(populated.failureRate, 20.0);
+  assert.equal(populated.medianResponseTime, 140.0);
+  assert.equal(populated.p95ResponseTime, 250.0);
+  assert.equal(populated.hasSufficientSamples, true);
+
+  // 3. Diff handling with zero denominators
+  const zeroBaselineStats = {
+    availability: 0,
+    failureRate: 0,
+    medianResponseTime: 0,
+    p95ResponseTime: 0,
+    hasSufficientSamples: true,
+  };
+  const diffWithZero = calculateMetricDiffs(zeroBaselineStats, populated);
+  assert.equal(diffWithZero.medianResponseTimeChangeMs, 140.0);
+  assert.equal(diffWithZero.medianResponseTimeChangePercent, null); // Zero denominator avoided!
+
+  // 4. Normal performance produces no false regression
+  const normalBefore = {
+    sampleCount: 10,
+    availability: 100,
+    failureRate: 0,
+    medianResponseTime: 100,
+    p95ResponseTime: 130,
+    hasSufficientSamples: true,
+  };
+  const normalAfter = {
+    sampleCount: 10,
+    availability: 100,
+    failureRate: 0,
+    medianResponseTime: 102,
+    p95ResponseTime: 135,
+    hasSufficientSamples: true,
+  };
+  const normalDiff = calculateMetricDiffs(normalBefore, normalAfter);
+  const normalVerdict = evaluateRegressionEvidence({
+    before: normalBefore,
+    after: normalAfter,
+    diff: normalDiff,
+    relatedIncidents: [],
+  });
+  assert.equal(normalVerdict.status, "normal");
+
+  // 5. Elevated failure rate or latency produces suspected_regression
+  const degradedAfter = {
+    sampleCount: 10,
+    availability: 80,
+    failureRate: 20,
+    failedChecks: 2,
+    medianResponseTime: 170,
+    p95ResponseTime: 220,
+    hasSufficientSamples: true,
+  };
+  const degradedDiff = calculateMetricDiffs(normalBefore, degradedAfter);
+  const regressionVerdict = evaluateRegressionEvidence({
+    before: normalBefore,
+    after: degradedAfter,
+    diff: degradedDiff,
+    relatedIncidents: [],
+  });
+  assert.equal(regressionVerdict.status, "suspected_regression");
+  assert.ok(regressionVerdict.evidence.length > 0);
+
+  // 6. Post-deployment incident triggers suspected_regression
+  const incidentVerdict = evaluateRegressionEvidence({
+    before: normalBefore,
+    after: normalAfter,
+    diff: normalDiff,
+    relatedIncidents: [
+      { id: "inc-1", timingRelation: "started_after_deployment" },
+    ],
+  });
+  assert.equal(incidentVerdict.status, "suspected_regression");
+
+  // 7. Sparse samples (< 3) produce insufficient_data
+  const sparseBefore = {
+    sampleCount: 1,
+    availability: 100,
+    failureRate: 0,
+    medianResponseTime: 100,
+    p95ResponseTime: 100,
+    hasSufficientSamples: false,
+  };
+  const sparseVerdict = evaluateRegressionEvidence({
+    before: sparseBefore,
+    after: normalAfter,
+    diff: normalDiff,
+    relatedIncidents: [],
+  });
+  assert.equal(sparseVerdict.status, "insufficient_data");
+});
+
+test("Phase 3: Impact API endpoint and Incident Correlation", async (t) => {
+  const deploymentEventId = "64b0000000000000000000d1";
+  const incidentId = "64b0000000000000000000e1";
+  const baseTime = new Date("2026-11-12T12:00:00.000Z");
+
+  const fakeMonitor = {
+    _id: new mongoose.Types.ObjectId(monitorAId),
+    id: monitorAId,
+    name: "Production Web",
+    url: "https://example.com",
+    owner: new mongoose.Types.ObjectId(userAId),
+  };
+
+  const fakeDeployment = {
+    _id: new mongoose.Types.ObjectId(deploymentEventId),
+    id: deploymentEventId,
+    version: "v2.2.0",
+    commitSha: "123456789abc",
+    environment: "production",
+    deployedAt: baseTime,
+    monitors: [new mongoose.Types.ObjectId(monitorAId)],
+    owner: new mongoose.Types.ObjectId(userAId),
+  };
+
+  t.mock.method(Monitor, "findOne", ({ _id, owner }) => {
+    if (String(_id) === monitorAId && String(owner) === userAId) {
+      return { lean: async () => fakeMonitor };
+    }
+    return { lean: async () => null };
+  });
+
+  t.mock.method(DeploymentEvent, "findOne", ({ _id, owner, monitors }) => {
+    if (
+      String(_id) === deploymentEventId &&
+      String(owner) === userAId &&
+      String(monitors) === monitorAId
+    ) {
+      return { lean: async () => fakeDeployment };
+    }
+    return { lean: async () => null };
+  });
+
+  // Scheduled HealthChecks mock
+  t.mock.method(HealthCheck, "find", (query) => {
+    assert.equal(String(query.monitor), monitorAId);
+    assert.equal(query.scheduled, true); // Verified scheduled: true
+
+    const isBefore = query.checkedAt?.$lt !== undefined;
+    const checks = isBefore
+      ? [
+          {
+            status: "up",
+            responseTime: 110,
+            checkedAt: new Date(baseTime.getTime() - 1000000),
+          },
+          {
+            status: "up",
+            responseTime: 120,
+            checkedAt: new Date(baseTime.getTime() - 500000),
+          },
+          {
+            status: "up",
+            responseTime: 130,
+            checkedAt: new Date(baseTime.getTime() - 200000),
+          },
+        ]
+      : [
+          {
+            status: "up",
+            responseTime: 180,
+            checkedAt: new Date(baseTime.getTime() + 200000),
+          },
+          {
+            status: "down",
+            responseTime: 250,
+            checkedAt: new Date(baseTime.getTime() + 500000),
+          },
+          {
+            status: "up",
+            responseTime: 190,
+            checkedAt: new Date(baseTime.getTime() + 1000000),
+          },
+        ];
+
+    return {
+      select: () => ({
+        sort: () => ({
+          lean: async () => checks,
+        }),
+      }),
+    };
+  });
+
+  // Incident Mock
+  t.mock.method(Incident, "find", (query) => {
+    assert.equal(String(query.monitor), monitorAId);
+    return {
+      select: () => ({
+        sort: () => ({
+          lean: async () => [
+            {
+              _id: new mongoose.Types.ObjectId(incidentId),
+              title: "HTTP Error Spike",
+              status: "investigating",
+              severity: "major",
+              startedAt: new Date(baseTime.getTime() + 300000), // 5 mins after deployment
+              endedAt: null,
+              duration: 600,
+            },
+          ],
+        }),
+      }),
+    };
+  });
+
+  // 1. GET /api/monitors/:id/deployments/:deploymentId/impact
+  const impactRes = await request(
+    `/monitors/${monitorAId}/deployments/${deploymentEventId}/impact?windowMinutes=30`,
+    {
+      role: "user",
+      userId: userAId,
+    },
+  );
+
+  assert.equal(impactRes.status, 200);
+  const impactJson = await impactRes.json();
+  assert.equal(impactJson.success, true);
+  assert.equal(impactJson.data.deployment.version, "v2.2.0");
+  assert.equal(impactJson.data.window.windowMinutes, 30);
+  assert.equal(impactJson.data.metrics.before.sampleCount, 3);
+  assert.equal(impactJson.data.metrics.after.sampleCount, 3);
+  assert.equal(impactJson.data.metrics.before.availability, 100.0);
+  assert.equal(impactJson.data.metrics.after.availability, 66.67);
+  assert.equal(impactJson.data.correlation.status, "suspected_regression");
+  assert.equal(impactJson.data.relatedIncidents.length, 1);
+  assert.equal(
+    impactJson.data.relatedIncidents[0].timingRelation,
+    "started_after_deployment",
+  );
+
+  // 2. Cross-tenant access to impact endpoint returns 404
+  const crossTenantRes = await request(
+    `/monitors/${monitorAId}/deployments/${deploymentEventId}/impact`,
+    {
+      role: "user",
+      userId: userBId,
+    },
+  );
+  assert.equal(crossTenantRes.status, 404);
+
+  // 3. Reverse correlation: findDeploymentsNearIncident
+  t.mock.method(DeploymentEvent, "find", (query) => {
+    assert.equal(String(query.owner), userAId);
+    assert.equal(String(query.monitors), monitorAId);
+    return {
+      select: () => ({
+        sort: () => ({
+          limit: () => ({
+            lean: async () => [fakeDeployment],
+          }),
+        }),
+      }),
+    };
+  });
+
+  const related = await findDeploymentsNearIncident(
+    {
+      monitor: new mongoose.Types.ObjectId(monitorAId),
+      startedAt: new Date(baseTime.getTime() + 300000),
+    },
+    { _id: userAId },
+  );
+
+  assert.equal(related.length, 1);
+  assert.equal(related[0].version, "v2.2.0");
+  assert.equal(related[0].temporalRelation, "deployed_before_incident");
 });
 
 after(async () => {

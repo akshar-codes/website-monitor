@@ -126,3 +126,16 @@ export const getMonitorDeploymentById = asyncHandler(async (req, res) => {
   );
   return sendSuccess(res, { data: deployment });
 });
+
+/**
+ * GET /api/monitors/:id/deployments/:deploymentId/impact
+ */
+export const getDeploymentImpact = asyncHandler(async (req, res) => {
+  const impact = await deploymentService.getDeploymentImpact(
+    req.params.id,
+    req.params.deploymentId,
+    req.user,
+    req.validatedQuery || req.query,
+  );
+  return sendSuccess(res, { data: impact });
+});

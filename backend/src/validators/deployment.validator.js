@@ -142,3 +142,14 @@ export const monitorDeploymentsQuerySchema = z.object({
   startDate: z.preprocess(parseDateString, z.date().optional()),
   endDate: z.preprocess(parseDateString, z.date().optional()),
 });
+
+export const deploymentImpactQuerySchema = z.object({
+  windowMinutes: z.coerce
+    .number()
+    .int()
+    .min(5)
+    .max(1440)
+    .optional()
+    .default(30),
+  window: z.string().trim().optional(),
+});

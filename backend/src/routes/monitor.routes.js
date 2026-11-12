@@ -39,8 +39,12 @@ import {
 import {
   getMonitorDeployments,
   getMonitorDeploymentById,
+  getDeploymentImpact,
 } from "../controllers/deployment.controller.js";
-import { monitorDeploymentsQuerySchema } from "../validators/deployment.validator.js";
+import {
+  monitorDeploymentsQuerySchema,
+  deploymentImpactQuerySchema,
+} from "../validators/deployment.validator.js";
 
 const router = Router();
 
@@ -50,6 +54,15 @@ router.get(
   validateObjectId("id"),
   validate(monitorDeploymentsQuerySchema, "query"),
   getMonitorDeployments,
+);
+
+router.get(
+  "/:id/deployments/:deploymentId/impact",
+  requirePermission("monitor:read"),
+  validateObjectId("id"),
+  validateObjectId("deploymentId"),
+  validate(deploymentImpactQuerySchema, "query"),
+  getDeploymentImpact,
 );
 
 router.get(
