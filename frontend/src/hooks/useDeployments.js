@@ -34,3 +34,22 @@ export function useMonitorDeploymentDetails(monitorId, deploymentId) {
     { immediate: Boolean(monitorId && deploymentId) },
   );
 }
+
+/**
+ * Hook to retrieve performance impact analysis comparing before and after deployment.
+ */
+export function useDeploymentImpact(monitorId, deploymentId, params = {}) {
+  const paramsKey = JSON.stringify(params);
+  return useQuery(
+    () => {
+      if (!monitorId || !deploymentId) return null;
+      return deploymentsApi.getDeploymentImpact(
+        monitorId,
+        deploymentId,
+        params,
+      );
+    },
+    [monitorId, deploymentId, paramsKey],
+    { immediate: Boolean(monitorId && deploymentId) },
+  );
+}

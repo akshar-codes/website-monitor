@@ -23,6 +23,22 @@ export async function getMonitorDeploymentById(monitorId, deploymentId) {
 }
 
 /**
+ * GET /api/monitors/:id/deployments/:deploymentId/impact
+ * Retrieve performance impact analysis comparing before and after deployment.
+ */
+export async function getDeploymentImpact(
+  monitorId,
+  deploymentId,
+  params = {},
+) {
+  const { data } = await apiClient.get(
+    `/monitors/${monitorId}/deployments/${deploymentId}/impact`,
+    { params },
+  );
+  return data?.data;
+}
+
+/**
  * GET /api/deployments/events
  * Retrieve general deployment events for user.
  */

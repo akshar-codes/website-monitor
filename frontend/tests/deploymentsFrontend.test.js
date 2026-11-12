@@ -15,6 +15,7 @@ import * as deploymentsApi from "../src/services/api/deployments.js";
 let viteServer;
 let DeploymentTimeline;
 let DeploymentDetailModal;
+let DeploymentImpactSection;
 
 test.before(async () => {
   viteServer = await createServer({
@@ -31,6 +32,11 @@ test.before(async () => {
     "./src/components/deployments/DeploymentDetailModal.jsx",
   );
   DeploymentDetailModal = modalMod.default;
+
+  const impactMod = await viteServer.ssrLoadModule(
+    "./src/components/deployments/DeploymentImpactSection.jsx",
+  );
+  DeploymentImpactSection = impactMod.default;
 });
 
 test.after(async () => {
@@ -225,6 +231,17 @@ test("DeploymentDetailModal Component: renders accessible release details dialog
   assert.match(html, /Associated with/);
 });
 
+test("DeploymentImpactSection Component: renders loading state during initial load", () => {
+  const html = renderToString(
+    React.createElement(DeploymentImpactSection, {
+      monitorId: "64b000000000000000000001",
+      deploymentId: "64b0000000000000000000d1",
+    }),
+  );
+
+  assert.match(html, /Calculating deployment impact/);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. API Client Export Verification
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,6 +249,7 @@ test("DeploymentDetailModal Component: renders accessible release details dialog
 test("API Client: verifies all deployment API client functions are exported", () => {
   assert.equal(typeof deploymentsApi.getMonitorDeployments, "function");
   assert.equal(typeof deploymentsApi.getMonitorDeploymentById, "function");
+  assert.equal(typeof deploymentsApi.getDeploymentImpact, "function");
   assert.equal(typeof deploymentsApi.getDeployments, "function");
   assert.equal(typeof deploymentsApi.getDeploymentIntegrations, "function");
 });

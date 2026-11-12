@@ -992,6 +992,7 @@ export default function MonitorDetails() {
         open={Boolean(inspectedDeployment)}
         onClose={() => setInspectedDeployment(null)}
         deployment={inspectedDeployment}
+        monitorId={id}
       />
     </Page>
   );

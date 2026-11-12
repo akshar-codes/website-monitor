@@ -23,6 +23,7 @@ import {
   ArrowUpDown,
   AlertTriangle,
   Clock3,
+  Rocket,
 } from "lucide-react";
 import * as alertingApi from "../services/api/alerting";
 import { toast } from "sonner";
@@ -435,6 +436,42 @@ export default function IncidentHistory() {
                     </li>
                   ))}
                 </ul>
+              </section>
+            )}
+            {selectedIncident.relatedDeployments?.length > 0 && (
+              <section className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
+                <h3 className="font-semibold text-xs text-indigo-900 flex items-center gap-1.5 mb-2">
+                  <Rocket size={13} className="text-indigo-600" />
+                  Correlated Releases & Deployments (
+                  {selectedIncident.relatedDeployments.length})
+                </h3>
+                <div className="space-y-1.5">
+                  {selectedIncident.relatedDeployments.map((dep) => (
+                    <div
+                      key={dep.id}
+                      className="p-2 bg-white rounded border border-indigo-100 flex items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900">
+                          {dep.version}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase">
+                          {dep.environment}
+                        </span>
+                        {dep.commitSha && (
+                          <span className="font-mono text-[10px] text-slate-500">
+                            {dep.commitSha.slice(0, 7)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        {dep.temporalRelation === "deployed_before_incident"
+                          ? `Deployed ${Math.max(1, Math.round(dep.timeDeltaSeconds / 60))}m before incident`
+                          : "Deployed during incident"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </section>
             )}
             {selectedIncident.status !== "resolved" && (

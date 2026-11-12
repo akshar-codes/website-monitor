@@ -7,6 +7,7 @@ import {
   Server,
   Tag,
   Info,
+  Activity,
 } from "lucide-react";
 import {
   getEnvironmentBadgeStyle,
@@ -14,17 +15,28 @@ import {
 } from "../../utils/deploymentFormat";
 import { formatDateTime, formatRelative } from "../../utils/format";
 import { Button } from "../ui/Primitives";
+import DeploymentImpactSection from "./DeploymentImpactSection";
 
-export default function DeploymentDetailModal({ open, onClose, deployment }) {
+export default function DeploymentDetailModal({
+  open,
+  onClose,
+  deployment,
+  monitorId,
+}) {
   if (!open || !deployment) return null;
 
   const envStyle = getEnvironmentBadgeStyle(deployment.environment);
   const commit = shortCommitSha(deployment.commitSha);
+  const effectiveMonitorId =
+    monitorId ||
+    (typeof deployment.monitors?.[0] === "object"
+      ? deployment.monitors[0]._id || deployment.monitors[0].id
+      : deployment.monitors?.[0]);
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
       <section
-        className="form-modal max-w-xl w-full"
+        className="form-modal max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         role="dialog"
         aria-modal="true"
         aria-labelledby="deployment-modal-title"
@@ -141,6 +153,20 @@ export default function DeploymentDetailModal({ open, onClose, deployment }) {
               </span>
             </div>
           )}
+
+        {/* Performance Impact & Regression Analysis */}
+        {effectiveMonitorId && (
+          <div className="mt-5 pt-4 border-t border-slate-200">
+            <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <Activity size={16} className="text-indigo-600" />
+              Performance Impact & Regression Evidence
+            </h3>
+            <DeploymentImpactSection
+              monitorId={effectiveMonitorId}
+              deploymentId={deployment.id}
+            />
+          </div>
+        )}
 
         <div className="mt-6 pt-3 border-t flex justify-end">
           <Button variant="secondary" onClick={onClose}>
