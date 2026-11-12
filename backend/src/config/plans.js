@@ -41,6 +41,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
       maxJobMonitors: 2,
       minJobIntervalSeconds: 300,
       jobRetentionDays: 7,
+      maxDeploymentIntegrations: 2,
     }),
     features: Object.freeze([
       "Up to 3 monitors",
@@ -77,6 +78,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
       maxJobMonitors: 15,
       minJobIntervalSeconds: 60,
       jobRetentionDays: 30,
+      maxDeploymentIntegrations: 10,
     }),
     features: Object.freeze([
       "Up to 25 monitors",
@@ -114,6 +116,7 @@ export const PLAN_DEFINITIONS = Object.freeze({
       maxJobMonitors: null,
       minJobIntervalSeconds: 10,
       jobRetentionDays: 365,
+      maxDeploymentIntegrations: null,
     }),
     features: Object.freeze([
       "Unlimited monitors",

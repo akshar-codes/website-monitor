@@ -23,7 +23,20 @@ const globalLimiter = rateLimit({
   handler: rateLimitHandler,
   skip: (req) =>
     req.path.startsWith("/internal/probes") ||
-    req.path.startsWith("/job-heartbeats"),
+    req.path.startsWith("/job-heartbeats") ||
+    (req.path.startsWith("/deployments") && req.method === "POST"),
+});
+
+export const deploymentIngestionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) =>
+    req.deploymentIntegration?._id?.toString() ||
+    req.get("x-deployment-key") ||
+    ipKeyGenerator(req.ip),
+  handler: rateLimitHandler,
 });
 
 export const heartbeatRateLimiter = rateLimit({
