@@ -30,6 +30,10 @@ import {
   start as startJobScheduler,
   stop as stopJobScheduler,
 } from "./workers/jobMonitorScheduler.js";
+import {
+  start as startDeploymentRegressionWorker,
+  stop as stopDeploymentRegressionWorker,
+} from "./workers/deploymentRegressionWorker.js";
 
 let server = null;
 let shuttingDown = false;
@@ -62,6 +66,7 @@ const shutdown = async (signal, exitCode = 0) => {
   await stopAlertingWorker();
   await stopSloScheduler();
   await stopJobScheduler();
+  await stopDeploymentRegressionWorker();
   if (digestTimer) clearInterval(digestTimer);
 
   if (!server) {
@@ -98,6 +103,7 @@ const startServer = async () => {
   startAlertingWorker();
   startSloScheduler();
   startJobScheduler();
+  startDeploymentRegressionWorker();
   digestTimer = setInterval(
     () =>
       dispatchNotificationDigests().catch((error) =>

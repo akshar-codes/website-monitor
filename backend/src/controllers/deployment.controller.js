@@ -161,6 +161,7 @@ export const evaluateDeploymentRegression = asyncHandler(async (req, res) => {
     {
       monitorId: req.params.id,
       deploymentId: req.params.deploymentId,
+      user: req.user,
       options: req.body || {},
     },
   );

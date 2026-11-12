@@ -22,6 +22,18 @@ export const REGRESSION_STATUS_VALUES = Object.freeze(
   Object.values(REGRESSION_STATUSES),
 );
 
+export const NOTIFICATION_STATES = Object.freeze({
+  IDLE: "idle",
+  PENDING: "pending",
+  DISPATCHING: "dispatching",
+  SENT: "sent",
+  FAILED: "failed",
+});
+
+export const NOTIFICATION_STATE_VALUES = Object.freeze(
+  Object.values(NOTIFICATION_STATES),
+);
+
 export const DEFAULT_CORRELATION_DISCLAIMER =
   "Temporal association detected. Performance changes or incidents occurred following release deployment. This indicates correlation, not proven causation. Manual verification is advised before rolling back.";
 
@@ -106,6 +118,40 @@ const deploymentAlertStateSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    notificationState: {
+      type: String,
+      enum: NOTIFICATION_STATE_VALUES,
+      default: NOTIFICATION_STATES.IDLE,
+      index: true,
+    },
+    notificationLeaseUntil: {
+      type: Date,
+      default: null,
+    },
+    notificationDispatchedAt: {
+      type: Date,
+      default: null,
+    },
+    lastNotifiedRegressionType: {
+      type: String,
+      default: null,
+    },
+    notificationAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lastNotificationError: {
+      type: String,
+      default: null,
+    },
+    notificationHistory: [
+      {
+        attemptedAt: { type: Date, default: Date.now },
+        state: { type: String, enum: NOTIFICATION_STATE_VALUES },
+        regressionType: { type: String, default: null },
+        error: { type: String, default: null },
+      },
+    ],
     lastEvaluatedAt: {
       type: Date,
       default: Date.now,
@@ -147,6 +193,10 @@ const deploymentAlertStateSchema = new mongoose.Schema(
   },
 );
 
+deploymentAlertStateSchema.index(
+  { deployment: 1, monitor: 1 },
+  { unique: true },
+);
 deploymentAlertStateSchema.index({ monitor: 1, deployment: 1 });
 deploymentAlertStateSchema.index({ owner: 1, status: 1 });
 deploymentAlertStateSchema.index({ monitor: 1, lastEvaluatedAt: -1 });

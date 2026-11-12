@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import DeploymentAlertState, {
   REGRESSION_TYPES,
   REGRESSION_STATUSES,
+  NOTIFICATION_STATES,
   DEFAULT_CORRELATION_DISCLAIMER,
 } from "../models/DeploymentAlertState.js";
 import DeploymentEvent from "../models/DeploymentEvent.js";
@@ -287,6 +288,7 @@ export const evaluateDeploymentRegression = async ({
   deploymentId,
   options = {},
   deps = {},
+  user,
 }) => {
   const models = {
     DeploymentAlertState: deps.DeploymentAlertState || DeploymentAlertState,
@@ -301,17 +303,99 @@ export const evaluateDeploymentRegression = async ({
   const config = validateRegressionConfig(options);
   const windowMs = config.windowMinutes * 60 * 1000;
 
-  // 1. Fetch monitor & deployment
+  const userId = (user?.id || user?._id)?.toString();
+  const isInternal = Boolean(deps.isInternal || !user);
+
+  // 1. Fetch monitor & deployment with ownership enforcement for non-internal callers
+  const monitorQuery =
+    isInternal || !userId
+      ? { _id: monitorId }
+      : { _id: monitorId, owner: userId };
+
+  const deploymentQuery =
+    isInternal || !userId
+      ? { _id: deploymentId }
+      : { _id: deploymentId, owner: userId };
+
+  const fetchMonitor = models.Monitor.findOne
+    ? models.Monitor.findOne(monitorQuery)
+    : models.Monitor.findById(monitorId);
+
+  const fetchDeployment = models.DeploymentEvent.findOne
+    ? models.DeploymentEvent.findOne(deploymentQuery)
+    : models.DeploymentEvent.findById(deploymentId);
+
   const [monitor, deployment] = await Promise.all([
-    models.Monitor.findById(monitorId).lean(),
-    models.DeploymentEvent.findById(deploymentId).lean(),
+    fetchMonitor.lean(),
+    fetchDeployment.lean(),
   ]);
 
   if (!monitor) {
+    if (!isInternal && userId) {
+      const existsOther = models.Monitor.findById
+        ? await models.Monitor.findById(monitorId).select("_id owner").lean()
+        : null;
+      if (existsOther) {
+        throw ApiError.forbidden(
+          "Access denied: You do not own this monitor",
+          "FORBIDDEN",
+        );
+      }
+    }
     throw ApiError.notFound("Monitor not found");
   }
+
+  if (
+    !isInternal &&
+    userId &&
+    monitor.owner &&
+    monitor.owner.toString() !== userId
+  ) {
+    throw ApiError.forbidden(
+      "Access denied: You do not own this monitor",
+      "FORBIDDEN",
+    );
+  }
+
   if (!deployment) {
+    if (!isInternal && userId) {
+      const existsOther = models.DeploymentEvent.findById
+        ? await models.DeploymentEvent.findById(deploymentId)
+            .select("_id owner")
+            .lean()
+        : null;
+      if (existsOther) {
+        throw ApiError.forbidden(
+          "Access denied: You do not own this deployment event",
+          "FORBIDDEN",
+        );
+      }
+    }
     throw ApiError.notFound("Deployment event not found");
+  }
+
+  if (
+    !isInternal &&
+    userId &&
+    deployment.owner &&
+    deployment.owner.toString() !== userId
+  ) {
+    throw ApiError.forbidden(
+      "Access denied: You do not own this deployment event",
+      "FORBIDDEN",
+    );
+  }
+
+  // Also verify that the monitor owner and deployment owner match
+  const monitorOwnerId = (monitor.owner?._id || monitor.owner)?.toString();
+  const deploymentOwnerId = (
+    deployment.owner?._id || deployment.owner
+  )?.toString();
+  if (monitorOwnerId !== deploymentOwnerId) {
+    throw ApiError.forbidden(
+      "Monitor and deployment owners do not match",
+      "FORBIDDEN",
+    );
   }
 
   // Confirm monitor belongs to deployment affected monitors
@@ -403,13 +487,13 @@ export const evaluateDeploymentRegression = async ({
     postDeployIncidents,
   } = evaluation;
 
-  const deduplicationKey = `${deployment._id.toString()}:${monitor._id.toString()}:${regressionType}`;
+  const deduplicationKey = `${deployment._id.toString()}:${monitor._id.toString()}`;
   const now = new Date();
   const cooldownMs = config.cooldownMinutes * 60 * 1000;
 
-  // 6. Upsert alert state document
+  // 6. Upsert canonical alert state document (1:1 per deployment and monitor)
   const alertState = await models.DeploymentAlertState.findOneAndUpdate(
-    { deduplicationKey },
+    { deployment: deployment._id, monitor: monitor._id },
     {
       $set: {
         owner: monitor.owner,
@@ -448,30 +532,68 @@ export const evaluateDeploymentRegression = async ({
   );
 
   let alertDispatched = false;
+  let finalAlertState = alertState;
 
-  // 7. Deduplicated notification dispatch
+  // 7. Deduplicated notification dispatch using state machine
   if (hasSuspectedRegression) {
     const isDueForAlert =
       !alertState.alertDispatchedAt ||
+      alertState.notificationState === NOTIFICATION_STATES.FAILED ||
+      alertState.notificationState !== NOTIFICATION_STATES.SENT ||
       (alertState.cooldownUntil && alertState.cooldownUntil <= now);
 
     if (isDueForAlert) {
-      // Concurrency protection: atomically claim notification dispatch
+      const LEASE_MS = 2 * 60 * 1000;
+      const leaseUntil = new Date(now.getTime() + LEASE_MS);
+
+      const claimFilter = {
+        _id: alertState._id,
+        $or: [
+          {
+            notificationState: {
+              $in: [
+                NOTIFICATION_STATES.IDLE,
+                NOTIFICATION_STATES.PENDING,
+                null,
+              ],
+            },
+          },
+          {
+            notificationState: NOTIFICATION_STATES.FAILED,
+            $or: [
+              { notificationLeaseUntil: null },
+              { notificationLeaseUntil: { $lte: now } },
+            ],
+          },
+          {
+            notificationState: NOTIFICATION_STATES.SENT,
+            cooldownUntil: { $lte: now },
+            $or: [
+              { notificationLeaseUntil: null },
+              { notificationLeaseUntil: { $lte: now } },
+            ],
+          },
+          {
+            notificationState: NOTIFICATION_STATES.DISPATCHING,
+            notificationLeaseUntil: { $lte: now },
+          },
+        ],
+      };
+
       const claimedState = await models.DeploymentAlertState.findOneAndUpdate(
-        {
-          _id: alertState._id,
-          $or: [{ alertDispatchedAt: null }, { cooldownUntil: { $lte: now } }],
-        },
+        claimFilter,
         {
           $set: {
-            alertDispatchedAt: now,
-            cooldownUntil: new Date(now.getTime() + cooldownMs),
+            notificationState: NOTIFICATION_STATES.DISPATCHING,
+            notificationLeaseUntil: leaseUntil,
           },
+          $inc: { notificationAttempts: 1 },
         },
         { returnDocument: "after" },
       );
 
       if (claimedState) {
+        finalAlertState = claimedState;
         try {
           // Priority selection: critical if incidents opened or severe failure rate
           const isCritical =
@@ -497,7 +619,8 @@ export const evaluateDeploymentRegression = async ({
             message: safeMessage,
             priority,
             link: inAppPath,
-            dedupeKey: deduplicationKey,
+            dedupeKey: `${deduplicationKey}:${regressionType}:${now.toISOString().slice(0, 13)}`,
+            throwOnError: true,
             relatedResource: {
               resourceType: "DeploymentEvent",
               resourceId: deployment._id,
@@ -520,7 +643,38 @@ export const evaluateDeploymentRegression = async ({
             },
           });
 
+          const updatedState =
+            await models.DeploymentAlertState.findOneAndUpdate(
+              { _id: alertState._id },
+              {
+                $set: {
+                  notificationState: NOTIFICATION_STATES.SENT,
+                  notificationLeaseUntil: null,
+                  notificationDispatchedAt: now,
+                  alertDispatchedAt: now,
+                  cooldownUntil: new Date(now.getTime() + cooldownMs),
+                  lastNotifiedRegressionType: regressionType,
+                  lastNotificationError: null,
+                },
+                $push: {
+                  notificationHistory: {
+                    $each: [
+                      {
+                        attemptedAt: now,
+                        state: NOTIFICATION_STATES.SENT,
+                        regressionType,
+                        error: null,
+                      },
+                    ],
+                    $slice: -20,
+                  },
+                },
+              },
+              { returnDocument: "after" },
+            );
+
           alertDispatched = true;
+          finalAlertState = updatedState || claimedState;
         } catch (dispatchErr) {
           logger.error(
             "Failed to dispatch deployment regression notification",
@@ -529,21 +683,42 @@ export const evaluateDeploymentRegression = async ({
               error: dispatchErr.message,
             },
           );
-          // Record error without crashing the evaluation
-          await models.DeploymentAlertState.updateOne(
-            { _id: alertState._id },
-            {
-              $set: { lastError: dispatchErr.message },
-              $inc: { retryCount: 1 },
-            },
-          );
+
+          const failedState =
+            await models.DeploymentAlertState.findOneAndUpdate(
+              { _id: alertState._id },
+              {
+                $set: {
+                  notificationState: NOTIFICATION_STATES.FAILED,
+                  notificationLeaseUntil: null,
+                  lastNotificationError: dispatchErr.message,
+                  lastError: dispatchErr.message,
+                },
+                $inc: { retryCount: 1 },
+                $push: {
+                  notificationHistory: {
+                    $each: [
+                      {
+                        attemptedAt: now,
+                        state: NOTIFICATION_STATES.FAILED,
+                        regressionType,
+                        error: dispatchErr.message,
+                      },
+                    ],
+                    $slice: -20,
+                  },
+                },
+              },
+              { returnDocument: "after" },
+            );
+          finalAlertState = failedState || claimedState;
         }
       }
     }
   }
 
   return {
-    alertState,
+    alertState: finalAlertState,
     evaluation: {
       status,
       regressionType,
@@ -630,6 +805,10 @@ export const evaluatePendingDeploymentRegressions = async (
   options = {},
   deps = {},
 ) => {
+  if (!deps.DeploymentEvent && mongoose.connection.readyState !== 1) {
+    return { evaluatedCount: 0, regressionsFound: 0 };
+  }
+
   const models = {
     DeploymentEvent: deps.DeploymentEvent || DeploymentEvent,
     DeploymentAlertState: deps.DeploymentAlertState || DeploymentAlertState,
@@ -683,12 +862,13 @@ export const getDeploymentRegressionState = async (
   deploymentId,
   user,
 ) => {
-  const userId = (user.id || user._id)?.toString();
+  const userId = (user?.id || user?._id)?.toString();
   const alertState = await DeploymentAlertState.findOne({
     monitor: monitorId,
     deployment: deploymentId,
     owner: userId,
   })
+    .sort({ lastEvaluatedAt: -1 })
     .populate(
       "relatedIncidents",
       "title status severity startedAt endedAt duration",

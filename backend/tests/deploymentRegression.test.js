@@ -368,6 +368,7 @@ test("End-to-End Evaluation Service: evaluates regression, dedupes alerts, and r
 
   const deployment = {
     _id: testDeploymentId,
+    owner: testOwnerId,
     version: "v3.2.0",
     environment: "production",
     deployedAt: new Date(Date.now() - 40 * 60 * 1000), // Deployed 40 mins ago
@@ -455,7 +456,12 @@ test("End-to-End Evaluation Service: evaluates regression, dedupes alerts, and r
     },
     DeploymentAlertState: {
       findOneAndUpdate: async (filter, update) => {
-        const rawKey = filter.deduplicationKey || filter._id;
+        const rawKey =
+          filter.deduplicationKey ||
+          filter._id ||
+          (filter.deployment && filter.monitor
+            ? `${filter.deployment}:${filter.monitor}`
+            : "");
         const key = rawKey ? rawKey.toString() : "";
         let existing = storedAlertStates.get(key);
 
@@ -464,6 +470,8 @@ test("End-to-End Evaluation Service: evaluates regression, dedupes alerts, and r
           if (!existing) return null;
           const isDue =
             !existing.alertDispatchedAt ||
+            existing.notificationState === "failed" ||
+            existing.notificationState !== "sent" ||
             (existing.cooldownUntil && existing.cooldownUntil <= new Date());
           if (!isDue) return null; // Failed atomic claim due to cooldown/race
           existing = {
@@ -480,6 +488,23 @@ test("End-to-End Evaluation Service: evaluates regression, dedupes alerts, and r
           return existing;
         }
 
+        if (filter._id && !filter.$or) {
+          if (existing) {
+            existing = {
+              ...existing,
+              ...update.$set,
+            };
+            storedAlertStates.set(key, existing);
+            if (existing.deduplicationKey) {
+              storedAlertStates.set(existing.deduplicationKey, existing);
+            }
+            if (existing._id) {
+              storedAlertStates.set(existing._id.toString(), existing);
+            }
+            return existing;
+          }
+        }
+
         // Upsert state
         const updated = {
           _id: existing?._id || new mongoose.Types.ObjectId(),
@@ -491,6 +516,12 @@ test("End-to-End Evaluation Service: evaluates regression, dedupes alerts, and r
         storedAlertStates.set(updated._id.toString(), updated);
         if (updated.deduplicationKey) {
           storedAlertStates.set(updated.deduplicationKey, updated);
+        }
+        if (updated.deployment && updated.monitor) {
+          storedAlertStates.set(
+            `${updated.deployment}:${updated.monitor}`,
+            updated,
+          );
         }
         return updated;
       },
