@@ -24,21 +24,18 @@ import {
 const router = Router();
 
 // Ingestion endpoints (external CI/CD authenticated via deployment credentials)
-// Request body is restricted to 64kb
 router.post(
   "/events",
-  express.json({ limit: "64kb" }),
-  deploymentAuth,
   deploymentIngestionLimiter,
+  deploymentAuth,
   validate(ingestDeploymentEventSchema, "body"),
   ingestDeploymentEvent,
 );
 
 router.post(
   "/",
-  express.json({ limit: "64kb" }),
-  deploymentAuth,
   deploymentIngestionLimiter,
+  deploymentAuth,
   validate(ingestDeploymentEventSchema, "body"),
   ingestDeploymentEvent,
 );

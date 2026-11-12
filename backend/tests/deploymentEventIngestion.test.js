@@ -64,7 +64,13 @@ before(async () => {
   Activity.create = async () => ({});
 
   const app = express();
-  app.use(express.json());
+  app.use(
+    express.json({
+      verify: (req, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use((req, _res, next) => {
     const role = req.get("x-test-role");
     req.isAuthenticated = () => Boolean(role);

@@ -52,8 +52,19 @@ app.use(
   express.json({
     limit: env.MAX_BODY_SIZE,
     verify(req, _res, buffer) {
-      if (req.originalUrl.startsWith("/api/payments/webhook"))
+      if (req.originalUrl.startsWith("/api/payments/webhook")) {
         req.rawBody = Buffer.from(buffer);
+      } else if (req.originalUrl.startsWith("/api/deployments")) {
+        if (buffer.length > 64 * 1024) {
+          const err = new Error(
+            "Deployment event payload exceeds the 64 KB limit",
+          );
+          err.statusCode = 413;
+          err.type = "entity.too.large";
+          throw err;
+        }
+        req.rawBody = Buffer.from(buffer);
+      }
     },
   }),
 );

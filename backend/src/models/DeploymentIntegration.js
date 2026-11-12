@@ -47,6 +47,11 @@ const deploymentIntegrationSchema = new mongoose.Schema(
       default: null,
       select: false,
     },
+    previousEncryptedSecret: {
+      type: String,
+      default: null,
+      select: false,
+    },
     secretRotatedAt: {
       type: Date,
       default: null,

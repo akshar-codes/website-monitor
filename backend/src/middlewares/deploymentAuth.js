@@ -50,9 +50,15 @@ export const deploymentAuth = async (req, _res, next) => {
         );
       }
 
-      const rawBody = req.rawBody
-        ? req.rawBody.toString("utf8")
-        : JSON.stringify(req.body || {});
+      if (!req.rawBody) {
+        return next(
+          ApiError.badRequest(
+            "Raw request body is required for HMAC signature verification",
+          ),
+        );
+      }
+
+      const rawBody = req.rawBody.toString("utf8");
 
       const sigResult = await authenticateDeploymentSignature({
         keyIdentifier,

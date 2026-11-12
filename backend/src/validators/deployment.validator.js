@@ -8,6 +8,45 @@ const parseDateString = (val) => {
   return isNaN(parsed.getTime()) ? null : parsed;
 };
 
+const deployedAtSchema = z
+  .unknown()
+  .optional()
+  .nullable()
+  .superRefine((val, ctx) => {
+    if (val === undefined || val === null || val === "") return;
+    const date = new Date(val);
+    if (isNaN(date.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "deployedAt must be a valid date or timestamp",
+      });
+      return;
+    }
+    const now = Date.now();
+    const maxFuture = now + 15 * 60 * 1000; // +15 minutes
+    const maxPast = now - 30 * 24 * 60 * 60 * 1000; // -30 days
+
+    if (date.getTime() > maxFuture) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "deployedAt cannot be more than 15 minutes in the future",
+      });
+      return;
+    }
+
+    if (date.getTime() < maxPast) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "deployedAt cannot be older than 30 days",
+      });
+      return;
+    }
+  })
+  .transform((val) => {
+    if (val === undefined || val === null || val === "") return undefined;
+    return new Date(val);
+  });
+
 const optionalUrl = z
   .string()
   .trim()
@@ -63,8 +102,8 @@ export const ingestDeploymentEventSchema = z
     releaseName: z.string().trim().max(128).optional(),
     commitSha: z.string().trim().max(64).optional().nullable(),
     commit: z.string().trim().max(64).optional().nullable(),
-    environment: z.string().trim().max(64).optional().default("production"),
-    deployedAt: z.preprocess(parseDateString, z.date().optional().nullable()),
+    environment: z.string().trim().max(64).optional().nullable(),
+    deployedAt: deployedAtSchema,
     source: z.string().trim().max(64).optional().default("custom"),
     url: optionalUrl,
     deploymentUrl: optionalUrl,

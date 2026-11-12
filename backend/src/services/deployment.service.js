@@ -56,13 +56,17 @@ export const generateDeploymentSecret = () => {
   const secret = `${prefix}_${secretPart}`;
   const secretHash = hashDeploymentSecret(secret);
 
-  let encryptedSecret = null;
-  if (env.ALERT_CREDENTIAL_ENCRYPTION_KEY) {
-    try {
-      encryptedSecret = encryptCredential(secret);
-    } catch {
-      encryptedSecret = null;
-    }
+  if (!env.ALERT_CREDENTIAL_ENCRYPTION_KEY) {
+    throw ApiError.internal(
+      "Credential encryption key (ALERT_CREDENTIAL_ENCRYPTION_KEY) is not configured. Deployment credentials cannot be generated securely.",
+    );
+  }
+
+  let encryptedSecret;
+  try {
+    encryptedSecret = encryptCredential(secret);
+  } catch (err) {
+    throw ApiError.internal(`Credential encryption failed: ${err.message}`);
   }
 
   return { secret, prefix, secretHash, encryptedSecret };
@@ -183,6 +187,9 @@ export const rotateDeploymentSecret = async (
     ? null
     : integration.secretHash;
   integration.previousPrefix = immediateRevoke ? null : integration.prefix;
+  integration.previousEncryptedSecret = immediateRevoke
+    ? null
+    : integration.encryptedSecret;
   integration.secretRotatedAt = new Date();
   integration.prefix = prefix;
   integration.secretHash = secretHash;
@@ -209,6 +216,7 @@ export const revokeDeploymentIntegration = async (user, id) => {
         revokedAt: new Date(),
         previousSecretHash: null,
         previousPrefix: null,
+        previousEncryptedSecret: null,
         isActive: false,
       },
     },
@@ -303,21 +311,12 @@ export const authenticateDeploymentSignature = async ({
     : { $or: [{ prefix }, { previousPrefix: prefix }] };
 
   const integration = await DeploymentIntegration.findOne(filter).select(
-    "+secretHash +encryptedSecret",
+    "+secretHash +encryptedSecret +previousSecretHash +previousEncryptedSecret +secretRotatedAt",
   );
 
   if (!integration) return null;
   if (integration.revokedAt || !integration.isActive) {
     return { error: "REVOKED", integration };
-  }
-
-  if (!integration.encryptedSecret) return null;
-
-  let plainSecret;
-  try {
-    plainSecret = decryptCredential(integration.encryptedSecret);
-  } catch {
-    return null;
   }
 
   const cleanSig = signature.startsWith("sha256=")
@@ -328,20 +327,44 @@ export const authenticateDeploymentSignature = async ({
     return null;
   }
 
-  const expected = createHmac("sha256", plainSecret)
-    .update(rawBody || "")
-    .digest("hex");
-
   const actualBuf = Buffer.from(cleanSig, "hex");
-  const expectedBuf = Buffer.from(expected, "hex");
+  if (actualBuf.length === 0) return null;
 
-  if (
-    actualBuf.length === 0 ||
-    actualBuf.length !== expectedBuf.length ||
-    !timingSafeEqual(actualBuf, expectedBuf)
-  ) {
-    return null;
+  const secretsToTry = [];
+  if (integration.encryptedSecret) {
+    try {
+      secretsToTry.push(decryptCredential(integration.encryptedSecret));
+    } catch {}
   }
+
+  const isGracePeriodActive =
+    integration.secretRotatedAt &&
+    Date.now() - new Date(integration.secretRotatedAt).getTime() <=
+      ROTATION_GRACE_PERIOD_MS;
+
+  if (isGracePeriodActive && integration.previousEncryptedSecret) {
+    try {
+      secretsToTry.push(decryptCredential(integration.previousEncryptedSecret));
+    } catch {}
+  }
+
+  let verified = false;
+  for (const plainSecret of secretsToTry) {
+    const expected = createHmac("sha256", plainSecret)
+      .update(rawBody || "")
+      .digest("hex");
+    const expectedBuf = Buffer.from(expected, "hex");
+
+    if (
+      actualBuf.length === expectedBuf.length &&
+      timingSafeEqual(actualBuf, expectedBuf)
+    ) {
+      verified = true;
+      break;
+    }
+  }
+
+  if (!verified) return null;
 
   let user = await User.findOne({
     _id: integration.owner,
@@ -444,7 +467,7 @@ export const recordDeploymentEvent = async ({ integration, payload }) => {
     : null;
 
   const externalId = payload.externalId || payload.deploymentId || null;
-  const idempotencyKey =
+  let idempotencyKey =
     payload.idempotencyKey ||
     payload.externalId ||
     payload.deploymentId ||
@@ -455,11 +478,20 @@ export const recordDeploymentEvent = async ({ integration, payload }) => {
     : new Date();
   const receivedAt = new Date();
 
+  // Deterministic fallback idempotency key if both externalId and idempotencyKey omitted
+  if (!externalId && !idempotencyKey) {
+    const timeBucket = Math.floor(deployedAt.getTime() / 60000);
+    const contentToHash = `${ownerId}:${integration._id}:${version.trim()}:${environment}:${commitSha || ""}:${timeBucket}`;
+    idempotencyKey = `auto_${createHash("sha256").update(contentToHash).digest("hex").slice(0, 32)}`;
+  }
+
   // 5. Idempotency Pre-Check
   if (externalId || idempotencyKey) {
     const orConditions = [];
-    if (externalId) orConditions.push({ externalId });
-    if (idempotencyKey) orConditions.push({ idempotencyKey });
+    if (externalId)
+      orConditions.push({ externalId: String(externalId).trim() });
+    if (idempotencyKey)
+      orConditions.push({ idempotencyKey: String(idempotencyKey).trim() });
 
     const existingEvent = await DeploymentEvent.findOne({
       owner: ownerId,
@@ -741,7 +773,9 @@ export const getDeploymentByIdForMonitor = async (
       alertState = await DeploymentAlertState.findOne({
         monitor: monitor._id,
         deployment: doc._id,
-      }).lean();
+      })
+        .sort({ lastEvaluatedAt: -1 })
+        .lean();
     }
   } catch {
     alertState = null;
@@ -995,8 +1029,17 @@ export const evaluateRegressionEvidence = ({
   // 4. Data sufficiency
   if (!before.hasSufficientSamples || !after.hasSufficientSamples) {
     if (evidence.length === 0) {
+      if (isWindowIncomplete) {
+        evidence.push(
+          `Evaluation window is still in progress (${after.sampleCount} post-deployment checks collected so far).`,
+        );
+        return {
+          status: "evaluating",
+          evidence,
+        };
+      }
       evidence.push(
-        `Insufficient sample history (${before.sampleCount} before / ${after.sampleCount} after) to establish a statistically confident comparison.`,
+        `Insufficient sample history (${before.sampleCount} before / ${after.sampleCount} after) to establish a baseline comparison.`,
       );
       return {
         status: "insufficient_data",
@@ -1008,6 +1051,16 @@ export const evaluateRegressionEvidence = ({
   if (isSuspectedRegression) {
     return {
       status: "suspected_regression",
+      evidence,
+    };
+  }
+
+  if (isWindowIncomplete) {
+    evidence.push(
+      "Evaluation window is still in progress. Observed metrics remain within stable operating boundaries so far.",
+    );
+    return {
+      status: "evaluating",
       evidence,
     };
   }
@@ -1155,7 +1208,9 @@ export const getDeploymentImpact = async (
       alertState = await DeploymentAlertState.findOne({
         monitor: monitor._id,
         deployment: deployment._id,
-      }).lean();
+      })
+        .sort({ lastEvaluatedAt: -1 })
+        .lean();
     }
   } catch {
     alertState = null;
