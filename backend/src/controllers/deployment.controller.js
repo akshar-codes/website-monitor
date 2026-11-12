@@ -1,6 +1,7 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import { sendSuccess, sendPaginated } from "../utils/apiResponse.js";
 import * as deploymentService from "../services/deployment.service.js";
+import * as deploymentRegressionService from "../services/deploymentRegression.service.js";
 
 export const createIntegration = asyncHandler(async (req, res) => {
   const result = await deploymentService.createDeploymentIntegration(
@@ -138,4 +139,33 @@ export const getDeploymentImpact = asyncHandler(async (req, res) => {
     req.validatedQuery || req.query,
   );
   return sendSuccess(res, { data: impact });
+});
+
+/**
+ * GET /api/monitors/:id/deployments/:deploymentId/regression
+ */
+export const getDeploymentRegression = asyncHandler(async (req, res) => {
+  const state = await deploymentRegressionService.getDeploymentRegressionState(
+    req.params.id,
+    req.params.deploymentId,
+    req.user,
+  );
+  return sendSuccess(res, { data: state });
+});
+
+/**
+ * POST /api/monitors/:id/deployments/:deploymentId/regression/evaluate
+ */
+export const evaluateDeploymentRegression = asyncHandler(async (req, res) => {
+  const result = await deploymentRegressionService.evaluateDeploymentRegression(
+    {
+      monitorId: req.params.id,
+      deploymentId: req.params.deploymentId,
+      options: req.body || {},
+    },
+  );
+  return sendSuccess(res, {
+    message: "Deployment regression evaluation completed",
+    data: result,
+  });
 });

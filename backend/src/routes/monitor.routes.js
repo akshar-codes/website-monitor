@@ -40,6 +40,8 @@ import {
   getMonitorDeployments,
   getMonitorDeploymentById,
   getDeploymentImpact,
+  getDeploymentRegression,
+  evaluateDeploymentRegression,
 } from "../controllers/deployment.controller.js";
 import {
   monitorDeploymentsQuerySchema,
@@ -63,6 +65,22 @@ router.get(
   validateObjectId("deploymentId"),
   validate(deploymentImpactQuerySchema, "query"),
   getDeploymentImpact,
+);
+
+router.get(
+  "/:id/deployments/:deploymentId/regression",
+  requirePermission("monitor:read"),
+  validateObjectId("id"),
+  validateObjectId("deploymentId"),
+  getDeploymentRegression,
+);
+
+router.post(
+  "/:id/deployments/:deploymentId/regression/evaluate",
+  requirePermission("monitor:update"),
+  validateObjectId("id"),
+  validateObjectId("deploymentId"),
+  evaluateDeploymentRegression,
 );
 
 router.get(

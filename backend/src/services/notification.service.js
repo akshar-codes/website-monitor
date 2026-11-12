@@ -18,7 +18,13 @@ const alertPreferenceKey = (type) => {
   if (type === "monitor_down" || type === "monitor_degraded")
     return "monitorDown";
   if (type === "monitor_up") return "monitorRecovery";
-  if (["performance_degraded", "performance_recovered"].includes(type))
+  if (
+    [
+      "performance_degraded",
+      "performance_recovered",
+      "deployment_regression",
+    ].includes(type)
+  )
     return "performanceAlerts";
   if (
     [

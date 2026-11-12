@@ -18,6 +18,7 @@ import { logActivity } from "../utils/activityLogger.js";
 import { createHealthResponseSnapshot } from "../utils/healthResponseSnapshot.js";
 import { pruneMonitorResponseSnapshots } from "../services/healthResponseRetention.service.js";
 import { evaluatePerformanceCheck } from "../services/performanceAnomaly.service.js";
+import { evaluateMonitorDeploymentRegressions } from "../services/deploymentRegression.service.js";
 import {
   createRegionalProbeRun,
   finalizeExpiredRegionalRuns,
@@ -157,6 +158,14 @@ const processMonitor = async (
         await evaluatePerformanceCheck(monitor, healthCheck);
       } catch (error) {
         logger.error("Performance anomaly evaluation failed", {
+          monitorId: id,
+          error: error.message,
+        });
+      }
+      try {
+        await evaluateMonitorDeploymentRegressions(monitor, healthCheck);
+      } catch (error) {
+        logger.error("Deployment regression evaluation failed", {
           monitorId: id,
           error: error.message,
         });
