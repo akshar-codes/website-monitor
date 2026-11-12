@@ -6,8 +6,16 @@ import {
   useMonitorRegionalAnalytics,
 } from "../hooks/useMonitors";
 import { useMonitorSlos, useSloMutations } from "../hooks/useSlos";
+import { useMonitorDeployments } from "../hooks/useDeployments";
 import { useUsage } from "../hooks/useUsage";
 import MonitorInsights from "../components/monitorDetails/MonitorInsights";
+import DeploymentTimeline from "../components/deployments/DeploymentTimeline";
+import DeploymentDetailModal from "../components/deployments/DeploymentDetailModal";
+import {
+  mapDeploymentsToChart,
+  shortCommitSha,
+  getEnvironmentBadgeStyle,
+} from "../utils/deploymentFormat";
 import { ROUTES, sloDetailsPath } from "../constants/routes";
 import { formatRelative, formatUptime } from "../utils/format";
 import { formatPercentage } from "../utils/sloFormat";
@@ -40,6 +48,8 @@ import {
   Clock3,
   TriangleAlert,
   Target,
+  Rocket,
+  GitCommit,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -52,6 +62,7 @@ import {
   Tooltip,
   LineChart,
   Line,
+  ReferenceLine,
 } from "recharts";
 
 const WINDOWS = [
@@ -59,6 +70,84 @@ const WINDOWS = [
   { label: "7d", value: "7d" },
   { label: "30d", value: "30d" },
 ];
+
+function ResponseTimeTooltip({
+  active,
+  payload,
+  label,
+  bucketDeploymentsMap,
+  onSelectDeployment,
+}) {
+  if (!active || !payload || !payload.length) return null;
+
+  const dataPoint = payload[0]?.payload;
+  const deployments = bucketDeploymentsMap?.get(label) || [];
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-lg text-xs space-y-2 max-w-xs">
+      <div>
+        <b className="text-slate-800 block text-xs">{label}</b>
+        <div className="flex justify-between gap-4 mt-1">
+          <span className="text-slate-500">Avg response:</span>
+          <span className="font-semibold text-blue-600">
+            {dataPoint?.response != null
+              ? `${Math.round(dataPoint.response)} ms`
+              : "—"}
+          </span>
+        </div>
+      </div>
+
+      {deployments.length > 0 && (
+        <div className="pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-1.5 font-semibold text-indigo-700 text-[11px] mb-1.5">
+            <Rocket size={12} />
+            <span>
+              {deployments.length} Release{deployments.length > 1 ? "s" : ""}:
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {deployments.slice(0, 3).map((dep) => {
+              const envStyle = getEnvironmentBadgeStyle(dep.environment);
+              const commit = shortCommitSha(dep.commitSha);
+              return (
+                <div
+                  key={dep.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectDeployment?.(dep);
+                  }}
+                  className="p-1.5 rounded bg-slate-50 hover:bg-indigo-50 border border-slate-100 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-semibold text-slate-800">
+                      {dep.version}
+                    </span>
+                    <span
+                      className={`px-1 py-0.5 rounded text-[9px] font-semibold border ${envStyle.badgeClass}`}
+                    >
+                      {envStyle.label}
+                    </span>
+                  </div>
+                  {commit && (
+                    <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center gap-1">
+                      <GitCommit size={10} className="text-slate-400" />
+                      {commit}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {deployments.length > 3 && (
+              <span className="text-[10px] text-slate-400 block italic">
+                + {deployments.length - 3} more releases
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MonitorDetails() {
   const { id } = useParams();
@@ -72,10 +161,26 @@ export default function MonitorDetails() {
   const [apiConfigState, setApiConfigState] = useState(null);
   const [sloModalOpen, setSloModalOpen] = useState(false);
 
+  // Deployment release correlation state
+  const [deploymentEnvFilter, setDeploymentEnvFilter] = useState("all");
+  const [selectedDeployment, setSelectedDeployment] = useState(null);
+  const [inspectedDeployment, setInspectedDeployment] = useState(null);
+
   const { data, loading, error, refetch } = useMonitorDetails(id, window);
   const { data: regionalResponse } = useMonitorRegionalAnalytics(id, window);
   const { data: monitorSlosRes, refetch: refetchMonitorSlos } =
     useMonitorSlos(id);
+  const {
+    data: deploymentsRes,
+    loading: deploymentsLoading,
+    error: deploymentsError,
+    refetch: refetchDeployments,
+  } = useMonitorDeployments(id, {
+    window,
+    environment:
+      deploymentEnvFilter !== "all" ? deploymentEnvFilter : undefined,
+  });
+  const deployments = deploymentsRes?.data || [];
   const monitorSlos = monitorSlosRes?.data || [];
   const details = data?.data;
   const regionalData = regionalResponse?.data;
@@ -150,6 +255,8 @@ export default function MonitorDetails() {
     uptime: point.uptimePercentage,
     response: point.avgResponseTime,
   }));
+  const { markers: deploymentMarkers, bucketDeploymentsMap } =
+    mapDeploymentsToChart(deployments, chart, chartPoints, window);
   return (
     <Page
       eyebrow={
@@ -244,6 +351,7 @@ export default function MonitorDetails() {
         />
       </div>
       <Panel
+        id="performance-history-panel"
         title="Performance history"
         subtitle="Uptime and response trends"
         actions={
@@ -279,14 +387,74 @@ export default function MonitorDetails() {
             </ResponsiveContainer>
           </div>
           <div>
-            <h3>Response time</h3>
+            <div className="flex items-center justify-between mb-1">
+              <h3>Response time</h3>
+              {deploymentMarkers.length > 0 && (
+                <span className="text-[11px] text-indigo-600 font-medium flex items-center gap-1">
+                  <Rocket size={11} /> {deploymentMarkers.length} release marker
+                  {deploymentMarkers.length > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={chart}>
+              <LineChart
+                data={chart}
+                onClick={(e) => {
+                  if (
+                    e?.activeLabel &&
+                    bucketDeploymentsMap?.has(e.activeLabel)
+                  ) {
+                    const deps = bucketDeploymentsMap.get(e.activeLabel);
+                    if (deps && deps[0]) {
+                      setSelectedDeployment(deps[0]);
+                      document
+                        .getElementById("deployment-history-panel")
+                        ?.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }
+                }}
+              >
                 <CartesianGrid stroke="#edf2f6" />
                 <XAxis dataKey="day" tick={{ fontSize: 9 }} />
                 <YAxis tick={{ fontSize: 9 }} />
-                <Tooltip />
+                <Tooltip
+                  content={
+                    <ResponseTimeTooltip
+                      bucketDeploymentsMap={bucketDeploymentsMap}
+                      onSelectDeployment={(dep) => {
+                        setSelectedDeployment(dep);
+                        setInspectedDeployment(dep);
+                      }}
+                    />
+                  }
+                />
                 <Line dataKey="response" stroke="#3a8ddd" dot={false} />
+                {deploymentMarkers.map((marker) => {
+                  const isSelected =
+                    selectedDeployment &&
+                    marker.deployments.some(
+                      (d) => d.id === selectedDeployment.id,
+                    );
+                  return (
+                    <ReferenceLine
+                      key={marker.day}
+                      x={marker.day}
+                      stroke={isSelected ? "#4f46e5" : "#8b5cf6"}
+                      strokeWidth={isSelected ? 2.5 : 1.5}
+                      strokeDasharray={isSelected ? undefined : "3 3"}
+                      label={{
+                        value:
+                          marker.count > 1
+                            ? `🚀 ${marker.count}`
+                            : `🚀 ${marker.latest.version}`,
+                        position: "top",
+                        fill: isSelected ? "#4338ca" : "#6d28d9",
+                        fontSize: 9,
+                        fontWeight: 600,
+                      }}
+                    />
+                  );
+                })}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -300,6 +468,32 @@ export default function MonitorDetails() {
             </p>
           </div>
         )}
+      </Panel>
+      <Panel
+        id="deployment-history-panel"
+        title="Deployment history"
+        subtitle="Releases and code changes correlated with monitor performance"
+      >
+        <DeploymentTimeline
+          deployments={deployments}
+          loading={deploymentsLoading}
+          error={deploymentsError}
+          selectedDeployment={selectedDeployment}
+          onSelectDeployment={setSelectedDeployment}
+          onFocusChart={(dep) => {
+            setSelectedDeployment(dep);
+            document
+              .getElementById("performance-history-panel")
+              ?.scrollIntoView({ behavior: "smooth" });
+          }}
+          onInspectDeployment={(dep) => {
+            setInspectedDeployment(dep);
+          }}
+          environmentFilter={deploymentEnvFilter}
+          onEnvironmentFilterChange={setDeploymentEnvFilter}
+          onRetry={refetchDeployments}
+          window={window}
+        />
       </Panel>
       <Panel title="Recent checks" subtitle="Latest health check results">
         <Table
@@ -793,6 +987,11 @@ export default function MonitorDetails() {
         open={Boolean(inspectedCheck)}
         onClose={() => setInspectedCheck(null)}
         check={inspectedCheck}
+      />
+      <DeploymentDetailModal
+        open={Boolean(inspectedDeployment)}
+        onClose={() => setInspectedDeployment(null)}
+        deployment={inspectedDeployment}
       />
     </Page>
   );
