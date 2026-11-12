@@ -8,6 +8,7 @@ import {
   Tag,
   Info,
   Activity,
+  AlertTriangle,
 } from "lucide-react";
 import {
   getEnvironmentBadgeStyle,
@@ -67,6 +68,26 @@ export default function DeploymentDetailModal({
             <X size={18} />
           </button>
         </div>
+
+        {(deployment.hasRegression ||
+          deployment.regressionStatus === "suspected_regression") && (
+          <div
+            className="my-3 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-900 flex items-start gap-2.5"
+            data-testid="modal-regression-alert"
+          >
+            <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">
+                Suspected Deployment Regression Detected:
+              </span>
+              <p className="mt-0.5 text-slate-700 leading-relaxed">
+                Empirical health check and incident data indicate degradation
+                temporally correlated with this release. Inspect the comparative
+                telemetry below.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Quick Stats Grid */}
         <div className="my-4 grid grid-cols-2 gap-3 text-xs">

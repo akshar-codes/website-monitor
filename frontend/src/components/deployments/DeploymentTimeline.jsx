@@ -8,6 +8,8 @@ import {
   RefreshCw,
   Server,
   Calendar,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import {
   getEnvironmentBadgeStyle,
@@ -146,7 +148,7 @@ export default function DeploymentTimeline({
               >
                 {/* Timeline Dot Icon */}
                 <span
-                  className={`absolute -left-[1.95rem] top-3.5 flex items-center justify-center w-5 h-5 rounded-full border text-[10px] transition-colors ${
+                  className={`absolute left-[-1.95rem] top-3.5 flex items-center justify-center w-5 h-5 rounded-full border text-[10px] transition-colors ${
                     isSelected
                       ? "bg-indigo-600 text-white border-indigo-600"
                       : "bg-white text-slate-500 border-slate-300 group-hover:border-indigo-400 group-hover:text-indigo-600"
@@ -167,6 +169,28 @@ export default function DeploymentTimeline({
                     >
                       {envStyle.label}
                     </span>
+
+                    {(dep.hasRegression ||
+                      dep.regressionStatus === "suspected_regression") && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-200"
+                        title={`Suspected regression: ${dep.regressionType || "performance degradation"}`}
+                        data-testid="timeline-regression-badge"
+                      >
+                        <AlertTriangle size={10} className="text-red-600" />
+                        Regression Suspected
+                      </span>
+                    )}
+
+                    {dep.regressionStatus === "normal" && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        title="No regression detected"
+                      >
+                        <CheckCircle2 size={10} className="text-emerald-600" />
+                        Healthy
+                      </span>
+                    )}
 
                     {commit && (
                       <span

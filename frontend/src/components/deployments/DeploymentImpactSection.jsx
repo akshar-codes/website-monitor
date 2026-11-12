@@ -13,6 +13,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useDeploymentImpact } from "../../hooks/useDeployments";
+import { evaluateDeploymentRegression } from "../../services/api/deployments";
 import { Status, Notice, Button } from "../ui/Primitives";
 
 const INTERVAL_OPTIONS = [
@@ -24,6 +25,7 @@ const INTERVAL_OPTIONS = [
 
 export default function DeploymentImpactSection({ monitorId, deploymentId }) {
   const [windowMinutes, setWindowMinutes] = useState(30);
+  const [reEvaluating, setReEvaluating] = useState(false);
 
   const {
     data: impactData,
@@ -31,6 +33,21 @@ export default function DeploymentImpactSection({ monitorId, deploymentId }) {
     error,
     refetch,
   } = useDeploymentImpact(monitorId, deploymentId, { windowMinutes });
+
+  const handleReevaluate = async () => {
+    try {
+      setReEvaluating(true);
+      await evaluateDeploymentRegression(monitorId, deploymentId, {
+        windowMinutes,
+      });
+      refetch();
+    } catch {
+      // refetch will update status
+      refetch();
+    } finally {
+      setReEvaluating(false);
+    }
+  };
 
   if (loading && !impactData) {
     return (
@@ -79,18 +96,33 @@ export default function DeploymentImpactSection({ monitorId, deploymentId }) {
         <div className="flex items-center gap-1.5 text-slate-600 font-semibold">
           <Clock size={13} /> Comparison Window:
         </div>
-        <select
-          value={windowMinutes}
-          onChange={(e) => setWindowMinutes(Number(e.target.value))}
-          className="text-xs border border-slate-200 rounded px-2.5 py-1 bg-white text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          data-testid="impact-window-select"
-        >
-          {INTERVAL_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={windowMinutes}
+            onChange={(e) => setWindowMinutes(Number(e.target.value))}
+            className="text-xs border border-slate-200 rounded px-2.5 py-1 bg-white text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            data-testid="impact-window-select"
+          >
+            {INTERVAL_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="secondary"
+            onClick={handleReevaluate}
+            disabled={reEvaluating}
+            className="text-xs py-1 px-2.5"
+            data-testid="reevaluate-impact-btn"
+          >
+            <RefreshCw
+              size={11}
+              className={`mr-1 ${reEvaluating ? "animate-spin" : ""}`}
+            />
+            {reEvaluating ? "Evaluating..." : "Re-evaluate"}
+          </Button>
+        </div>
       </div>
 
       {/* Regression & Correlation Status Banner */}
@@ -107,20 +139,17 @@ export default function DeploymentImpactSection({ monitorId, deploymentId }) {
         <div className="flex items-center gap-2 font-bold mb-1.5">
           {status === "suspected_regression" ? (
             <>
-              <AlertTriangle size={15} className="text-red-600 flex-shrink-0" />
+              <AlertTriangle size={15} className="text-red-600 shrink-0" />
               <span>Suspected Performance Regression</span>
             </>
           ) : status === "normal" ? (
             <>
-              <CheckCircle2
-                size={15}
-                className="text-emerald-600 flex-shrink-0"
-              />
+              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
               <span>Stable Performance (No Regressions Detected)</span>
             </>
           ) : (
             <>
-              <Info size={15} className="text-slate-500 flex-shrink-0" />
+              <Info size={15} className="text-slate-500 shrink-0" />
               <span>Insufficient Comparison Data</span>
             </>
           )}
@@ -355,6 +384,22 @@ export default function DeploymentImpactSection({ monitorId, deploymentId }) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Explicit Causality vs Correlation Disclaimer */}
+      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600">
+        <div className="flex items-start gap-2">
+          <Info size={14} className="text-slate-400 shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            <strong className="text-slate-700">
+              Important Correlation Note:
+            </strong>{" "}
+            Temporal association detected. Performance changes or incidents
+            occurred following release deployment. This indicates correlation,
+            not proven causation. Manual verification is advised before rolling
+            back.
+          </p>
+        </div>
       </div>
     </div>
   );

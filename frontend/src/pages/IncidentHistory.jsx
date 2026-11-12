@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   useIncidentHistory,
   useIncidentDetails,
@@ -464,10 +465,27 @@ export default function IncidentHistory() {
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-500">
-                        {dep.temporalRelation === "deployed_before_incident"
-                          ? `Deployed ${Math.max(1, Math.round(dep.timeDeltaSeconds / 60))}m before incident`
-                          : "Deployed during incident"}
+                      <div className="flex items-center gap-2">
+                        <div className="text-[11px] text-slate-500">
+                          {dep.temporalRelation === "deployed_before_incident"
+                            ? `Deployed ${Math.max(1, Math.round(dep.timeDeltaSeconds / 60))}m before incident`
+                            : "Deployed during incident"}
+                        </div>
+                        {(selectedIncident.monitor?._id ||
+                          selectedIncident.monitor?.id ||
+                          selectedIncident.monitor) && (
+                          <Link
+                            to={`/monitors/${
+                              selectedIncident.monitor?._id ||
+                              selectedIncident.monitor?.id ||
+                              selectedIncident.monitor
+                            }?deploymentId=${dep.id}`}
+                            className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 underline ml-2"
+                            data-testid="inspect-correlated-release-link"
+                          >
+                            Inspect Release
+                          </Link>
+                        )}
                       </div>
                     </div>
                   ))}

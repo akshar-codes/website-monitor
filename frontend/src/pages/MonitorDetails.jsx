@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   useMonitorDetails,
   useMonitorMutations,
@@ -152,6 +152,8 @@ function ResponseTimeTooltip({
 export default function MonitorDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const linkedDeploymentId = searchParams.get("deploymentId");
 
   const [window, setWindow] = useState("24h");
   const [regionalMetric, setRegionalMetric] = useState("p95");
@@ -180,7 +182,27 @@ export default function MonitorDetails() {
     environment:
       deploymentEnvFilter !== "all" ? deploymentEnvFilter : undefined,
   });
-  const deployments = deploymentsRes?.data || [];
+  const deployments = useMemo(
+    () => deploymentsRes?.data || [],
+    [deploymentsRes?.data],
+  );
+
+  // Deep-link auto-selection of deployment from notification / incident links
+  useEffect(() => {
+    if (!linkedDeploymentId || deployments.length === 0) return;
+    const match = deployments.find(
+      (d) => (d.id || d._id) === linkedDeploymentId,
+    );
+    if (match) {
+      const timer = setTimeout(() => {
+        setSelectedDeployment(match);
+        setInspectedDeployment(match);
+        const el = document.getElementById("deployment-history-panel");
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [linkedDeploymentId, deployments]);
   const monitorSlos = monitorSlosRes?.data || [];
   const details = data?.data;
   const regionalData = regionalResponse?.data;

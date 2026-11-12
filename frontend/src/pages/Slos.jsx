@@ -150,7 +150,7 @@ export default function Slos() {
         title="Service Level Objectives"
         description="Monitor availability targets, multi-window burn rates, and error budgets."
       >
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-2xl p-8 max-w-4xl mx-auto my-8 shadow-sm text-center space-y-6">
+        <div className="bg-linear-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-2xl p-8 max-w-4xl mx-auto my-8 shadow-sm text-center space-y-6">
           <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-md">
             <Target size={32} />
           </div>
