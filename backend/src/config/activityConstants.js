@@ -33,6 +33,7 @@ export const ACTIVITY_ACTIONS = Object.freeze({
   MONITOR_PAUSED: "monitor_paused",
   MONITOR_RESUMED: "monitor_resumed",
   MONITOR_DELETED: "monitor_deleted",
+  DEPLOYMENT_REGRESSION_DETECTED: "deployment_regression_detected",
 
   // ── SLO ──
   SLO_CREATED: "slo_created",

@@ -10,6 +10,7 @@ import DeploymentEvent from "../models/DeploymentEvent.js";
 import Monitor from "../models/Monitor.js";
 import HealthCheck from "../models/HealthCheck.js";
 import Incident from "../models/Incident.js";
+import DeploymentAlertState from "../models/DeploymentAlertState.js";
 import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import env from "../config/env.js";
@@ -647,21 +648,49 @@ export const getDeploymentsForMonitor = async (
     DeploymentEvent.countDocuments(filter),
   ]);
 
-  const deployments = items.map((doc) => ({
-    id: doc._id?.toString() || doc.id,
-    version: doc.version,
-    commitSha: doc.commitSha || null,
-    environment: doc.environment,
-    deployedAt: doc.deployedAt,
-    receivedAt: doc.receivedAt,
-    source: doc.source,
-    url: doc.url || null,
-    description: doc.description || null,
-    externalId: doc.externalId || null,
-    monitors: doc.monitors,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt,
-  }));
+  const deploymentIds = items.map((doc) => doc._id);
+  let alertStates = [];
+  try {
+    if (mongoose.connection.readyState === 1) {
+      alertStates = await DeploymentAlertState.find({
+        monitor: monitor._id,
+        deployment: { $in: deploymentIds },
+      })
+        .select("deployment status regressionType evidence alertDispatchedAt")
+        .lean();
+    }
+  } catch {
+    alertStates = [];
+  }
+
+  const alertMap = new Map();
+  for (const s of alertStates) {
+    if (s.deployment) {
+      alertMap.set(s.deployment.toString(), s);
+    }
+  }
+
+  const deployments = items.map((doc) => {
+    const alert = alertMap.get((doc._id || doc.id)?.toString());
+    return {
+      id: doc._id?.toString() || doc.id,
+      version: doc.version,
+      commitSha: doc.commitSha || null,
+      environment: doc.environment,
+      deployedAt: doc.deployedAt,
+      receivedAt: doc.receivedAt,
+      source: doc.source,
+      url: doc.url || null,
+      description: doc.description || null,
+      externalId: doc.externalId || null,
+      monitors: doc.monitors,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+      regressionStatus: alert?.status || null,
+      regressionType: alert?.regressionType || null,
+      hasRegression: alert?.status === "suspected_regression",
+    };
+  });
 
   return {
     deployments,
@@ -706,6 +735,18 @@ export const getDeploymentByIdForMonitor = async (
     throw ApiError.notFound("Deployment event not found");
   }
 
+  let alertState = null;
+  try {
+    if (mongoose.connection.readyState === 1) {
+      alertState = await DeploymentAlertState.findOne({
+        monitor: monitor._id,
+        deployment: doc._id,
+      }).lean();
+    }
+  } catch {
+    alertState = null;
+  }
+
   return {
     id: doc._id?.toString() || doc.id,
     version: doc.version,
@@ -720,6 +761,10 @@ export const getDeploymentByIdForMonitor = async (
     monitors: doc.monitors,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
+    regressionStatus: alertState?.status || null,
+    regressionType: alertState?.regressionType || null,
+    hasRegression: alertState?.status === "suspected_regression",
+    regressionState: alertState || null,
   };
 };
 
@@ -1104,6 +1149,18 @@ export const getDeploymentImpact = async (
     isWindowIncomplete,
   });
 
+  let alertState = null;
+  try {
+    if (mongoose.connection.readyState === 1) {
+      alertState = await DeploymentAlertState.findOne({
+        monitor: monitor._id,
+        deployment: deployment._id,
+      }).lean();
+    }
+  } catch {
+    alertState = null;
+  }
+
   return {
     deployment: {
       id: deployment._id?.toString() || deployment.id,
@@ -1136,6 +1193,7 @@ export const getDeploymentImpact = async (
     },
     correlation,
     relatedIncidents,
+    alertState: alertState || null,
   };
 };
 
