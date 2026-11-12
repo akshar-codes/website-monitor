@@ -53,3 +53,17 @@ export function useDeploymentImpact(monitorId, deploymentId, params = {}) {
     { immediate: Boolean(monitorId && deploymentId) },
   );
 }
+
+/**
+ * Hook to retrieve regression alert state for a deployment.
+ */
+export function useDeploymentRegression(monitorId, deploymentId) {
+  return useQuery(
+    () => {
+      if (!monitorId || !deploymentId) return null;
+      return deploymentsApi.getDeploymentRegression(monitorId, deploymentId);
+    },
+    [monitorId, deploymentId],
+    { immediate: Boolean(monitorId && deploymentId) },
+  );
+}

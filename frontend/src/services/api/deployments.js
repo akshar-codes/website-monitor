@@ -39,6 +39,33 @@ export async function getDeploymentImpact(
 }
 
 /**
+ * GET /api/monitors/:id/deployments/:deploymentId/regression
+ * Retrieve regression alert state for a deployment.
+ */
+export async function getDeploymentRegression(monitorId, deploymentId) {
+  const { data } = await apiClient.get(
+    `/monitors/${monitorId}/deployments/${deploymentId}/regression`,
+  );
+  return data?.data;
+}
+
+/**
+ * POST /api/monitors/:id/deployments/:deploymentId/regression/evaluate
+ * Trigger on-demand regression evaluation.
+ */
+export async function evaluateDeploymentRegression(
+  monitorId,
+  deploymentId,
+  options = {},
+) {
+  const { data } = await apiClient.post(
+    `/monitors/${monitorId}/deployments/${deploymentId}/regression/evaluate`,
+    options,
+  );
+  return data?.data;
+}
+
+/**
  * GET /api/deployments/events
  * Retrieve general deployment events for user.
  */

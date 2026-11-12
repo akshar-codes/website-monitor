@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
 import { renderToString } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import { createServer } from "vite";
 
 import {
@@ -16,6 +17,7 @@ let viteServer;
 let DeploymentTimeline;
 let DeploymentDetailModal;
 let DeploymentImpactSection;
+let DeploymentInvestigationSummary;
 
 test.before(async () => {
   viteServer = await createServer({
@@ -37,6 +39,11 @@ test.before(async () => {
     "./src/components/deployments/DeploymentImpactSection.jsx",
   );
   DeploymentImpactSection = impactMod.default;
+
+  const summaryMod = await viteServer.ssrLoadModule(
+    "./src/components/deployments/DeploymentInvestigationSummary.jsx",
+  );
+  DeploymentInvestigationSummary = summaryMod.default;
 });
 
 test.after(async () => {
@@ -242,6 +249,157 @@ test("DeploymentImpactSection Component: renders loading state during initial lo
   assert.match(html, /Calculating deployment impact/);
 });
 
+test("DeploymentTimeline Component: renders regression badge when release has suspected regression", () => {
+  const deployments = [
+    {
+      id: "dep-reg-1",
+      version: "v4.0.0-rc1",
+      environment: "production",
+      deployedAt: new Date().toISOString(),
+      source: "github-actions",
+      hasRegression: true,
+      regressionStatus: "suspected_regression",
+      regressionType: "latency",
+    },
+    {
+      id: "dep-norm-1",
+      version: "v3.9.0",
+      environment: "production",
+      deployedAt: new Date().toISOString(),
+      source: "github-actions",
+      hasRegression: false,
+      regressionStatus: "normal",
+    },
+  ];
+
+  const html = renderToString(
+    React.createElement(DeploymentTimeline, {
+      deployments,
+      loading: false,
+    }),
+  );
+
+  assert.match(html, /data-testid="timeline-regression-badge"/);
+  assert.match(html, /Regression Suspected/);
+  assert.match(html, /Healthy/);
+});
+
+test("DeploymentDetailModal Component: renders regression alert banner when release has suspected regression", () => {
+  const deployment = {
+    id: "dep-reg-1",
+    version: "v4.0.0-rc1",
+    environment: "production",
+    deployedAt: new Date().toISOString(),
+    source: "github-actions",
+    hasRegression: true,
+    regressionStatus: "suspected_regression",
+    monitors: ["64b000000000000000000001"],
+  };
+
+  const html = renderToString(
+    React.createElement(DeploymentDetailModal, {
+      open: true,
+      onClose: () => {},
+      deployment,
+    }),
+  );
+
+  assert.match(html, /data-testid="modal-regression-alert"/);
+  assert.match(html, /Suspected Deployment Regression Detected/);
+});
+
+test("DeploymentInvestigationSummary Component: renders investigation summary, evidence, and causality disclaimer", () => {
+  const deployment = {
+    id: "dep-reg-1",
+    version: "v4.0.0-rc1",
+    environment: "production",
+    deployedAt: new Date().toISOString(),
+    source: "github-actions",
+  };
+
+  const impact = {
+    window: {
+      windowMinutes: 30,
+      elapsedAfterMinutes: 30,
+      isWindowIncomplete: false,
+    },
+    metrics: {
+      before: {
+        sampleCount: 15,
+        availability: 100,
+        medianResponseTime: 45,
+        p95ResponseTime: 65,
+        hasSufficientSamples: true,
+      },
+      after: {
+        sampleCount: 15,
+        availability: 93.3,
+        medianResponseTime: 110,
+        p95ResponseTime: 180,
+        hasSufficientSamples: true,
+      },
+      diff: {
+        availabilityChange: -6.7,
+        failureRateChange: 6.7,
+        medianResponseTimeChangeMs: 65,
+        medianResponseTimeChangePercent: 144.4,
+        p95ResponseTimeChangeMs: 115,
+        p95ResponseTimeChangePercent: 176.9,
+      },
+    },
+    correlation: {
+      status: "suspected_regression",
+      regressionType: "combined",
+      evidence: [
+        "Failure rate elevated by +6.7%",
+        "Median response time degraded by +65 ms (+144.4%)",
+      ],
+    },
+    relatedIncidents: [
+      {
+        id: "inc-1",
+        title: "High API Latency",
+        status: "ongoing",
+        severity: "major",
+        startedAt: new Date().toISOString(),
+        timeDeltaSeconds: 300,
+        timingRelation: "started_after_deployment",
+      },
+    ],
+    alertState: {
+      status: "suspected_regression",
+      regressionType: "combined",
+      evidence: [
+        "Failure rate elevated by +6.7%",
+        "Median response time degraded by +65 ms (+144.4%)",
+      ],
+      alertDispatchedAt: new Date().toISOString(),
+    },
+  };
+
+  const html = renderToString(
+    React.createElement(
+      MemoryRouter,
+      null,
+      React.createElement(DeploymentInvestigationSummary, {
+        deployment,
+        impact,
+        monitorId: "64b000000000000000000001",
+      }),
+    ),
+  );
+
+  assert.match(html, /data-testid="deployment-investigation-summary"/);
+  assert.match(html, /data-testid="regression-status-badge"/);
+  assert.match(html, /Suspected Regression/);
+  assert.match(html, /Failure rate elevated by \+6\.7%/);
+  assert.match(html, /Median response time degraded by \+65 ms/);
+  assert.match(html, /Temporal association detected/);
+  assert.match(html, /not proven causation/);
+  assert.match(html, /data-testid="reevaluate-regression-btn"/);
+  assert.match(html, /High API Latency/);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. API Client Export Verification
 // ─────────────────────────────────────────────────────────────────────────────
@@ -250,6 +408,8 @@ test("API Client: verifies all deployment API client functions are exported", ()
   assert.equal(typeof deploymentsApi.getMonitorDeployments, "function");
   assert.equal(typeof deploymentsApi.getMonitorDeploymentById, "function");
   assert.equal(typeof deploymentsApi.getDeploymentImpact, "function");
+  assert.equal(typeof deploymentsApi.getDeploymentRegression, "function");
+  assert.equal(typeof deploymentsApi.evaluateDeploymentRegression, "function");
   assert.equal(typeof deploymentsApi.getDeployments, "function");
   assert.equal(typeof deploymentsApi.getDeploymentIntegrations, "function");
 });
