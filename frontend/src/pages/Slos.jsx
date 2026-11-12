@@ -311,7 +311,7 @@ export default function Slos() {
 
       {/* Filter and Search Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="relative flex-1 min-w-[240px] max-w-md">
+        <div className="relative flex-1 min-w-60 max-w-md">
           <Search
             className="absolute left-3 top-2.5 text-slate-400"
             size={15}
@@ -386,7 +386,7 @@ export default function Slos() {
                   <th className="py-3 px-4">Target</th>
                   <th className="py-3 px-4">Current SLI</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 min-w-[180px]">Remaining Budget</th>
+                  <th className="py-3 px-4 min-w-45">Remaining Budget</th>
                   <th className="py-3 px-4">Window</th>
                   <th className="py-3 px-4">1h Burn</th>
                   <th className="py-3 px-4 text-right">Actions</th>

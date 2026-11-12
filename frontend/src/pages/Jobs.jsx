@@ -208,7 +208,7 @@ export default function Jobs() {
             </strong>
           </div>
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs">
-            <span className="text-xs text-emerald-600 font-medium block flex items-center gap-1">
+            <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
               <CheckCircle2 size={13} /> Operational
             </span>
             <strong className="text-2xl font-bold text-emerald-600 mt-1 block">
@@ -216,7 +216,7 @@ export default function Jobs() {
             </strong>
           </div>
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs">
-            <span className="text-xs text-amber-600 font-medium block flex items-center gap-1">
+            <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
               <Clock size={13} /> Late / Overdue
             </span>
             <strong className="text-2xl font-bold text-amber-600 mt-1 block">
@@ -224,7 +224,7 @@ export default function Jobs() {
             </strong>
           </div>
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs">
-            <span className="text-xs text-rose-600 font-medium block flex items-center gap-1">
+            <span className="text-xs text-rose-600 font-medium flex items-center gap-1">
               <AlertTriangle size={13} /> Failing / Down
             </span>
             <strong className="text-2xl font-bold text-rose-600 mt-1 block">
@@ -235,9 +235,9 @@ export default function Jobs() {
 
         {/* Filter Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-white border border-slate-200">
-          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-60">
             {/* Search Input */}
-            <div className="relative flex-1 min-w-[180px] max-w-sm">
+            <div className="relative flex-1 min-w-45 max-w-sm">
               <Search
                 size={14}
                 className="absolute left-3 top-2.5 text-slate-400"

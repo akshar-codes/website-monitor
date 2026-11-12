@@ -100,7 +100,7 @@ export default function JobDurationChart({ runs = [] }) {
                     </b>
                   </div>
                   {data.runId && (
-                    <div className="text-[10px] text-slate-400 font-mono truncate max-w-[200px]">
+                    <div className="text-[10px] text-slate-400 font-mono truncate max-w-50">
                       ID: {data.runId}
                     </div>
                   )}

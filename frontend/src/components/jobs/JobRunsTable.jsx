@@ -122,7 +122,7 @@ export default function JobRunsTable({
                       <td className="py-2.5 px-3">
                         <JobRunStatusBadge status={run.status} />
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700 max-w-[140px] truncate">
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700 max-w-35 truncate">
                         {run.runId}
                       </td>
                       <td className="py-2.5 px-3 text-slate-600">
@@ -141,7 +141,7 @@ export default function JobRunsTable({
                           ? formatDate(run.completedAt)
                           : "In flight"}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-500 truncate max-w-[180px]">
+                      <td className="py-2.5 px-3 text-slate-500 truncate max-w-45">
                         {run.errorMessage ? (
                           <span className="text-rose-600 truncate flex items-center gap-1 font-mono text-[11px]">
                             <AlertTriangle size={11} className="shrink-0" />
