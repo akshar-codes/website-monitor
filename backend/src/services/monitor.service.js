@@ -12,6 +12,7 @@ import RegionalPerformanceState from "../models/RegionalPerformanceState.js";
 import RegionalIncident from "../models/RegionalIncident.js";
 import RegionalDailyStat from "../models/RegionalDailyStat.js";
 import RegionalHourlyStat from "../models/RegionalHourlyStat.js";
+import ServiceDependency from "../models/ServiceDependency.js";
 import ApiError from "../utils/ApiError.js";
 import { ROLES } from "../config/constants.js";
 import { hasFeature, FEATURES } from "../config/features.js";
@@ -736,6 +737,12 @@ export const deleteMonitor = async (id, user) => {
     RegionalHourlyStat.deleteMany({ monitor: monitor._id }),
     RegionalPerformanceState.deleteMany({ monitor: monitor._id }),
     Incident.deleteMany({ monitor: monitor._id }),
+    ServiceDependency.deleteMany({
+      $or: [
+        { dependentMonitor: monitor._id },
+        { dependencyMonitor: monitor._id },
+      ],
+    }),
     StatusPage.updateMany(
       { "services.monitor": monitor._id },
       { $pull: { services: { monitor: monitor._id } } },
