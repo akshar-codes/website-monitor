@@ -47,6 +47,8 @@ import {
   monitorDeploymentsQuerySchema,
   deploymentImpactQuerySchema,
 } from "../validators/deployment.validator.js";
+import { getMonitorCorrelation } from "../controllers/correlation.controller.js";
+import { correlationQuerySchema } from "../validators/correlation.validator.js";
 
 const router = Router();
 
@@ -96,6 +98,14 @@ router.get(
   requirePermission("monitor:read"),
   validateObjectId("id"),
   getMonitorDiagnostics,
+);
+
+router.get(
+  "/:id/correlation",
+  requirePermission("incident:read"),
+  validateObjectId("id"),
+  validate(correlationQuerySchema, "query"),
+  getMonitorCorrelation,
 );
 
 router.post(

@@ -144,6 +144,24 @@ const openIncident = async (monitor, healthCheck, failureCount, deps) => {
     deps,
   );
   await deps.syncStatusIncident(activeIncident, "opened");
+
+  // Asynchronously trigger failure correlation in background without blocking health-check pipeline
+  setImmediate(async () => {
+    try {
+      const { correlateIncident } =
+        await import("../services/correlation.service.js");
+      await correlateIncident(
+        activeIncident._id,
+        { _id: monitor.owner },
+        { lookbackMinutes: 30 },
+      );
+    } catch (corrErr) {
+      logger.warn(
+        `Asynchronous correlation sweep failed for incident ${activeIncident._id}: ${corrErr.message}`,
+      );
+    }
+  });
+
   return activeIncident;
 };
 

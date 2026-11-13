@@ -27,7 +27,9 @@ import {
   updateStatusSchema,
   downtimeStatsSchema,
 } from "../validators/incident.validator.js";
+import { correlationQuerySchema } from "../validators/correlation.validator.js";
 import * as alertingController from "../controllers/alerting.controller.js";
+import * as correlationController from "../controllers/correlation.controller.js";
 
 const router = Router();
 
@@ -49,6 +51,13 @@ router.get(
   requirePermission("incident:read"),
   validateObjectId("id"),
   getIncidentById,
+);
+router.get(
+  "/:id/correlation",
+  requirePermission("incident:read"),
+  validateObjectId("id"),
+  validate(correlationQuerySchema, "query"),
+  correlationController.getIncidentCorrelation,
 );
 router.patch(
   "/:id/status",
