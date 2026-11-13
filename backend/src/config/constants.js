@@ -267,3 +267,50 @@ export const JOB_MONITOR_LIMITS = Object.freeze({
   MAX_RECOVERY_THRESHOLD: 10,
   DEFAULT_RECOVERY_THRESHOLD: 1,
 });
+
+// ── Service Dependency & Graph Mapping ──────────────────────────────────────
+
+export const DEPENDENCY_TYPES = Object.freeze({
+  HARD: "hard",
+  SOFT: "soft",
+});
+
+export const DEPENDENCY_TYPE_VALUES = Object.freeze(
+  Object.values(DEPENDENCY_TYPES),
+);
+
+export const DEPENDENCY_TARGET_TYPES = Object.freeze({
+  MONITOR: "monitor",
+  EXTERNAL_SERVICE: "external_service",
+});
+
+export const DEPENDENCY_TARGET_TYPE_VALUES = Object.freeze(
+  Object.values(DEPENDENCY_TARGET_TYPES),
+);
+
+export const EXTERNAL_SERVICE_TYPES = Object.freeze({
+  DATABASE: "database",
+  THIRD_PARTY_API: "third_party_api",
+  PAYMENT_PROVIDER: "payment_provider",
+  CLOUD_SERVICE: "cloud_service",
+  MESSAGE_BROKER: "message_broker",
+  OTHER: "other",
+});
+
+export const EXTERNAL_SERVICE_TYPE_VALUES = Object.freeze(
+  Object.values(EXTERNAL_SERVICE_TYPES),
+);
+
+export const DEPENDENCY_SORT_FIELDS = Object.freeze([
+  "createdAt",
+  "updatedAt",
+  "dependencyType",
+  "isActive",
+]);
+
+export const GRAPH_LIMITS = Object.freeze({
+  MAX_DEPENDENCY_DEPTH: 10,
+  MAX_GRAPH_NODES_PER_USER: 200,
+  HEALTH_DATA_STALENESS_FACTOR: 2.5,
+  MIN_STALENESS_SECONDS: 600, // 10 minutes
+});

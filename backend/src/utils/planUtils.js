@@ -46,6 +46,15 @@ export const getSloLimit = (plan) => {
 
 export const hasUnlimitedSlos = (plan) => getSloLimit(plan) === null;
 
+/** `null` return means the plan has no dependency cap. */
+export const getDependencyLimit = (plan) => {
+  const definition = getPlanDefinition(plan);
+  return definition ? definition.limits.maxDependencies : 0;
+};
+
+export const hasUnlimitedDependencies = (plan) =>
+  getDependencyLimit(plan) === null;
+
 /**
  * True when `intervalSeconds` respects the plan's minimum check interval —
  * a smaller interval means more frequent polling, so the requested

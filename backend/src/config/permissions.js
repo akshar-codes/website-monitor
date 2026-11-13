@@ -42,6 +42,14 @@ export const ROLE_PERMISSIONS = Object.freeze({
     "job-monitor:create",
     "job-monitor:update",
     "job-monitor:delete",
+    "dependency:read",
+    "dependency:create",
+    "dependency:update",
+    "dependency:delete",
+    "external-service:read",
+    "external-service:create",
+    "external-service:update",
+    "external-service:delete",
   ]),
 
   [ROLES.ADMIN]: Object.freeze([
@@ -69,6 +77,12 @@ export const ROLE_PERMISSIONS = Object.freeze({
     "job-monitor:read",
     "job-monitor:update",
     "job-monitor:delete",
+    "dependency:read",
+    "dependency:update",
+    "dependency:delete",
+    "external-service:read",
+    "external-service:update",
+    "external-service:delete",
   ]),
 });
 

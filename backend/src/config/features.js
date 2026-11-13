@@ -19,6 +19,7 @@ export const FEATURES = Object.freeze({
   API_MONITORING: "apiMonitoring",
   SLO_MANAGEMENT: "sloManagement",
   JOB_MONITORING: "jobMonitoring",
+  DEPENDENCY_MAPPING: "dependencyMapping",
 });
 
 const FEATURE_CHECKS = Object.freeze({
@@ -74,6 +75,14 @@ const FEATURE_CHECKS = Object.freeze({
       !!definition &&
       (definition.limits.maxJobMonitors === null ||
         definition.limits.maxJobMonitors > 0)
+    );
+  },
+  [FEATURES.DEPENDENCY_MAPPING]: (plan) => {
+    const definition = getPlanDefinition(plan);
+    return (
+      !!definition &&
+      (definition.limits.maxDependencies === null ||
+        definition.limits.maxDependencies > 0)
     );
   },
 });
