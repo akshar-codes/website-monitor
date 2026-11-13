@@ -30,6 +30,7 @@ const StatusSubscription = lazy(() => import("./pages/StatusSubscription"));
 const MonitorDetails = lazy(() => import("./pages/MonitorDetails"));
 const SslMonitoring = lazy(() => import("./pages/SslMonitoring"));
 const Insights = lazy(() => import("./pages/Insights"));
+const Dependencies = lazy(() => import("./pages/Dependencies"));
 const IncidentHistory = lazy(() => import("./pages/IncidentHistory"));
 const Billing = lazy(() => import("./pages/Billing"));
 const Activity = lazy(() => import("./pages/Activity"));
@@ -231,6 +232,14 @@ export default function App() {
                           element={
                             <Suspense fallback={null}>
                               <Insights />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/dependencies"
+                          element={
+                            <Suspense fallback={null}>
+                              <Dependencies />
                             </Suspense>
                           }
                         />

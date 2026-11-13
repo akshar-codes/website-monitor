@@ -26,6 +26,7 @@ import {
   PlugZap,
   Target,
   Clock,
+  Network,
 } from "lucide-react";
 import { formatPlanName } from "../../utils/formatPlanName";
 import { useTranslation } from "../../i18n";
@@ -35,6 +36,7 @@ const userLinks = [
   ["Monitors", "/monitors", Signal],
   ["Background Jobs", "/jobs", Clock],
   ["SLOs & Budgets", "/slos", Target],
+  ["Dependencies", "/dependencies", Network],
   ["Status pages", "/status-pages", Globe2],
   ["Alert integrations", "/integrations", PlugZap],
   ["Integration Guide", "/integration-guide", BookOpen],

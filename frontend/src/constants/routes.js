@@ -18,6 +18,7 @@ export const ROUTES = Object.freeze({
   SLO_EDIT: "/slos/:id/edit",
   SSL_MONITORING: "/ssl",
   INSIGHTS: "/insights",
+  DEPENDENCIES: "/dependencies",
   INCIDENTS: "/incidents",
   BILLING: "/billing",
   ACTIVITY: "/activity",
@@ -33,3 +34,6 @@ export const ROUTES = Object.freeze({
 export const monitorDetailsPath = (monitorId) => `/monitors/${monitorId}`;
 export const jobDetailsPath = (jobId) => `/jobs/${jobId}`;
 export const sloDetailsPath = (sloId) => `/slos/${sloId}`;
+export const dependenciesPath = () => "/dependencies";
+export const incidentDetailsPath = (incidentId) =>
+  incidentId ? `/incidents/${incidentId}` : "/incidents";

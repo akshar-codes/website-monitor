@@ -7,6 +7,7 @@ import {
 } from "../hooks/useMonitors";
 import { useMonitorSlos, useSloMutations } from "../hooks/useSlos";
 import { useMonitorDeployments } from "../hooks/useDeployments";
+import { useMonitorDependencies } from "../hooks/useDependencies";
 import { useUsage } from "../hooks/useUsage";
 import MonitorInsights from "../components/monitorDetails/MonitorInsights";
 import DeploymentTimeline from "../components/deployments/DeploymentTimeline";
@@ -50,6 +51,7 @@ import {
   Target,
   Rocket,
   GitCommit,
+  Network,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -172,6 +174,15 @@ export default function MonitorDetails() {
   const { data: regionalResponse } = useMonitorRegionalAnalytics(id, window);
   const { data: monitorSlosRes, refetch: refetchMonitorSlos } =
     useMonitorSlos(id);
+  const { data: dependenciesRes } = useMonitorDependencies(id);
+  const monitorDeps = useMemo(
+    () => dependenciesRes?.dependencies || [],
+    [dependenciesRes],
+  );
+  const monitorDependents = useMemo(
+    () => dependenciesRes?.dependents || [],
+    [dependenciesRes],
+  );
   const {
     data: deploymentsRes,
     loading: deploymentsLoading,
@@ -798,6 +809,140 @@ export default function MonitorDetails() {
         initialMonitorId={id}
         submitting={creatingSlo}
       />
+      <Panel
+        title="Service Dependencies & Topology"
+        subtitle="Upstream dependencies required by this monitor and downstream dependents relying on it"
+        actions={
+          <Link
+            to="/dependencies"
+            className="sw-button secondary text-xs flex items-center gap-1.5"
+          >
+            <Network size={14} /> View in Dependency Map
+          </Link>
+        }
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
+          {/* Dependencies (Upstream) */}
+          <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Depends On ({monitorDeps.length})
+              </span>
+              <span className="text-[11px] text-slate-400">Upstream</span>
+            </div>
+            {monitorDeps.length === 0 ? (
+              <p className="text-xs text-slate-400">
+                No upstream dependencies configured.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {monitorDeps.map((dep) => {
+                  const targetName =
+                    dep.dependencyMonitor?.name ||
+                    dep.dependencyExternalService?.name ||
+                    "Target Service";
+                  const targetId =
+                    dep.dependencyMonitor?._id || dep.dependencyMonitor?.id;
+                  const isHard = dep.dependencyType === "hard";
+                  return (
+                    <div
+                      key={dep._id || dep.id}
+                      className="p-2.5 rounded-lg border border-slate-100 bg-slate-50 flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        {targetId ? (
+                          <Link
+                            to={`/monitors/${targetId}`}
+                            className="text-xs font-semibold text-slate-900 hover:text-emerald-600 truncate block"
+                          >
+                            {targetName}
+                          </Link>
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-900 truncate block">
+                            {targetName}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          {dep.toType === "external_service"
+                            ? "External Service"
+                            : "Internal Monitor"}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                          isHard
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-sky-100 text-sky-700"
+                        }`}
+                      >
+                        {dep.dependencyType}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Dependents (Downstream) */}
+          <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Dependents ({monitorDependents.length})
+              </span>
+              <span className="text-[11px] text-slate-400">Downstream</span>
+            </div>
+            {monitorDependents.length === 0 ? (
+              <p className="text-xs text-slate-400">
+                No services currently depend on this monitor.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {monitorDependents.map((dep) => {
+                  const callerName =
+                    dep.dependentMonitor?.name || "Caller Service";
+                  const callerId =
+                    dep.dependentMonitor?._id || dep.dependentMonitor?.id;
+                  const isHard = dep.dependencyType === "hard";
+                  return (
+                    <div
+                      key={dep._id || dep.id}
+                      className="p-2.5 rounded-lg border border-slate-100 bg-slate-50 flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        {callerId ? (
+                          <Link
+                            to={`/monitors/${callerId}`}
+                            className="text-xs font-semibold text-slate-900 hover:text-emerald-600 truncate block"
+                          >
+                            {callerName}
+                          </Link>
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-900 truncate block">
+                            {callerName}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          Relies on this monitor
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                          isHard
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-sky-100 text-sky-700"
+                        }`}
+                      >
+                        {dep.dependencyType}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </Panel>
       {(editOpen || deleteOpen) && (
         <div className="modal-backdrop">
           <section className="form-modal">
