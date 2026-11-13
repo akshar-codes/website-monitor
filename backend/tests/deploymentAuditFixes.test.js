@@ -288,6 +288,7 @@ test("Issue 3 (P1/P2): Delivery state machine transitions to FAILED on notificat
       return { id: "notif-success" };
     },
     logActivity: async () => ({}),
+    isInternal: true,
   };
 
   // Run 1: Notification fails -> must mark state as FAILED and NOT lock out with cooldown
@@ -299,7 +300,7 @@ test("Issue 3 (P1/P2): Delivery state machine transitions to FAILED on notificat
 
   assert.equal(run1.alertDispatched, false);
   assert.equal(currentAlertDoc.notificationState, NOTIFICATION_STATES.FAILED);
-  assert.equal(currentAlertDoc.lastNotificationError, "Mail transport offline");
+  assert.match(currentAlertDoc.lastNotificationError, /Mail transport offline/);
   // cooldownUntil should NOT be set into future
   assert.ok(!currentAlertDoc.cooldownUntil);
 

@@ -54,11 +54,11 @@ POST /api/deployments/integrations/:id/rotate
 Content-Type: application/json
 
 {
-  "immediateRevocation": false
+  "immediateRevoke": false
 }
 ```
 
-During the 15-minute grace period, both the old and new secrets authenticate successfully. Setting `immediateRevocation: true` revokes the previous secret immediately.
+During the 15-minute grace period, both the old and new secrets authenticate successfully. Setting `immediateRevoke: true` (or `immediateRevocation: true`) revokes the previous secret immediately.
 
 ### Revocation
 
@@ -88,11 +88,12 @@ Content-Type: application/json
 
 ### Option B: HMAC-SHA256 signature (Enhanced security)
 
-Compute the HMAC-SHA256 hex digest of the raw request payload using the deployment secret as the signing key:
+Compute the HMAC-SHA256 hex digest of the raw request payload using the deployment secret as the signing key. Include the integration key identifier (integration prefix or token prefix) via `x-deployment-key-id`:
 
 ```http
 POST /api/deployments/events
 Content-Type: application/json
+x-deployment-key-id: dep_live_a1b2c3
 x-deployment-signature: sha256=4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
 ```
 
@@ -104,19 +105,19 @@ x-deployment-signature: sha256=4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873
 
 ### Schema fields
 
-| Field            | Type                      | Required | Description                                                                                 |
-| ---------------- | ------------------------- | -------- | ------------------------------------------------------------------------------------------- |
-| `version`        | string                    | **Yes**  | Release version or name (max 128 chars, e.g. `v2.4.1`, `release-2026-11-12`).               |
-| `monitors`       | array of ObjectId strings | No*      | List of monitor IDs affected by this release. (*Required if integration is not pre-scoped). |
-| `environment`    | string                    | No       | Target environment (default: `production`, e.g. `staging`, `preview`).                      |
-| `commitSha`      | string                    | No       | Git commit hash (up to 64 chars, e.g. `9f82d3a`).                                           |
-| `deployedAt`     | ISO 8601 string           | No       | Actual deployment completion timestamp (defaults to current server time).                   |
-| `source`         | string                    | No       | CI/CD platform identifier (e.g. `github-actions`, `gitlab-ci`, `circleci`).                 |
-| `url`            | string                    | No       | URL to deployment logs, PR, or build run (max 2048 chars).                                  |
-| `description`    | string                    | No       | Release notes or deployment summary (max 2000 chars).                                       |
-| `externalId`     | string                    | No       | CI/CD build run ID (max 256 chars, enforces idempotency per owner).                         |
-| `idempotencyKey` | string                    | No       | Explicit deduplication key (also accepted via `Idempotency-Key` HTTP header).               |
-| `metadata`       | object                    | No       | Arbitrary JSON key-value pairs for custom deployment attributes.                            |
+| Field            | Type                      | Required | Description                                                                                  |
+| ---------------- | ------------------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `version`        | string                    | **Yes**  | Release version or name (max 128 chars, e.g. `v2.4.1`, `release-2026-11-12`).                |
+| `monitors`       | array of ObjectId strings | No\*     | List of monitor IDs affected by this release. (\*Required if integration is not pre-scoped). |
+| `environment`    | string                    | No       | Target environment (default: `production`, e.g. `staging`, `preview`).                       |
+| `commitSha`      | string                    | No       | Git commit hash (up to 64 chars, e.g. `9f82d3a`).                                            |
+| `deployedAt`     | ISO 8601 string           | No       | Actual deployment completion timestamp (defaults to current server time).                    |
+| `source`         | string                    | No       | CI/CD platform identifier (e.g. `github-actions`, `gitlab-ci`, `circleci`).                  |
+| `url`            | string                    | No       | URL to deployment logs, PR, or build run (max 2048 chars).                                   |
+| `description`    | string                    | No       | Release notes or deployment summary (max 2000 chars).                                        |
+| `externalId`     | string                    | No       | CI/CD build run ID (max 256 chars, enforces idempotency per owner).                          |
+| `idempotencyKey` | string                    | No       | Explicit deduplication key (also accepted via `Idempotency-Key` HTTP header).                |
+| `metadata`       | object                    | No       | Arbitrary JSON key-value pairs for custom deployment attributes.                             |
 
 ### Sample request payload
 
@@ -138,6 +139,9 @@ x-deployment-signature: sha256=4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873
 ### Idempotency guarantees
 
 Repeated submissions with the same `externalId` or `idempotencyKey` return HTTP 200 with `{ "meta": { "duplicate": true } }` and return the existing deployment event without creating duplicate records or inflating regression signals.
+
+> [!NOTE]
+> When both `externalId` and `idempotencyKey` are omitted, SiteWatch computes a deterministic fallback idempotency fingerprint bucketed by integration, affected monitor set, release version, environment, commit SHA, and a 1-minute time window. CI/CD pipelines deploying multiple unique releases to identical monitors in under 60 seconds should supply explicit `externalId` or `idempotencyKey` values.
 
 ---
 

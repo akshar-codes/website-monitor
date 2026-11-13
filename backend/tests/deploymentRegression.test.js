@@ -535,6 +535,7 @@ test("End-to-End Evaluation Service: evaluates regression, dedupes alerts, and r
       loggedActivities.push(payload);
       return { id: new mongoose.Types.ObjectId(), ...payload };
     },
+    isInternal: true,
   };
 
   // 1. Initial Evaluation -> Should detect latency regression and dispatch first alert

@@ -26,6 +26,12 @@ import {
 import ApiError from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
 
+export const NOTIFICATION_RETRY_CONFIG = Object.freeze({
+  maxAttempts: 5,
+  baseBackoffMs: 60 * 1000, // 1 minute
+  maxBackoffMs: 60 * 60 * 1000, // 60 minutes
+});
+
 export const DEFAULT_REGRESSION_CONFIG = Object.freeze({
   windowMinutes: 30, // 30 minutes before and 30 minutes after
   minSampleCount: 3, // At least 3 scheduled checks before and after
@@ -304,18 +310,23 @@ export const evaluateDeploymentRegression = async ({
   const windowMs = config.windowMinutes * 60 * 1000;
 
   const userId = (user?.id || user?._id)?.toString();
-  const isInternal = Boolean(deps.isInternal || !user);
+  const isInternal = deps.isInternal === true;
+
+  if (!isInternal && !userId) {
+    throw ApiError.unauthorized(
+      "Authentication required for deployment regression evaluation",
+      "UNAUTHORIZED",
+    );
+  }
 
   // 1. Fetch monitor & deployment with ownership enforcement for non-internal callers
-  const monitorQuery =
-    isInternal || !userId
-      ? { _id: monitorId }
-      : { _id: monitorId, owner: userId };
+  const monitorQuery = isInternal
+    ? { _id: monitorId }
+    : { _id: monitorId, owner: userId };
 
-  const deploymentQuery =
-    isInternal || !userId
-      ? { _id: deploymentId }
-      : { _id: deploymentId, owner: userId };
+  const deploymentQuery = isInternal
+    ? { _id: deploymentId }
+    : { _id: deploymentId, owner: userId };
 
   const fetchMonitor = models.Monitor.findOne
     ? models.Monitor.findOne(monitorQuery)
@@ -534,13 +545,25 @@ export const evaluateDeploymentRegression = async ({
   let alertDispatched = false;
   let finalAlertState = alertState;
 
-  // 7. Deduplicated notification dispatch using state machine
+  // 7. Deduplicated notification dispatch using state machine with bounded exponential backoff
   if (hasSuspectedRegression) {
+    const maxAttempts =
+      alertState.maxNotificationAttempts ||
+      NOTIFICATION_RETRY_CONFIG.maxAttempts;
+    const currentAttempts = alertState.notificationAttempts || 0;
+    const canRetryFailed =
+      alertState.notificationState === NOTIFICATION_STATES.FAILED &&
+      currentAttempts < maxAttempts &&
+      (!alertState.nextRetryAt ||
+        new Date(alertState.nextRetryAt).getTime() <= now.getTime());
+
     const isDueForAlert =
       !alertState.alertDispatchedAt ||
-      alertState.notificationState === NOTIFICATION_STATES.FAILED ||
-      alertState.notificationState !== NOTIFICATION_STATES.SENT ||
-      (alertState.cooldownUntil && alertState.cooldownUntil <= now);
+      canRetryFailed ||
+      alertState.notificationState === NOTIFICATION_STATES.IDLE ||
+      (alertState.notificationState === NOTIFICATION_STATES.SENT &&
+        alertState.cooldownUntil &&
+        alertState.cooldownUntil <= now);
 
     if (isDueForAlert) {
       const LEASE_MS = 2 * 60 * 1000;
@@ -560,9 +583,17 @@ export const evaluateDeploymentRegression = async ({
           },
           {
             notificationState: NOTIFICATION_STATES.FAILED,
-            $or: [
-              { notificationLeaseUntil: null },
-              { notificationLeaseUntil: { $lte: now } },
+            notificationAttempts: { $lt: maxAttempts },
+            $and: [
+              {
+                $or: [{ nextRetryAt: null }, { nextRetryAt: { $lte: now } }],
+              },
+              {
+                $or: [
+                  { notificationLeaseUntil: null },
+                  { notificationLeaseUntil: { $lte: now } },
+                ],
+              },
             ],
           },
           {
@@ -650,6 +681,7 @@ export const evaluateDeploymentRegression = async ({
                 $set: {
                   notificationState: NOTIFICATION_STATES.SENT,
                   notificationLeaseUntil: null,
+                  nextRetryAt: null,
                   notificationDispatchedAt: now,
                   alertDispatchedAt: now,
                   cooldownUntil: new Date(now.getTime() + cooldownMs),
@@ -684,6 +716,21 @@ export const evaluateDeploymentRegression = async ({
             },
           );
 
+          const attemptsSoFar = claimedState.notificationAttempts || 1;
+          const isTerminalFailure = attemptsSoFar >= maxAttempts;
+          const backoffMs = Math.min(
+            NOTIFICATION_RETRY_CONFIG.maxBackoffMs,
+            NOTIFICATION_RETRY_CONFIG.baseBackoffMs *
+              Math.pow(2, attemptsSoFar - 1),
+          );
+          const nextRetryAt = isTerminalFailure
+            ? null
+            : new Date(now.getTime() + backoffMs);
+
+          const errorMsg = isTerminalFailure
+            ? `Notification delivery permanently failed after ${attemptsSoFar} attempts: ${dispatchErr.message}`
+            : `Notification delivery failed (attempt ${attemptsSoFar}/${maxAttempts}): ${dispatchErr.message}`;
+
           const failedState =
             await models.DeploymentAlertState.findOneAndUpdate(
               { _id: alertState._id },
@@ -691,7 +738,8 @@ export const evaluateDeploymentRegression = async ({
                 $set: {
                   notificationState: NOTIFICATION_STATES.FAILED,
                   notificationLeaseUntil: null,
-                  lastNotificationError: dispatchErr.message,
+                  nextRetryAt,
+                  lastNotificationError: errorMsg,
                   lastError: dispatchErr.message,
                 },
                 $inc: { retryCount: 1 },
@@ -782,7 +830,7 @@ export const evaluateMonitorDeploymentRegressions = async (
         monitorId: monitor._id,
         deploymentId: dep._id,
         options: {},
-        deps,
+        deps: { ...deps, isInternal: true },
       });
       results.push(res);
     } catch (err) {
@@ -799,7 +847,8 @@ export const evaluateMonitorDeploymentRegressions = async (
 
 /**
  * Worker / background job method:
- * Finds pending deployments from recent hours and evaluates any due regression checks.
+ * Finds pending deployments from recent hours using durable state filtering
+ * and chronological pagination so all pending windows complete without older events being skipped.
  */
 export const evaluatePendingDeploymentRegressions = async (
   options = {},
@@ -816,38 +865,102 @@ export const evaluatePendingDeploymentRegressions = async (
 
   const lookbackHours = options.lookbackHours || 24;
   const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
-
-  const deployments = await models.DeploymentEvent.find({
-    deployedAt: { $gte: since },
-  })
-    .select("_id monitors deployedAt")
-    .sort({ deployedAt: -1 })
-    .limit(50)
-    .lean();
+  const batchSize = Math.max(1, Math.min(100, Number(options.batchSize) || 25));
+  const maxDeployments = Number(options.maxDeployments) || 500;
+  const defaultWindowMs =
+    (Number(options.windowMinutes) || DEFAULT_REGRESSION_CONFIG.windowMinutes) *
+    60 *
+    1000;
+  const nowTime = Date.now();
 
   let evaluatedCount = 0;
   let regressionsFound = 0;
+  let skip = 0;
+  let hasMore = true;
 
-  for (const dep of deployments) {
-    for (const monitorId of dep.monitors || []) {
-      try {
-        const res = await evaluateDeploymentRegression({
-          monitorId: monitorId._id || monitorId,
-          deploymentId: dep._id,
-          options,
-          deps,
-        });
-        evaluatedCount++;
-        if (res.evaluation?.hasSuspectedRegression) {
-          regressionsFound++;
+  while (hasMore && evaluatedCount < maxDeployments) {
+    const deployments = await models.DeploymentEvent.find({
+      deployedAt: { $gte: since },
+    })
+      .select("_id monitors deployedAt")
+      .sort({ deployedAt: 1, _id: 1 })
+      .skip(skip)
+      .limit(batchSize)
+      .lean();
+
+    if (!deployments || deployments.length === 0) {
+      break;
+    }
+
+    for (const dep of deployments) {
+      const depTime = new Date(dep.deployedAt).getTime();
+      const isWindowElapsed = nowTime >= depTime + defaultWindowMs;
+
+      for (const rawMon of dep.monitors || []) {
+        const monitorId = (rawMon._id || rawMon).toString();
+
+        // Check durable alert state to avoid unnecessary repeated evaluations on finalized windows
+        let shouldEvaluate = true;
+        try {
+          if (models.DeploymentAlertState.findOne) {
+            const existingState = await models.DeploymentAlertState.findOne({
+              deployment: dep._id,
+              monitor: monitorId,
+            })
+              .select(
+                "status notificationState nextRetryAt notificationAttempts",
+              )
+              .lean();
+
+            if (existingState) {
+              const isFailedNotif =
+                existingState.notificationState === NOTIFICATION_STATES.FAILED;
+              const canRetryNotif =
+                isFailedNotif &&
+                (existingState.notificationAttempts || 0) <
+                  NOTIFICATION_RETRY_CONFIG.maxAttempts &&
+                (!existingState.nextRetryAt ||
+                  new Date(existingState.nextRetryAt).getTime() <= nowTime);
+
+              if (
+                isWindowElapsed &&
+                existingState.status !== REGRESSION_STATUSES.EVALUATING &&
+                !canRetryNotif
+              ) {
+                shouldEvaluate = false;
+              }
+            }
+          }
+        } catch {
+          shouldEvaluate = true;
         }
-      } catch (err) {
-        logger.warn("Pending deployment regression evaluation failed", {
-          deploymentId: dep._id,
-          monitorId,
-          error: err.message,
-        });
+
+        if (shouldEvaluate) {
+          try {
+            const res = await evaluateDeploymentRegression({
+              monitorId,
+              deploymentId: dep._id,
+              options,
+              deps: { ...deps, isInternal: true },
+            });
+            evaluatedCount++;
+            if (res?.evaluation?.hasSuspectedRegression) {
+              regressionsFound++;
+            }
+          } catch (err) {
+            logger.warn("Pending deployment regression evaluation failed", {
+              deploymentId: dep._id,
+              monitorId,
+              error: err.message,
+            });
+          }
+        }
       }
+    }
+
+    skip += deployments.length;
+    if (deployments.length < batchSize) {
+      hasMore = false;
     }
   }
 
