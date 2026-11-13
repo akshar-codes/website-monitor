@@ -137,6 +137,21 @@ const incidentSchema = new mongoose.Schema(
       default: null,
     },
 
+    // ── Root-Cause Correlation (Phase 3) ──
+    correlationSummary: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    correlatedCandidateCount: {
+      type: Number,
+      default: 0,
+    },
+    probableRootCauseIncident: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Incident",
+      default: null,
+    },
+
     // ── Timeline ──
 
     statusHistory: {
