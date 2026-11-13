@@ -140,6 +140,15 @@ const deploymentAlertStateSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    nextRetryAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    maxNotificationAttempts: {
+      type: Number,
+      default: 5,
+    },
     lastNotificationError: {
       type: String,
       default: null,

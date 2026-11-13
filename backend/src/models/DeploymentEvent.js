@@ -142,6 +142,22 @@ deploymentEventSchema.index(
   },
 );
 
+deploymentEventSchema.index(
+  { owner: 1, integration: 1, externalId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { externalId: { $type: "string" } },
+  },
+);
+
+deploymentEventSchema.index(
+  { owner: 1, integration: 1, idempotencyKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { idempotencyKey: { $type: "string" } },
+  },
+);
+
 const DeploymentEvent = mongoose.model(
   "DeploymentEvent",
   deploymentEventSchema,

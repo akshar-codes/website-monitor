@@ -452,11 +452,10 @@ export const recordDeploymentEvent = async ({ integration, payload }) => {
       ? String(payload.commitSha || payload.commit).trim()
       : null;
 
-  const environment = (
-    payload.environment ||
-    integration.environment ||
-    "production"
-  )
+  const rawEnv =
+    typeof payload.environment === "string" ? payload.environment.trim() : "";
+
+  const environment = (rawEnv || integration.environment || "production")
     .trim()
     .toLowerCase();
 
@@ -479,13 +478,15 @@ export const recordDeploymentEvent = async ({ integration, payload }) => {
   const receivedAt = new Date();
 
   // Deterministic fallback idempotency key if both externalId and idempotencyKey omitted
+  // Fingerprint includes owner, integration, sorted affected monitors, version, environment, commitSha, and 1-minute time bucket
   if (!externalId && !idempotencyKey) {
     const timeBucket = Math.floor(deployedAt.getTime() / 60000);
-    const contentToHash = `${ownerId}:${integration._id}:${version.trim()}:${environment}:${commitSha || ""}:${timeBucket}`;
+    const sortedMonitors = [...uniqueMonitorIds].sort().join(",");
+    const contentToHash = `${ownerId}:${integration._id}:${sortedMonitors}:${version.trim()}:${environment}:${commitSha || ""}:${timeBucket}`;
     idempotencyKey = `auto_${createHash("sha256").update(contentToHash).digest("hex").slice(0, 32)}`;
   }
 
-  // 5. Idempotency Pre-Check
+  // 5. Idempotency Pre-Check (scoped to integration to prevent cross-pipeline collisions)
   if (externalId || idempotencyKey) {
     const orConditions = [];
     if (externalId)
@@ -495,6 +496,7 @@ export const recordDeploymentEvent = async ({ integration, payload }) => {
 
     const existingEvent = await DeploymentEvent.findOne({
       owner: ownerId,
+      integration: integration._id,
       $or: orConditions,
     });
 
@@ -534,6 +536,7 @@ export const recordDeploymentEvent = async ({ integration, payload }) => {
       if (orConditions.length > 0) {
         const existingEvent = await DeploymentEvent.findOne({
           owner: ownerId,
+          integration: integration._id,
           $or: orConditions,
         });
         if (existingEvent) {

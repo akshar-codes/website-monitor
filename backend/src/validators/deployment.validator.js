@@ -87,9 +87,20 @@ export const createDeploymentIntegrationSchema = z.object({
   monitors: z.array(objectIdSchema).optional().default([]),
 });
 
-export const rotateDeploymentSecretSchema = z.object({
-  immediateRevoke: z.boolean().optional().default(false),
-});
+export const rotateDeploymentSecretSchema = z
+  .object({
+    immediateRevoke: z.boolean().optional(),
+    immediateRevocation: z.boolean().optional(),
+  })
+  .transform((val) => ({
+    immediateRevoke: Boolean(
+      val.immediateRevoke != null
+        ? val.immediateRevoke
+        : val.immediateRevocation != null
+          ? val.immediateRevocation
+          : false,
+    ),
+  }));
 
 export const ingestDeploymentEventSchema = z
   .object({
@@ -102,7 +113,13 @@ export const ingestDeploymentEventSchema = z
     releaseName: z.string().trim().max(128).optional(),
     commitSha: z.string().trim().max(64).optional().nullable(),
     commit: z.string().trim().max(64).optional().nullable(),
-    environment: z.string().trim().max(64).optional().nullable(),
+    environment: z
+      .string()
+      .trim()
+      .max(64)
+      .optional()
+      .nullable()
+      .transform((val) => (val && val.trim() ? val.trim() : undefined)),
     deployedAt: deployedAtSchema,
     source: z.string().trim().max(64).optional().default("custom"),
     url: optionalUrl,

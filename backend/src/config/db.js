@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import env from "./env.js";
 import logger from "../utils/logger.js";
 import { maskConnectionString } from "../utils/sanitizeLogData.js";
+import { reconcileDeploymentAlertDuplicates } from "../migrations/reconcileDeploymentAlertDuplicates.js";
 
 // Mongoose propagates the active transaction session to model operations
 // inside connection.transaction(). Keep multi-document state transitions
@@ -20,6 +21,13 @@ const connectDB = async () => {
     logger.info(
       `MongoDB connected: ${conn.connection.host}/${conn.connection.name}`,
     );
+
+    // Reconcile any legacy duplicate DeploymentAlertState documents before index creation
+    await reconcileDeploymentAlertDuplicates().catch((migrationErr) => {
+      logger.warn(
+        `Deployment alert duplicate reconciliation warning: ${migrationErr.message}`,
+      );
+    });
   } catch (error) {
     logger.error(`MongoDB connection error: ${error.message}`, {
       stack: error.stack,
