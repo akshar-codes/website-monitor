@@ -519,6 +519,43 @@ test("SloHistoryChart Component: Renders guidance empty state when snapshots arr
   assert.ok(clean(emptyChartHtml).includes("Run an on-demand evaluation"));
 });
 
+test("SloHistoryChart Component: Renders with snapshots and correlates deployment release markers", () => {
+  const snapshots = [
+    {
+      evaluatedAt: new Date(Date.now() - 3600000).toISOString(),
+      sliPercentage: 99.95,
+      remainingBudgetSeconds: 500,
+      consumedBudgetSeconds: 20,
+      dataCoveragePercentage: 100,
+    },
+    {
+      evaluatedAt: new Date().toISOString(),
+      sliPercentage: 99.75,
+      remainingBudgetSeconds: 400,
+      consumedBudgetSeconds: 120,
+      dataCoveragePercentage: 100,
+    },
+  ];
+
+  const deployments = [
+    {
+      id: "dep-1",
+      version: "v2.5.0",
+      deployedAt: new Date(Date.now() - 1800000).toISOString(),
+    },
+  ];
+
+  const chartHtml = renderToString(
+    React.createElement(SloHistoryChart, {
+      snapshots,
+      target: 99.9,
+      deployments,
+    }),
+  );
+
+  assert.ok(clean(chartHtml).includes("recharts-responsive-container"));
+});
+
 // ----------------------------------------------------------------------------
 // 10. Component Rendering: SloFormModal Dialog
 // ----------------------------------------------------------------------------

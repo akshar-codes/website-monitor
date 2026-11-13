@@ -5,6 +5,7 @@ import {
   useSloSnapshots,
   useSloMutations,
 } from "../hooks/useSlos";
+import { useMonitorDeployments } from "../hooks/useDeployments";
 import { ROUTES, monitorDetailsPath } from "../constants/routes";
 import { Page, Button, Notice } from "../components/ui/Primitives";
 import SloStatusBadge from "../components/slo/SloStatusBadge";
@@ -59,6 +60,13 @@ export default function SloDetails() {
   );
   const snapshots = snapshotsData?.data || [];
   const snapshotsPagination = snapshotsData?.pagination;
+
+  // Correlate deployment releases for the SLO's target monitor
+  const targetMonitorId = slo?.monitor?._id || slo?.monitor?.id || slo?.monitor;
+  const { data: deploymentsData } = useMonitorDeployments(targetMonitorId, {
+    limit: 20,
+  });
+  const deployments = deploymentsData?.data || [];
 
   const handleMutationSuccess = useCallback(
     (action) => {
@@ -435,7 +443,11 @@ export default function SloDetails() {
           </span>
         </div>
 
-        <SloHistoryChart snapshots={snapshots} target={target} />
+        <SloHistoryChart
+          snapshots={snapshots}
+          target={target}
+          deployments={deployments}
+        />
       </div>
 
       {/* Historical Snapshots Table */}

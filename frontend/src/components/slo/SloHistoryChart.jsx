@@ -11,7 +11,11 @@ import {
 import { formatPercentage, formatBudgetDuration } from "../../utils/sloFormat";
 import { formatDateTime } from "../../utils/format";
 
-export default function SloHistoryChart({ snapshots = [], target = 99.9 }) {
+export default function SloHistoryChart({
+  snapshots = [],
+  target = 99.9,
+  deployments = [],
+}) {
   if (!snapshots || snapshots.length === 0) {
     return (
       <div className="h-64 flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">
@@ -53,6 +57,35 @@ export default function SloHistoryChart({ snapshots = [], target = 99.9 }) {
   const allSli = chartData.map((d) => d.sli);
   const minVal = Math.max(0, Math.min(...allSli, target) - 0.5);
   const maxVal = 100;
+
+  // Map relevant deployments that fall in the timeline
+  const relevantDeployments = (deployments || [])
+    .filter((dep) => {
+      if (!dep.deployedAt || chartData.length === 0) return false;
+      const depTime = new Date(dep.deployedAt).getTime();
+      const firstTime = chartData[0].timestamp;
+      const lastTime = chartData[chartData.length - 1].timestamp;
+      return (
+        depTime >= firstTime - 15 * 60 * 1000 &&
+        depTime <= lastTime + 15 * 60 * 1000
+      );
+    })
+    .map((dep) => {
+      const depTime = new Date(dep.deployedAt).getTime();
+      let closestPoint = chartData[0];
+      let minDiff = Math.abs(chartData[0].timestamp - depTime);
+      for (const pt of chartData) {
+        const diff = Math.abs(pt.timestamp - depTime);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestPoint = pt;
+        }
+      }
+      return {
+        ...dep,
+        closestDateLabel: closestPoint.dateLabel,
+      };
+    });
 
   return (
     <div className="w-full h-72">
@@ -136,6 +169,22 @@ export default function SloHistoryChart({ snapshots = [], target = 99.9 }) {
               fontWeight: 600,
             }}
           />
+          {relevantDeployments.map((dep, idx) => (
+            <ReferenceLine
+              key={dep.id || dep._id || `dep-${idx}`}
+              x={dep.closestDateLabel}
+              stroke="#8b5cf6"
+              strokeDasharray="4 4"
+              strokeWidth={2}
+              label={{
+                value: `🚀 ${dep.version}`,
+                position: "insideTopLeft",
+                fill: "#7c3aed",
+                fontSize: 10,
+                fontWeight: 600,
+              }}
+            />
+          ))}
           <Area
             type="monotone"
             dataKey="sli"
