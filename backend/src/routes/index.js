@@ -35,6 +35,8 @@ import sloRoutes from "./slo.routes.js";
 import jobMonitorRoutes from "./jobMonitor.routes.js";
 import jobHeartbeatRoutes from "./jobHeartbeat.routes.js";
 import deploymentRoutes from "./deployment.routes.js";
+import dependencyRoutes from "./dependency.routes.js";
+import externalServiceRoutes from "./externalService.routes.js";
 import { isAuthenticated } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
 import { ROLES } from "../config/constants.js";
@@ -82,6 +84,8 @@ router.use("/slos", isAuthenticated, sloRoutes);
 router.use("/job-monitors", isAuthenticated, jobMonitorRoutes);
 router.use("/plan-upgrade-requests", isAuthenticated, planUpgradeRequestRoutes);
 router.use("/suggestions", isAuthenticated, suggestionRoutes);
+router.use("/dependencies", isAuthenticated, dependencyRoutes);
+router.use("/external-services", isAuthenticated, externalServiceRoutes);
 
 // ── Requires an authenticated session AND the admin role ──
 router.use("/admin", isAuthenticated, authorize(ROLES.ADMIN), adminRoutes);
