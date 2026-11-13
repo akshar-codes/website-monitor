@@ -862,6 +862,8 @@ export const evaluatePendingDeploymentRegressions = async (
     DeploymentEvent: deps.DeploymentEvent || DeploymentEvent,
     DeploymentAlertState: deps.DeploymentAlertState || DeploymentAlertState,
   };
+  const evaluate =
+    deps.evaluateDeploymentRegression || evaluateDeploymentRegression;
 
   const lookbackHours = options.lookbackHours || 24;
   const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
@@ -893,10 +895,20 @@ export const evaluatePendingDeploymentRegressions = async (
     }
 
     for (const dep of deployments) {
+      // Enforce the hard cap inside the loop so a large batch cannot overshoot
+      // maxDeployments significantly when a single deployment has many monitors.
+      if (evaluatedCount >= maxDeployments) {
+        hasMore = false;
+        break;
+      }
+
       const depTime = new Date(dep.deployedAt).getTime();
       const isWindowElapsed = nowTime >= depTime + defaultWindowMs;
 
       for (const rawMon of dep.monitors || []) {
+        // Re-check cap inside the monitor loop for deployments with many monitors.
+        if (evaluatedCount >= maxDeployments) break;
+
         const monitorId = (rawMon._id || rawMon).toString();
 
         // Check durable alert state to avoid unnecessary repeated evaluations on finalized windows
@@ -936,14 +948,16 @@ export const evaluatePendingDeploymentRegressions = async (
         }
 
         if (shouldEvaluate) {
+          // Count the attempt before invoking it so repeated failures cannot
+          // bypass the sweep's configured work limit.
+          evaluatedCount++;
           try {
-            const res = await evaluateDeploymentRegression({
+            const res = await evaluate({
               monitorId,
               deploymentId: dep._id,
               options,
               deps: { ...deps, isInternal: true },
             });
-            evaluatedCount++;
             if (res?.evaluation?.hasSuspectedRegression) {
               regressionsFound++;
             }

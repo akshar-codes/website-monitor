@@ -194,22 +194,42 @@ test("DeploymentEvent Model: defines appropriate indexes for owner, monitor, env
   );
 
   const externalIdIndex = indexes.find(
-    ([fields]) => fields.owner === 1 && fields.externalId === 1,
+    ([fields]) =>
+      fields.owner === 1 && fields.integration === 1 && fields.externalId === 1,
   );
-  assert.ok(externalIdIndex, "Unique index on owner and externalId");
+  assert.ok(
+    externalIdIndex,
+    "Unique index on owner, integration, and externalId",
+  );
   assert.equal(externalIdIndex[1].unique, true);
   assert.deepEqual(externalIdIndex[1].partialFilterExpression, {
     externalId: { $type: "string" },
   });
 
   const idempotencyKeyIndex = indexes.find(
-    ([fields]) => fields.owner === 1 && fields.idempotencyKey === 1,
+    ([fields]) =>
+      fields.owner === 1 &&
+      fields.integration === 1 &&
+      fields.idempotencyKey === 1,
   );
-  assert.ok(idempotencyKeyIndex, "Unique index on owner and idempotencyKey");
+  assert.ok(
+    idempotencyKeyIndex,
+    "Unique index on owner, integration, and idempotencyKey",
+  );
   assert.equal(idempotencyKeyIndex[1].unique, true);
   assert.deepEqual(idempotencyKeyIndex[1].partialFilterExpression, {
     idempotencyKey: { $type: "string" },
   });
+  assert.equal(
+    indexes.some(
+      ([fields]) =>
+        fields.owner === 1 &&
+        (fields.externalId === 1 || fields.idempotencyKey === 1) &&
+        fields.integration !== 1,
+    ),
+    false,
+    "Owner-wide unique idempotency indexes must not be declared",
+  );
 });
 
 test("DeploymentIntegration Model: redacts secrets from toJSON and enforces prefix uniqueness", () => {

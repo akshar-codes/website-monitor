@@ -125,26 +125,15 @@ deploymentEventSchema.index({ monitors: 1, deployedAt: -1 });
 deploymentEventSchema.index({ owner: 1, environment: 1, deployedAt: -1 });
 deploymentEventSchema.index({ monitors: 1, environment: 1, deployedAt: -1 });
 
-// Idempotency and duplicate-event prevention indexes
-deploymentEventSchema.index(
-  { owner: 1, externalId: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { externalId: { $type: "string" } },
-  },
-);
-
-deploymentEventSchema.index(
-  { owner: 1, idempotencyKey: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { idempotencyKey: { $type: "string" } },
-  },
-);
-
+// Per-integration idempotency indexes (scoped to integration to allow same externalId
+// across multiple integrations owned by the same account, e.g. two CI pipelines both
+// submitting run-id "123" independently).
+// NOTE: The old owner-wide unique indexes { owner, externalId } and { owner, idempotencyKey }
+// have been intentionally removed. A startup migration drops them from MongoDB if present.
 deploymentEventSchema.index(
   { owner: 1, integration: 1, externalId: 1 },
   {
+    name: "owner_integration_externalId",
     unique: true,
     partialFilterExpression: { externalId: { $type: "string" } },
   },
@@ -153,6 +142,7 @@ deploymentEventSchema.index(
 deploymentEventSchema.index(
   { owner: 1, integration: 1, idempotencyKey: 1 },
   {
+    name: "owner_integration_idempotencyKey",
     unique: true,
     partialFilterExpression: { idempotencyKey: { $type: "string" } },
   },

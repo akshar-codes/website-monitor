@@ -3,7 +3,6 @@ import DeploymentAlertState, {
   REGRESSION_STATUSES,
   NOTIFICATION_STATES,
 } from "../models/DeploymentAlertState.js";
-import logger from "../utils/logger.js";
 
 /**
  * Reconciles duplicate DeploymentAlertState documents for the same (deployment, monitor) pair.
@@ -147,19 +146,17 @@ export const reconcileDeploymentAlertDuplicates = async (options = {}) => {
     reconciledGroups++;
   }
 
-  // Ensure unique index is built
-  try {
-    if (model.collection && model.collection.createIndex) {
-      await model.collection.createIndex(
-        { deployment: 1, monitor: 1 },
-        { unique: true, background: true },
-      );
-    }
-  } catch (idxErr) {
-    logger.warn(
-      `Could not ensure unique index on DeploymentAlertState: ${idxErr.message}`,
+  // Ensure unique index is built — failure here is fatal so the caller (db.js)
+  // can halt startup before the application runs without the deduplication guard.
+  if (!model.collection || !model.collection.createIndex) {
+    throw new Error(
+      "Cannot establish required DeploymentAlertState unique index: collection is unavailable",
     );
   }
+  await model.collection.createIndex(
+    { deployment: 1, monitor: 1 },
+    { unique: true, background: false },
+  );
 
   return { reconciledGroups, deletedDuplicates };
 };

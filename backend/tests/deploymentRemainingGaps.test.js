@@ -16,6 +16,7 @@ import {
   NOTIFICATION_RETRY_CONFIG,
 } from "../src/services/deploymentRegression.service.js";
 import { reconcileDeploymentAlertDuplicates } from "../src/migrations/reconcileDeploymentAlertDuplicates.js";
+import { dropOwnerWideDeploymentIndexes } from "../src/migrations/dropOwnerWideDeploymentIndexes.js";
 import DeploymentAlertState, {
   NOTIFICATION_STATES,
   REGRESSION_STATUSES,
@@ -34,6 +35,57 @@ const userAId = "64b0000000000000000000a1";
 const monitorAId = "64b000000000000000000001";
 const monitorBId = "64b000000000000000000002";
 const deploymentAId = "64b0000000000000000000d1";
+
+test("Owner-wide deployment index migration drops both legacy unique indexes", async () => {
+  const dropped = [];
+  const result = await dropOwnerWideDeploymentIndexes({
+    force: true,
+    collection: {
+      indexes: async () => [
+        { name: "owner_1_externalId_1" },
+        { name: "owner_1_idempotencyKey_1" },
+      ],
+      dropIndex: async (name) => dropped.push(name),
+    },
+  });
+  assert.deepEqual(dropped, [
+    "owner_1_externalId_1",
+    "owner_1_idempotencyKey_1",
+  ]);
+  assert.equal(result.dropped.length, 2);
+  assert.equal(result.skippedReason, undefined);
+});
+
+test("Owner-wide deployment index migration fails closed when index listing fails", async () => {
+  const indexError = new Error("database unavailable");
+  await assert.rejects(
+    dropOwnerWideDeploymentIndexes({
+      force: true,
+      collection: {
+        indexes: async () => {
+          throw indexError;
+        },
+      },
+    }),
+    indexError,
+  );
+});
+
+test("Owner-wide deployment index migration treats a missing collection as fresh", async () => {
+  const namespaceError = Object.assign(new Error("collection does not exist"), {
+    code: 26,
+    codeName: "NamespaceNotFound",
+  });
+  const result = await dropOwnerWideDeploymentIndexes({
+    force: true,
+    collection: {
+      indexes: async () => {
+        throw namespaceError;
+      },
+    },
+  });
+  assert.deepEqual(result, { dropped: [], skipped: [] });
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Gap 1: Reconcile Duplicate Alert States Migration
@@ -708,4 +760,229 @@ test("Gap 7 (P3): Whitespace-only environment falls back to integration environm
     mongoose.model("DeploymentEvent").findOne = origDeploymentFindOne;
     mongoose.model("DeploymentEvent").create = origDeploymentCreate;
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gap 8 (P1): Cross-integration same externalId must succeed for both
+// ─────────────────────────────────────────────────────────────────────────────
+test("Gap 8 (P1): Two integrations under the same owner can submit the same externalId independently", async () => {
+  const integrationA = {
+    _id: new mongoose.Types.ObjectId(),
+    owner: new mongoose.Types.ObjectId(userAId),
+    environment: "production",
+    monitors: [],
+  };
+  const integrationB = {
+    _id: new mongoose.Types.ObjectId(),
+    owner: new mongoose.Types.ObjectId(userAId),
+    environment: "production",
+    monitors: [],
+  };
+
+  const SHARED_EXTERNAL_ID = "gh-run-9999";
+
+  const store = new Map();
+
+  const origMonitorFind = mongoose.model("Monitor").find;
+  const origDeploymentFindOne = mongoose.model("DeploymentEvent").findOne;
+  const origDeploymentCreate = mongoose.model("DeploymentEvent").create;
+
+  mongoose.model("Monitor").find = (query) => ({
+    select: async () => {
+      const ids = query._id.$in.map(String);
+      return ids.map((id) => ({
+        _id: new mongoose.Types.ObjectId(id),
+        owner: new mongoose.Types.ObjectId(userAId),
+        name: `Monitor ${id}`,
+      }));
+    },
+  });
+
+  mongoose.model("DeploymentEvent").findOne = async (query) => {
+    // Per-integration scoped lookup — the key difference from owner-wide indexes
+    return (
+      [...store.values()].find(
+        (e) =>
+          e.owner.toString() === query.owner.toString() &&
+          e.integration.toString() === query.integration.toString() &&
+          (query.$or || []).some(
+            (c) =>
+              (c.externalId && c.externalId === e.externalId) ||
+              (c.idempotencyKey && c.idempotencyKey === e.idempotencyKey),
+          ),
+      ) || null
+    );
+  };
+
+  let createCallCount = 0;
+  mongoose.model("DeploymentEvent").create = async (doc) => {
+    createCallCount++;
+    const created = {
+      ...doc,
+      _id: new mongoose.Types.ObjectId(),
+      toJSON: () => ({ ...doc }),
+    };
+    store.set(created._id.toString(), created);
+    return created;
+  };
+
+  try {
+    // Integration A posts externalId "gh-run-9999"
+    const resA = await recordDeploymentEvent({
+      integration: integrationA,
+      payload: {
+        monitors: [monitorAId],
+        version: "v1.0.0",
+        externalId: SHARED_EXTERNAL_ID,
+        idempotencyKey: "shared-integration-key",
+      },
+    });
+    assert.equal(resA.isDuplicate, false, "Integration A: first insert");
+
+    // Integration B posts the SAME externalId — must NOT be treated as duplicate
+    const resB = await recordDeploymentEvent({
+      integration: integrationB,
+      payload: {
+        monitors: [monitorAId],
+        version: "v1.0.0",
+        externalId: SHARED_EXTERNAL_ID,
+        idempotencyKey: "shared-integration-key",
+      },
+    });
+    assert.equal(
+      resB.isDuplicate,
+      false,
+      "Integration B: same externalId through different integration must succeed",
+    );
+
+    assert.equal(
+      createCallCount,
+      2,
+      "Two distinct create calls must be made — one per integration",
+    );
+
+    // Integration A posting the same externalId again IS a duplicate within the same integration
+    const resC = await recordDeploymentEvent({
+      integration: integrationA,
+      payload: {
+        monitors: [monitorAId],
+        version: "v1.0.0",
+        externalId: SHARED_EXTERNAL_ID,
+        idempotencyKey: "shared-integration-key",
+      },
+    });
+    assert.equal(
+      resC.isDuplicate,
+      true,
+      "Integration A: repeat submission of same externalId must be a duplicate",
+    );
+    assert.equal(
+      createCallCount,
+      2,
+      "No additional create on duplicate for Integration A",
+    );
+  } finally {
+    mongoose.model("Monitor").find = origMonitorFind;
+    mongoose.model("DeploymentEvent").findOne = origDeploymentFindOne;
+    mongoose.model("DeploymentEvent").create = origDeploymentCreate;
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gap 9 (P2): reconcileDeploymentAlertDuplicates throws if index creation fails
+// ─────────────────────────────────────────────────────────────────────────────
+test("Gap 9 (P2): reconcileDeploymentAlertDuplicates propagates index-creation failure (no silent swallow)", async () => {
+  const INDEX_ERROR = new Error("MongoServerError: index creation failed");
+
+  const mockModel = {
+    aggregate: async () => [], // No duplicates — skip to index step
+    collection: {
+      createIndex: async () => {
+        throw INDEX_ERROR;
+      },
+    },
+  };
+
+  await assert.rejects(
+    async () =>
+      reconcileDeploymentAlertDuplicates({
+        DeploymentAlertState: mockModel,
+        force: true,
+      }),
+    (err) => {
+      assert.equal(err.message, INDEX_ERROR.message);
+      return true;
+    },
+    "reconcileDeploymentAlertDuplicates must propagate index creation errors",
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gap 10 (P5): Worker maxDeployments cap is enforced inside nested loops
+// ─────────────────────────────────────────────────────────────────────────────
+test("Gap 10 (P5): evaluatePendingDeploymentRegressions respects maxDeployments cap inside nested monitor loops", async () => {
+  const monitorIds = Array.from(
+    { length: 10 },
+    () => new mongoose.Types.ObjectId(),
+  );
+  const deploymentId = new mongoose.Types.ObjectId();
+
+  // Single deployment with 10 monitors — cap is 3
+  const mockDeploy = {
+    _id: deploymentId,
+    deployedAt: new Date(Date.now() - 60 * 60 * 1000),
+    monitors: monitorIds,
+  };
+
+  let evaluationCount = 0;
+
+  const result = await evaluatePendingDeploymentRegressions(
+    { maxDeployments: 3, batchSize: 10, windowMinutes: 30 },
+    {
+      DeploymentEvent: {
+        find: () => ({
+          select: () => ({
+            sort: () => ({
+              skip: (s) => ({
+                limit: () => ({
+                  lean: async () => (s === 0 ? [mockDeploy] : []),
+                }),
+              }),
+            }),
+          }),
+        }),
+      },
+      DeploymentAlertState: {
+        findOne: () => ({
+          select: () => ({
+            lean: async () => null,
+          }),
+        }),
+      },
+      Monitor: {
+        findOne: (q) => ({
+          lean: async () => ({
+            _id: q._id,
+            owner: new mongoose.Types.ObjectId(userAId),
+            name: "mock",
+          }),
+        }),
+      },
+      // Replace evaluateDeploymentRegression via deps
+      evaluateDeploymentRegression: async () => {
+        evaluationCount++;
+        throw new Error("simulated evaluation failure");
+      },
+      isInternal: true,
+    },
+  );
+
+  // The cap should prevent all 10 from running — exact count depends on
+  // order but must be ≤ maxDeployments (3)
+  assert.equal(
+    evaluationCount,
+    3,
+    "Failed evaluation attempts must still count toward the hard cap",
+  );
+  assert.equal(result.evaluatedCount, 3);
 });
