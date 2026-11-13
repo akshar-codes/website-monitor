@@ -34,8 +34,8 @@ Content-Type: application/json
   "data": {
     "id": "64c000000000000000000010",
     "name": "Production GitHub Actions",
-    "prefix": "dep_live_a1b2c3",
-    "secret": "dep_live_a1b2c3_dGhpc2lzYXNlY3JldHRva2VudmFsdWUxMjM0NTY",
+    "prefix": "dep_live_a1b2c3d4e5f6",
+    "secret": "dep_live_a1b2c3d4e5f6_dGhpc2lzYXNlY3JldHRva2VudmFsdWUxMjM0NTY",
     "environment": "production",
     "monitors": ["64b000000000000000000001", "64b000000000000000000002"]
   }
@@ -82,7 +82,7 @@ Include the secret token in the `Authorization` header:
 
 ```http
 POST /api/deployments/events
-Authorization: Bearer dep_live_a1b2c3_dGhpc2lzYXNlY3JldHRva2VudmFsdWUxMjM0NTY
+Authorization: Bearer dep_live_a1b2c3d4e5f6_dGhpc2lzYXNlY3JldHRva2VudmFsdWUxMjM0NTY
 Content-Type: application/json
 ```
 
@@ -93,7 +93,7 @@ Compute the HMAC-SHA256 hex digest of the raw request payload using the deployme
 ```http
 POST /api/deployments/events
 Content-Type: application/json
-x-deployment-key-id: dep_live_a1b2c3
+x-deployment-key-id: dep_live_a1b2c3d4e5f6
 x-deployment-signature: sha256=4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
 ```
 
@@ -105,19 +105,19 @@ x-deployment-signature: sha256=4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873
 
 ### Schema fields
 
-| Field            | Type                      | Required | Description                                                                                  |
-| ---------------- | ------------------------- | -------- | -------------------------------------------------------------------------------------------- |
-| `version`        | string                    | **Yes**  | Release version or name (max 128 chars, e.g. `v2.4.1`, `release-2026-11-12`).                |
-| `monitors`       | array of ObjectId strings | No\*     | List of monitor IDs affected by this release. (\*Required if integration is not pre-scoped). |
-| `environment`    | string                    | No       | Target environment (default: `production`, e.g. `staging`, `preview`).                       |
-| `commitSha`      | string                    | No       | Git commit hash (up to 64 chars, e.g. `9f82d3a`).                                            |
-| `deployedAt`     | ISO 8601 string           | No       | Actual deployment completion timestamp (defaults to current server time).                    |
-| `source`         | string                    | No       | CI/CD platform identifier (e.g. `github-actions`, `gitlab-ci`, `circleci`).                  |
-| `url`            | string                    | No       | URL to deployment logs, PR, or build run (max 2048 chars).                                   |
-| `description`    | string                    | No       | Release notes or deployment summary (max 2000 chars).                                        |
-| `externalId`     | string                    | No       | CI/CD build run ID (max 256 chars, enforces idempotency per owner).                          |
-| `idempotencyKey` | string                    | No       | Explicit deduplication key (also accepted via `Idempotency-Key` HTTP header).                |
-| `metadata`       | object                    | No       | Arbitrary JSON key-value pairs for custom deployment attributes.                             |
+| Field            | Type                      | Required | Description                                                                                                                                                         |
+| ---------------- | ------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`        | string                    | **Yes**  | Release version or name (max 128 chars, e.g. `v2.4.1`, `release-2026-11-12`).                                                                                       |
+| `monitors`       | array of ObjectId strings | No\*     | List of monitor IDs affected by this release. (\*Required if integration is not pre-scoped).                                                                        |
+| `environment`    | string                    | No       | Target environment (default: `production`, e.g. `staging`, `preview`).                                                                                              |
+| `commitSha`      | string                    | No       | Git commit hash (up to 64 chars, e.g. `9f82d3a`).                                                                                                                   |
+| `deployedAt`     | ISO 8601 string           | No       | Actual deployment completion timestamp (defaults to current server time).                                                                                           |
+| `source`         | string                    | No       | CI/CD platform identifier (e.g. `github-actions`, `gitlab-ci`, `circleci`).                                                                                         |
+| `url`            | string                    | No       | URL to deployment logs, PR, or build run (max 2048 chars).                                                                                                          |
+| `description`    | string                    | No       | Release notes or deployment summary (max 2000 chars).                                                                                                               |
+| `externalId`     | string                    | No       | CI/CD build run ID (max 256 chars, enforces idempotency per integration — the same value submitted through two different integrations creates two separate events). |
+| `idempotencyKey` | string                    | No       | Explicit deduplication key (also accepted via `Idempotency-Key` HTTP header).                                                                                       |
+| `metadata`       | object                    | No       | Arbitrary JSON key-value pairs for custom deployment attributes.                                                                                                    |
 
 ### Sample request payload
 
@@ -142,6 +142,9 @@ Repeated submissions with the same `externalId` or `idempotencyKey` return HTTP 
 
 > [!NOTE]
 > When both `externalId` and `idempotencyKey` are omitted, SiteWatch computes a deterministic fallback idempotency fingerprint bucketed by integration, affected monitor set, release version, environment, commit SHA, and a 1-minute time window. CI/CD pipelines deploying multiple unique releases to identical monitors in under 60 seconds should supply explicit `externalId` or `idempotencyKey` values.
+
+> [!IMPORTANT]
+> `externalId` and `idempotencyKey` deduplication is scoped **per integration**, not per account. Two separate integrations owned by the same account can legitimately use the same `externalId` value (e.g. two CI pipelines both sending run-id `gh-run-123`) without causing duplicate-key errors.
 
 ---
 
@@ -259,10 +262,10 @@ track_deployment:
 
 ## 7. Troubleshooting & FAQ
 
-| Symptom                         | Cause                                                                                | Solution                                                                                               |
-| ------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| **401 Invalid credentials**     | Token typo, revoked integration, or using a read-only general API key (`wm_live_*`). | Use the dedicated deployment integration secret (`dep_live_*`) created via Integrations > Deployments. |
-| **403 Cross-tenant monitor**    | The referenced monitor belongs to a different user account.                          | Verify that all IDs in `monitors` belong to the integration creator's account.                         |
-| **400 Invalid ID format**       | Monitor ID is not a 24-character hexadecimal MongoDB ObjectId.                       | Copy the exact monitor ID from the monitor details URL or API response.                                |
-| **Status: `insufficient_data`** | Less than 3 scheduled health checks occurred in the comparison window.               | Adjust the monitor check interval or wait for scheduled checks to accumulate.                          |
-| **No chart reference lines**    | Selected chart range does not overlap with the deployment timestamp.                 | Select a wider time window (e.g. `24h` or `7d`) on the monitor details page.                           |
+| Symptom                         | Cause                                                                                | Solution                                                                                                                                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **401 Invalid credentials**     | Token typo, revoked integration, or using a read-only general API key (`wm_live_*`). | Use the dedicated deployment integration secret (`dep_live_*`) created via Integrations > Deployments. The prefix is `dep_live_` followed by exactly 12 hexadecimal characters (e.g. `dep_live_a1b2c3d4e5f6`). |
+| **403 Cross-tenant monitor**    | The referenced monitor belongs to a different user account.                          | Verify that all IDs in `monitors` belong to the integration creator's account.                                                                                                                                 |
+| **400 Invalid ID format**       | Monitor ID is not a 24-character hexadecimal MongoDB ObjectId.                       | Copy the exact monitor ID from the monitor details URL or API response.                                                                                                                                        |
+| **Status: `insufficient_data`** | Less than 3 scheduled health checks occurred in the comparison window.               | Adjust the monitor check interval or wait for scheduled checks to accumulate.                                                                                                                                  |
+| **No chart reference lines**    | Selected chart range does not overlap with the deployment timestamp.                 | Select a wider time window (e.g. `24h` or `7d`) on the monitor details page.                                                                                                                                   |

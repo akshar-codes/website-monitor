@@ -15,6 +15,7 @@ import {
 } from "../src/utils/sloFormat.js";
 
 import { FEATURES, planHasFeature } from "../src/constants/features.js";
+import { formatDateTime } from "../src/utils/format.js";
 import * as slosApi from "../src/services/api/slos.js";
 
 // Vite server to load JSX components for testing in SSR environment
@@ -537,23 +538,45 @@ test("SloHistoryChart Component: Renders with snapshots and correlates deploymen
     },
   ];
 
-  const deployments = [
-    {
-      id: "dep-1",
-      version: "v2.5.0",
-      deployedAt: new Date(Date.now() - 1800000).toISOString(),
-    },
-  ];
+  // Deployment within snap distance (30 min ago — within the 1-hour chart)
+  const deploymentInRange = {
+    id: "dep-1",
+    version: "v2.5.0",
+    deployedAt: new Date(Date.now() - 1800000).toISOString(),
+  };
+
+  // Deployment 25 hours ago — outside the chart range entirely
+  const deploymentOutOfRange = {
+    id: "dep-2",
+    version: "v1.0.0",
+    deployedAt: new Date(Date.now() - 25 * 3600000).toISOString(),
+  };
 
   const chartHtml = renderToString(
     React.createElement(SloHistoryChart, {
       snapshots,
       target: 99.9,
-      deployments,
+      deployments: [deploymentInRange, deploymentOutOfRange],
     }),
   );
 
   assert.ok(clean(chartHtml).includes("recharts-responsive-container"));
+  // In-range marker version should appear in rendered output (ReferenceLine label)
+  assert.ok(
+    clean(chartHtml).includes("v2.5.0"),
+    "Release marker within snap distance must appear in chart HTML",
+  );
+  assert.ok(
+    clean(chartHtml).includes(
+      `v2.5.0 deployed at ${formatDateTime(deploymentInRange.deployedAt)}`,
+    ),
+    "Release marker tooltip must expose the exact deployment timestamp",
+  );
+  // Out-of-range marker must be excluded
+  assert.ok(
+    !clean(chartHtml).includes("v1.0.0"),
+    "Release marker outside chart timeline must not appear in chart HTML",
+  );
 });
 
 // ----------------------------------------------------------------------------

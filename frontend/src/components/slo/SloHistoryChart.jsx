@@ -58,7 +58,22 @@ export default function SloHistoryChart({
   const minVal = Math.max(0, Math.min(...allSli, target) - 0.5);
   const maxVal = 100;
 
-  // Map relevant deployments that fall in the timeline
+  // Map relevant deployments that fall in the timeline.
+  // Enforce a maximum snap distance: a deployment will only be pinned to a
+  // snapshot if it is within half the median interval, capped at 30 minutes.
+  // Sparse snapshots therefore cannot pull a release marker arbitrarily far
+  // from its actual deployment time.
+  const medianIntervalMs = (() => {
+    if (chartData.length < 2) return 30 * 60 * 1000;
+    const gaps = [];
+    for (let i = 1; i < chartData.length; i++) {
+      gaps.push(chartData[i].timestamp - chartData[i - 1].timestamp);
+    }
+    gaps.sort((a, b) => a - b);
+    return gaps[Math.floor(gaps.length / 2)];
+  })();
+  const MAX_SNAP_DISTANCE_MS = Math.min(medianIntervalMs / 2, 30 * 60 * 1000);
+
   const relevantDeployments = (deployments || [])
     .filter((dep) => {
       if (!dep.deployedAt || chartData.length === 0) return false;
@@ -81,14 +96,27 @@ export default function SloHistoryChart({
           closestPoint = pt;
         }
       }
+      // Drop markers that are too far from any data point to be meaningful
+      if (minDiff > MAX_SNAP_DISTANCE_MS) return null;
       return {
         ...dep,
         closestDateLabel: closestPoint.dateLabel,
+        actualDeployedAt: dep.deployedAt,
+        snapOffsetMs: minDiff,
       };
-    });
+    })
+    .filter(Boolean);
 
   return (
     <div className="w-full h-72">
+      <ul className="sr-only" aria-label="Deployment release markers">
+        {relevantDeployments.map((dep, idx) => (
+          <li key={dep.id || dep._id || `deployment-marker-${idx}`}>
+            {dep.version} deployed at{" "}
+            {formatDateTime(new Date(dep.actualDeployedAt).getTime())}
+          </li>
+        ))}
+      </ul>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={chartData}
@@ -183,7 +211,10 @@ export default function SloHistoryChart({
                 fontSize: 10,
                 fontWeight: 600,
               }}
-            />
+              ifOverflow="extendDomain"
+            >
+              <title>{`${dep.version} deployed at ${formatDateTime(new Date(dep.actualDeployedAt).getTime())}${dep.snapOffsetMs > 60000 ? ` (~${Math.round(dep.snapOffsetMs / 60000)}m offset from nearest snapshot)` : ""}`}</title>
+            </ReferenceLine>
           ))}
           <Area
             type="monotone"
